@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, Rocket, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Lightbulb, X } from 'lucide-react';
+import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, Rocket, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Lightbulb, Search } from 'lucide-react';
 
 interface PostVersion {
   version: number;
@@ -32,6 +32,7 @@ export default function StudioPage() {
   const [resolvedSource, setResolvedSource] = useState<'calendar' | 'weekly' | 'manual'>('manual');
 
   const [generating, setGenerating] = useState(false);
+  const [webSearchStatus, setWebSearchStatus] = useState<string | null>(null); // null = idle, string = current step label
   const [versions, setVersions] = useState<PostVersion[]>([]);
   const [activeVersion, setActiveVersion] = useState(0);
   const [editedSections, setEditedSections] = useState<Record<string, string>>({});
@@ -130,6 +131,7 @@ export default function StudioPage() {
     resolveToday();
   }, [today, settings, postTypes]);
 
+  // ── Mode A: generate from raw notes ──────────────────────────
   const handleGenerate = async () => {
     if (!selectedPostTypeId) { showToast('Select a post type first.', 'error'); return; }
     if (!rawNotes.trim()) { showToast('Add raw notes before generating.', 'error'); return; }
@@ -155,6 +157,97 @@ export default function StudioPage() {
       showToast(String(e), 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // ── Mode B: web search → then generate ─────────────────────
+  // localStorage cache: same query within 30 min reuses saved results (skips Tavily call)
+  const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+  const CACHE_KEY_PREFIX = 'ws_cache_';
+
+  const getCachedResults = (query: string) => {
+    try {
+      const key = CACHE_KEY_PREFIX + query.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 80);
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const entry = JSON.parse(raw) as { resultsText: string; resultCount: number; savedAt: number };
+      if (Date.now() - entry.savedAt > CACHE_TTL_MS) { localStorage.removeItem(key); return null; }
+      return entry;
+    } catch { return null; }
+  };
+
+  const saveCachedResults = (query: string, resultsText: string, resultCount: number) => {
+    try {
+      const key = CACHE_KEY_PREFIX + query.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 80);
+      localStorage.setItem(key, JSON.stringify({ resultsText, resultCount, savedAt: Date.now() }));
+    } catch { /* ignore quota errors */ }
+  };
+
+  const handleWebSearchGenerate = async () => {
+    if (!selectedPostTypeId) { showToast('Select a pillar first.', 'error'); return; }
+    if (!rawNotes.trim()) { showToast('Enter a topic in Raw Notes to search for.', 'error'); return; }
+
+    setGenerating(true);
+    setVersions([]);
+    setRepeatWarning(null);
+    setPostId(null);
+
+    try {
+      // ── Step 1: check localStorage cache first ──────────────
+      let resultsText: string;
+      let resultCount: number;
+
+      const cached = getCachedResults(rawNotes);
+      if (cached) {
+        // Reuse saved results — skip Tavily call entirely
+        resultsText = cached.resultsText;
+        resultCount = cached.resultCount;
+        setWebSearchStatus(`⚡ Using cached results (${resultCount} sources) — generating post…`);
+        showToast(`Using saved search results — no API call needed.`, 'success');
+      } else {
+        // Fresh Tavily search
+        setWebSearchStatus('🔍 Searching the web…');
+        const searchRes = await fetch('/api/web-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: rawNotes.trim() }),
+        });
+        const searchData = await searchRes.json();
+        if (!searchRes.ok) { showToast(searchData.error ?? 'Web search failed.', 'error'); return; }
+
+        resultsText = searchData.resultsText;
+        resultCount = searchData.resultCount;
+
+        // Save to localStorage for 30 minutes
+        saveCachedResults(rawNotes, resultsText, resultCount);
+        setWebSearchStatus(`✅ Found ${resultCount} sources — generating post…`);
+      }
+
+      // ── Step 2: generate post with web results ──────────────
+      const genRes = await fetch('/api/generate-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawNotes,
+          postTypeId: selectedPostTypeId,
+          date: today,
+          webResults: resultsText,
+        }),
+      });
+      const data = await genRes.json();
+      if (!genRes.ok) { showToast(data.error ?? 'Generation failed.', 'error'); return; }
+
+      setVersions(data.versions);
+      setActiveVersion(0);
+      setEditedSections(data.versions[0].sections);
+      setPostId(data.postId);
+      setPostStatus('draft');
+      if (data.repeatWarning) setRepeatWarning(data.repeatWarning);
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      setGenerating(false);
+      setWebSearchStatus(null);
     }
   };
 
@@ -253,11 +346,11 @@ export default function StudioPage() {
   const hasOutput = versions.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {ToastEl}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 border-b px-6 py-4"
+      <div className="flex-shrink-0 border-b px-6 py-4 sticky top-0 z-10"
         style={{ background: 'rgba(10,10,15,0.9)', borderColor: 'var(--border)', backdropFilter: 'blur(8px)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -281,9 +374,11 @@ export default function StudioPage() {
         </div>
       </div>
 
-      <div className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Left: Input panel */}
-        <div className="flex flex-col gap-4">
+      {/* Body — fixed height, two scrollable columns */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-2 gap-0 overflow-hidden">
+
+        {/* Left: Input panel — scrollable */}
+        <div className="flex flex-col gap-4 overflow-y-auto p-6 border-r" style={{ borderColor: 'var(--border)' }}>
           
           {/* Calendar context banner */}
           {calendarEntry && (
@@ -440,7 +535,7 @@ export default function StudioPage() {
                   value={rawNotes}
                   onChange={e => setRawNotes(e.target.value)}
                   placeholder="Type or paste everything you built, learned, or studied today here. Articles, code snippets, bug stories, or frameworks — all in this one box."
-                  rows={12}
+                  rows={9}
                   className="w-full flex-1 px-4 py-3 rounded-xl border resize-none text-sm leading-relaxed transition-colors focus:outline-none"
                   style={{
                     background: 'var(--bg-elevated)',
@@ -476,26 +571,60 @@ export default function StudioPage() {
             </div>
           )}
 
-          {/* Generate button */}
-          <button
-            onClick={handleGenerate}
-            disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-            className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
-              color: 'white',
-              boxShadow: generating ? 'none' : '0 4px 20px var(--accent-glow)',
-            }}>
-            {generating ? (
-              <><Loader2 size={16} className="spinner" /> Generating with Gemini…</>
-            ) : (
-              <><Zap size={16} /> Generate Post (3 Versions)</>
-            )}
-          </button>
+          {/* Web search status badge */}
+          {webSearchStatus && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs animate-fade-in"
+              style={{ background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.25)', color: 'var(--text-secondary)' }}>
+              <Loader2 size={12} className="spinner flex-shrink-0" style={{ color: 'var(--accent)' }} />
+              {webSearchStatus}
+            </div>
+          )}
+
+          {/* Generate buttons — two explicit modes */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Mode A: from notes */}
+            <button
+              id="btn-generate-notes"
+              onClick={handleGenerate}
+              disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
+              className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
+                color: 'white',
+                boxShadow: generating ? 'none' : '0 4px 20px var(--accent-glow)',
+              }}>
+              {generating && !webSearchStatus ? (
+                <><Loader2 size={14} className="spinner" /> Generating…</>
+              ) : (
+                <><Zap size={14} /> From Notes</>
+              )}
+            </button>
+
+            {/* Mode B: web search first, then generate */}
+            <button
+              id="btn-generate-websearch"
+              onClick={handleWebSearchGenerate}
+              disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
+              className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: generating && webSearchStatus
+                  ? 'rgba(20,184,166,0.2)'
+                  : 'linear-gradient(135deg, #0f766e, #14b8a6)',
+                color: 'white',
+                boxShadow: generating ? 'none' : '0 4px 16px rgba(20,184,166,0.3)',
+                border: '1px solid rgba(20,184,166,0.4)',
+              }}>
+              {generating && webSearchStatus ? (
+                <><Loader2 size={14} className="spinner" /> Searching…</>
+              ) : (
+                <><Search size={14} /> Web Search</>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Right: Output panel */}
-        <div className="flex flex-col gap-4">
+        {/* Right: Output panel — scrollable */}
+        <div className="flex flex-col gap-4 overflow-y-auto p-6">
           {!hasOutput && !generating && (
             <div className="flex-1 flex flex-col items-center justify-center rounded-xl border border-dashed py-20"
               style={{ borderColor: 'var(--border)' }}>
@@ -509,8 +638,12 @@ export default function StudioPage() {
             <div className="flex-1 flex flex-col items-center justify-center rounded-xl border py-20"
               style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
               <Loader2 size={32} className="spinner" style={{ color: 'var(--accent)' }} />
-              <p className="text-sm mt-4" style={{ color: 'var(--text-secondary)' }}>Generating 3 versions…</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Gemini is writing your post</p>
+              <p className="text-sm mt-4" style={{ color: 'var(--text-secondary)' }}>
+                {webSearchStatus ?? 'Generating 3 versions…'}
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                {webSearchStatus ? 'Tavily → Gemini pipeline running' : 'Gemini is writing your post'}
+              </p>
             </div>
           )}
 
@@ -534,7 +667,7 @@ export default function StudioPage() {
               </div>
 
               {/* Sections */}
-              <div className="flex flex-col gap-3 flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+              <div className="flex flex-col gap-3" style={{ minHeight: 0 }}>
                 {activeAnatomy.map(section => {
                   const content = editedSections[section.section_name] ?? '';
                   const isRegen = regeneratingSection === section.section_name;

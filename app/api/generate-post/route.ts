@@ -67,13 +67,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If regenerating a single section
+    // ── Single-section regeneration (early return) ─────────────────
     if (sectionId) {
       const section = anatomySections.find(s => s.id === sectionId);
       if (!section) return NextResponse.json({ error: 'Section not found.' }, { status: 404 });
-      const sectionContent = await generateSingleSection(rawNotes, postType, tone, section, dos, donts);
+      const sectionContent = await generateSingleSection(rawNotes, postType, tone, section, dos, donts, coreFocus);
       return NextResponse.json({ sectionContent, repeatWarning });
     }
+
+    // ── Determine generation mode ─────────────────────────────────
+    // Mode A: generate from raw notes (default, always present)
+    // Mode B: research & generate via web search results (future / optional)
+    const webResults: string | undefined = body.webResults;
+    const mode: 'A' | 'B' = webResults?.trim() ? 'B' : 'A';
 
     // Build the prompt for 3 versions
     const apiKey = process.env.GEMINI_API_KEY;
@@ -87,39 +93,110 @@ export async function POST(req: NextRequest) {
       `${i + 1}. **${s.section_name}**: ${s.rule_description}`
     ).join('\n');
 
-    const prompt = `You are an expert LinkedIn content strategist. Generate 3 distinct, high-quality versions of a LinkedIn post.
+    // ── Shared context block ───────────────────────────────────────
+    const sharedContext = `
+ACTIVE MODE: ${mode === 'A' ? 'A — Generate from Notes' : 'B — Research & Generate via Web Search'}
+TODAY'S PILLAR: ${postType.name}
 
-**POST TYPE: ${postType.name}**
+PILLAR DEFINITIONS (internalize these before writing):
+- Value/Educational = explains a concept generically, no specific project name attached, teaches "how something works."
+- Lead Magnet = a ready-to-use resource (checklist, cheat sheet, comparison table, framework) — save-worthy, list-format, not narrative.
+- Showcase/Authority = "Problem → Decision → Result" — real code/architecture from MY project, proof of execution.
+- Personal = my raw struggle/confusion/realization — no polish, no teaching, just a relatable human moment.
 
-**CORE FOCUS — the fundamental purpose of this post type (internalize this before writing):**
-${coreFocus || "No core focus defined — rely on DOs/DON'Ts as your primary guide."}
+ACTIVE PILLAR'S CORE FOCUS:
+${coreFocus || "No core focus defined — rely entirely on DOs/DON'Ts below as your primary guide."}
 
-DOs:
-${dos.map((d: string) => `- ${d}`).join('\n')}
-DON'Ts:
-${donts.map((d: string) => `- ✗ ${d}`).join('\n')}
+ACTIVE PILLAR'S DOs:
+${dos.map((d: string) => `✓ ${d}`).join('\n')}
 
-**TONE & VOICE**
+ACTIVE PILLAR'S DON'Ts:
+${donts.map((d: string) => `✗ ${d}`).join('\n')}
+
+ACTIVE POST ANATOMY (output every section in this exact order for EVERY version):
+${anatomyPrompt}
+
+TONE & VOICE PROFILE:
 - Formality: ${tone.formality}
 - Sentence length: ${tone.sentenceLength}
 - Language mix: ${tone.languageMix || 'Professional English'}
 - NEVER use these phrases: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
 
-**POST ANATOMY (follow this structure for EVERY version)**
-${anatomyPrompt}
+LANGUAGE RULE: Write in clear English. Roman Urdu/Hindi mixing is only acceptable for Personal-pillar posts, or as very short quoted colloquial hook fragments elsewhere — never the majority of any section or title.
+`.trim();
 
-**RAW NOTES / TODAY'S CONTENT**
+    // ── Mode-specific instruction block ───────────────────────────
+    const modeInstructions = mode === 'A'
+      ? `
+## MODE A — Generate from Notes
+
+RAW NOTES / TODAY'S INPUT:
 ${rawNotes}
 
-**INSTRUCTIONS**
-Generate exactly 3 versions. Each version must:
-- Follow the anatomy structure above, section by section
-- Be genuinely distinct (different angle, opening, or framing — not just rephrased)
-- Respect all DOs and avoid all DON'Ts
-- Never include placeholder text or meta-commentary
-- Be ready to copy-paste to LinkedIn
+### Step 1 — Intent Analysis (run this mentally before writing)
 
-**OUTPUT FORMAT** — respond with ONLY valid JSON, no markdown fences:
+Classify the input above as one of two types:
+
+**Detailed input** — the notes contain specific technical detail, a narrative, a real event, code, or a described problem/solution.
+→ Use this content directly as the backbone of the post; your job is mainly structuring it into the active anatomy, not inventing new substance.
+
+**Thin/keyword input** — the notes are just a topic name or a short phrase (e.g. "pgvector indexing", "LangGraph multi-agent orchestration", a couple of words with no real detail).
+→ Do NOT shallow-match — do not simply drop the keyword into a generic template sentence. Instead:
+  1. Ask: what would a substantive post in this pillar actually need to say about this topic?
+  2. Draw on foundational knowledge of the topic (how it works, what problem it solves, common patterns) to write real substance — not vague filler.
+  3. Match depth to the pillar:
+     - Value → explain the core mechanism properly
+     - Lead Magnet → produce an actual usable checklist/framework about this topic
+     - Personal → reflect honestly on the experience of learning or using it
+  4. EXCEPTION — Showcase/Authority pillar: this pillar requires real proof from the user's own project. If the input is too thin to contain real project detail, do NOT fabricate specifics. Instead, generate the post with clearly marked placeholders (e.g. [describe what broke / what you built]) and leave a note asking the user to fill in the real detail before publishing.
+
+### Step 2 — Write the post
+
+Using the anatomy sections above, tone profile, pillar DOs/DON'Ts, and your Step 1 analysis, write all 3 versions. Every section must reflect what the intent analysis established — never let a thin input result in generic, could-apply-to-anyone content.
+`.trim()
+      : `
+## MODE B — Research & Generate via Web Search
+
+TOPIC: ${rawNotes}
+
+WEB SEARCH RESULTS (provided via Tavily):
+${webResults}
+
+### Step 1 — Read and evaluate the sources
+
+Review all provided search results. Identify:
+- 2-4 concrete, specific facts, best practices, or recent developments actually relevant to the topic and pillar (not generic background everyone already knows).
+- Whether the sources agree or conflict. If they conflict, note the disagreement briefly, or default to the most recent/authoritative-looking source.
+- Whether the sources are thin or off-topic. If the search results don't contain enough substance to write a grounded post, say so explicitly instead of inventing facts to compensate.
+
+### Step 2 — Synthesize, never copy
+
+- NEVER reproduce sentences from the source material verbatim or near-verbatim. Paraphrase every fact fully in your own words.
+- Do not string together lightly-reworded source sentences — genuinely re-explain ideas as if teaching them from understanding, not summarizing text.
+- Add the user's own angle: tie the researched fact back to their actual work/project where natural (e.g. "this is exactly the tradeoff I hit when building X"), since the goal is authentic building-in-public content, not a news recap.
+- If a specific source is unusually important to a claim (e.g. official docs change, benchmark number), you may reference it narratively (e.g. "the official docs now recommend...") without directly quoting it.
+
+### Step 3 — Write the post
+
+Use the active anatomy, tone profile, and pillar DOs/DON'Ts. The substance now comes from verified, current web research — the post should read as informed and current.
+`.trim();
+
+    // ── Full assembled prompt ──────────────────────────────────────
+    const prompt = `You are an expert LinkedIn content strategist writing on behalf of an AI Engineer (Software Engineering student, class of 2027) who builds LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. They share their authentic learning and building journey on LinkedIn.
+
+${sharedContext}
+
+---
+
+${modeInstructions}
+
+---
+
+## Output Format
+
+Return exactly 3 versions. For each version, output every section defined in the active Post Anatomy above (in order), plus a Visual suggestion.
+
+Respond with ONLY valid JSON — no markdown fences, no commentary before or after:
 {
   "versions": [
     {
@@ -127,12 +204,18 @@ Generate exactly 3 versions. Each version must:
       "sections": {
         "${anatomySections.map(s => s.section_name).join('": "...",\n        "')}: "..."
       },
-      "visualSuggestion": "Specific, concrete visual recommendation for this post"
+      "visualSuggestion": "Specific, concrete one-line description of the image/graphic to pair with this version"
     },
     { "version": 2, "sections": { ... }, "visualSuggestion": "..." },
     { "version": 3, "sections": { ... }, "visualSuggestion": "..." }
   ]
-}`;
+}
+
+CRITICAL RULES:
+- Each version must be genuinely distinct (different angle, opening hook, or framing — not just rephrased).
+- Never include placeholder text or meta-commentary unless the Showcase/Authority pillar exception applies (thin input with no real project detail).
+- Every section listed in the anatomy must appear in every version.
+- The post must be ready to copy-paste to LinkedIn as-is.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
@@ -141,7 +224,7 @@ Generate exactly 3 versions. Each version must:
     const jsonText = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
     const parsed = JSON.parse(jsonText);
 
-    // Auto-extract topic summary from raw notes (first 200 chars of distilled keywords)
+    // Auto-extract topic summary from raw notes (first 200 chars)
     const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim();
 
     // Persist post to DB
@@ -165,29 +248,39 @@ async function generateSingleSection(
   tone: { formality: string; sentenceLength: string; bannedPhrases: string[]; languageMix: string },
   section: Record<string, unknown>,
   dos: string[],
-  donts: string[]
+  donts: string[],
+  coreFocus: string
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured.');
   const genAI = new GoogleGenerativeAI(apiKey);
   const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const model = genAI.getGenerativeModel({ model: modelName });
-  const prompt = `You are an expert LinkedIn content strategist. Rewrite ONLY the "${section.section_name}" section of a LinkedIn post.
 
-**Section Rule:** ${section.rule_description}
+  const prompt = `You are an expert LinkedIn content strategist. Rewrite ONLY the "${section.section_name}" section of a LinkedIn post for an AI Engineer building in public.
 
-**Post Type:** ${postType.name}
-**Core Focus:** ${(postType.core_focus as string | null) || "See DOs/DON'Ts below"}
-DOs: ${dos.join(', ')}
-DON'Ts: ${donts.join(', ')}
+SECTION RULE: ${section.rule_description}
 
-**Tone:** ${tone.formality}, ${tone.sentenceLength} sentences, ${tone.languageMix || 'English'}
-Do NOT use: ${tone.bannedPhrases.join(', ') || 'none'}
+PILLAR: ${postType.name}
+CORE FOCUS: ${coreFocus || "Rely on DOs/DON'Ts below as your primary guide."}
 
-**Original raw notes:**
+DOs:
+${dos.map((d: string) => `✓ ${d}`).join('\n')}
+
+DON'Ts:
+${donts.map((d: string) => `✗ ${d}`).join('\n')}
+
+TONE: ${tone.formality} formality, ${tone.sentenceLength} sentences, ${tone.languageMix || 'Professional English'}.
+NEVER use: ${tone.bannedPhrases.join(', ') || 'none'}
+LANGUAGE RULE: Write in clear English. Roman Urdu/Hindi is only acceptable for Personal-pillar posts.
+
+RAW NOTES:
 ${rawNotes}
 
+INSTRUCTION: Apply intent analysis first — if the notes are detailed, use them directly. If they are thin/keyword-only, draw on foundational knowledge to write real, substantive content rather than generic filler. Showcase/Authority pillar exception: if notes are too thin to contain real project detail, use [placeholder] markers instead of fabricating specifics.
+
 Respond with ONLY the section content text. No labels, no quotes, no extra formatting.`;
+
   const result = await model.generateContent(prompt);
   return result.response.text().trim();
 }
