@@ -152,6 +152,11 @@ function initSchema(db: Database.Database) {
   if (!reviewColumns.includes('apply_mode')) {
     db.exec("ALTER TABLE extraction_review ADD COLUMN apply_mode TEXT DEFAULT 'merge'");
   }
+
+  // Runtime migration — add suggested_order_index column to extraction_review for smart anatomy ordering
+  if (!reviewColumns.includes('suggested_order_index')) {
+    db.exec("ALTER TABLE extraction_review ADD COLUMN suggested_order_index INTEGER DEFAULT NULL");
+  }
 }
 
 function seedIfEmpty(db: Database.Database) {

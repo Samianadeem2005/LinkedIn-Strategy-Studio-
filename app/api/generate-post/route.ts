@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callWithGeminiFallback } from '@/lib/gemini';
 
 export async function POST(req: NextRequest) {
   try {
@@ -237,11 +238,14 @@ CRITICAL RULES:
 - Every section listed in the anatomy must appear in every version.
 - The post must be ready to copy-paste to LinkedIn as-is.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const jsonText = await callWithGeminiFallback(async (genAI) => {
+      const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+      return text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+    });
 
-    // Strip markdown code fences if present
-    const jsonText = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
     const parsed = JSON.parse(jsonText);
 
     // Auto-extract topic summary from raw notes (first 200 chars)

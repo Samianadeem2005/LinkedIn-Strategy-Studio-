@@ -14,6 +14,7 @@ interface ReviewItem {
   target_row_name?: string | null;
   current_text?: string | null;
   apply_mode?: 'merge' | 'replace';
+  suggested_order_index?: number | null;
   user_decision: 'keep' | 'discard' | 'pending' | 'apply_update' | 'keep_previous';
 }
 
@@ -327,13 +328,21 @@ export default function IngestPage() {
                           }}
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
                               <span
                                 className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md"
                                 style={{ background: badge.bg, color: badge.color }}
                               >
                                 {badge.label}
                               </span>
+                              {item.target_table === 'post_anatomy' && item.suggested_order_index != null && (
+                                <span
+                                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                                  style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' }}
+                                >
+                                  Sequence Position: #{item.suggested_order_index}
+                                </span>
+                              )}
                               <span className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
                                 {item.heading}
                               </span>

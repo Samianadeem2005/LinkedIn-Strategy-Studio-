@@ -437,7 +437,10 @@ export default function SettingsPage() {
     const items = Array.from(anatomy);
     const [moved] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, moved);
-    const reordered = items.map((item, i) => ({ id: item.id, order_index: i }));
+
+    // 1-based sequential order index (1, 2, 3, 4...)
+    const reordered = items.map((item, i) => ({ id: item.id, order_index: i + 1 }));
+
     await fetch('/api/anatomy', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

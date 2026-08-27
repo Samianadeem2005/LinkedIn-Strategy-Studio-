@@ -63,6 +63,7 @@ export async function GET(
         is_new_category: Number(row.is_new_category),
         apply_mode: (row.apply_mode as string) || 'merge',
         user_decision: decision,
+        suggested_order_index: row.suggested_order_index != null ? Number(row.suggested_order_index) : null,
         target_row_name: targetRowId ? (nameMap[targetRowId] ?? 'Existing Rule') : null,
         current_text: (!isNew && targetRowId) ? (currentTextMap[targetRowId] ?? 'Current rule value not found.') : null
       };

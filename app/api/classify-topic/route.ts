@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callWithGeminiFallback } from '@/lib/gemini';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { rawTopic, recentTypes } = body as {
       rawTopic: string;
-      recentTypes?: string[]; // names of recently used post types (for mix awareness)
+      recentTypes?: string[];
     };
 
     if (!rawTopic?.trim()) {
       return NextResponse.json({ error: 'rawTopic is required.' }, { status: 400 });
     }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY not configured.' }, { status: 500 });
 
     const db = getDb();
     const postTypes = db.prepare('SELECT * FROM post_types').all() as {
@@ -26,7 +23,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No post types defined in Settings.' }, { status: 400 });
     }
 
-    // Build pillar definitions block for the prompt
     const pillarDefs = postTypes.map(pt => {
       const dos: string[] = JSON.parse(pt.dos || '[]');
       const donts: string[] = JSON.parse(pt.donts || '[]');
@@ -75,19 +71,18 @@ ${recentContext}
 **AVAILABLE POST TYPE IDs:**
 ${postTypes.map(pt => `- id: "${pt.id}", name: "${pt.name}"`).join('\n')}`;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const jsonText = await callWithGeminiFallback(async (genAI) => {
+      const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+      return text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+    });
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-    const jsonText = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
     const parsed = JSON.parse(jsonText);
 
-    // Validate the returned id exists in our DB
     const match = postTypes.find(pt => pt.id === parsed.recommended_type_id);
     if (!match) {
-      // Fallback: match by name
       const nameMatch = postTypes.find(pt =>
         pt.name.toLowerCase() === (parsed.recommended_type_name ?? '').toLowerCase()
       );

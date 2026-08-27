@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callWithGeminiFallback } from '@/lib/gemini';
 
-async function mergeRulesWithAI(beforeText: string, afterText: string, apiKey: string): Promise<string> {
+async function mergeRulesWithAI(beforeText: string, afterText: string): Promise<string> {
   if (!beforeText || beforeText.trim() === 'No current rule set.') return afterText;
   if (!afterText) return beforeText;
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-    const model = genAI.getGenerativeModel({ model: modelName });
+    return await callWithGeminiFallback(async (genAI) => {
+      const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+      const model = genAI.getGenerativeModel({ model: modelName });
 
-    const prompt = `You are a LinkedIn Content Strategy Editor. Combine these two content directives into ONE clean, non-repetitive, concise, high-impact rule directive. Eliminate duplicate wording and resolve any minor contradictions.
+      const prompt = `You are a LinkedIn Content Strategy Editor. Combine these two content directives into ONE clean, non-repetitive, concise, high-impact rule directive. Eliminate duplicate wording and resolve any minor contradictions.
 
 EXISTING RULE (BEFORE):
 ${beforeText}
@@ -22,8 +22,9 @@ ${afterText}
 
 Output ONLY the final merged directive string. No intro, no quotes, no markdown wrappers.`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+      const result = await model.generateContent(prompt);
+      return result.response.text().trim();
+    });
   } catch (e) {
     console.error('Failed to merge rules with AI, falling back to merge concatenation:', e);
     return `${beforeText} | ${afterText}`;
@@ -37,15 +38,12 @@ export async function POST(
   try {
     const { id } = await params;
     const db = getDb();
-    const apiKey = process.env.GEMINI_API_KEY;
 
     const dump = db.prepare('SELECT * FROM knowledge_dumps WHERE id = ?').get(id);
     if (!dump) {
       return NextResponse.json({ error: 'Knowledge dump not found.' }, { status: 404 });
     }
 
-    // Retrieve items marked for insertion (is_new_category = 1 & user_decision = 'keep')
-    // OR marked for updating (is_new_category = 0 & user_decision = 'apply_update')
     const confirmItems = db.prepare(`
       SELECT * FROM extraction_review 
       WHERE dump_id = ? 
@@ -69,6 +67,7 @@ export async function POST(
       const heading = item.heading as string;
       const pointText = item.point_text as string;
       const applyMode = (item.apply_mode as string) || 'merge';
+      const suggestedOrderIndex = item.suggested_order_index != null ? Number(item.suggested_order_index) : null;
 
       if (targetTable === 'writing_mechanics') {
         if (isNew || !targetRowId) {
@@ -83,8 +82,8 @@ export async function POST(
           const beforeText = existingRow?.prompt_directive || existingRow?.description || '';
 
           let finalText = pointText;
-          if (applyMode === 'merge' && apiKey) {
-            finalText = await mergeRulesWithAI(beforeText, pointText, apiKey);
+          if (applyMode === 'merge') {
+            finalText = await mergeRulesWithAI(beforeText, pointText);
           }
 
           db.prepare(`
@@ -105,8 +104,8 @@ export async function POST(
           const beforeText = existingRow?.hook_text || '';
 
           let finalText = pointText;
-          if (applyMode === 'merge' && apiKey) {
-            finalText = await mergeRulesWithAI(beforeText, pointText, apiKey);
+          if (applyMode === 'merge') {
+            finalText = await mergeRulesWithAI(beforeText, pointText);
           }
 
           db.prepare('UPDATE hook_bank SET hook_text = ? WHERE id = ?').run(finalText, targetRowId);
@@ -114,19 +113,34 @@ export async function POST(
         hooksCount++;
       } else if (targetTable === 'post_anatomy') {
         if (isNew || !targetRowId) {
-          const maxOrderObj = db.prepare('SELECT MAX(order_index) as m FROM post_anatomy').get() as { m: number | null };
-          const maxOrder = (maxOrderObj?.m ?? -1) + 1;
+          let targetOrder = 1;
+
+          if (suggestedOrderIndex != null && suggestedOrderIndex > 0) {
+            targetOrder = suggestedOrderIndex;
+            // Shift existing anatomy sections with order_index >= targetOrder up by 1
+            db.prepare('UPDATE post_anatomy SET order_index = order_index + 1 WHERE order_index >= ?').run(targetOrder);
+          } else {
+            const maxOrderObj = db.prepare('SELECT MAX(order_index) as m FROM post_anatomy').get() as { m: number | null };
+            targetOrder = (maxOrderObj?.m ?? 0) + 1;
+          }
+
           db.prepare(`
             INSERT INTO post_anatomy (id, section_name, rule_description, order_index, applies_to_post_type_id)
             VALUES (?, ?, ?, ?, NULL)
-          `).run(uuidv4(), heading, pointText, maxOrder);
+          `).run(uuidv4(), heading, pointText, targetOrder);
+
+          // Clean re-index post_anatomy rows sequentially (1, 2, 3...)
+          const allAnatomy = db.prepare('SELECT id FROM post_anatomy ORDER BY order_index ASC, rowid ASC').all() as { id: string }[];
+          allAnatomy.forEach((a, idx) => {
+            db.prepare('UPDATE post_anatomy SET order_index = ? WHERE id = ?').run(idx + 1, a.id);
+          });
         } else {
           const existingRow = db.prepare('SELECT rule_description FROM post_anatomy WHERE id = ?').get(targetRowId) as { rule_description: string } | undefined;
           const beforeText = existingRow?.rule_description || '';
 
           let finalText = pointText;
-          if (applyMode === 'merge' && apiKey) {
-            finalText = await mergeRulesWithAI(beforeText, pointText, apiKey);
+          if (applyMode === 'merge') {
+            finalText = await mergeRulesWithAI(beforeText, pointText);
           }
 
           db.prepare('UPDATE post_anatomy SET rule_description = ? WHERE id = ?').run(finalText, targetRowId);
@@ -148,8 +162,8 @@ export async function POST(
             const beforeCoreFocus = (existingPt.core_focus as string) || '';
             let finalCoreFocus = pointText;
 
-            if (applyMode === 'merge' && apiKey) {
-              finalCoreFocus = await mergeRulesWithAI(beforeCoreFocus, pointText, apiKey);
+            if (applyMode === 'merge') {
+              finalCoreFocus = await mergeRulesWithAI(beforeCoreFocus, pointText);
             }
 
             const currentDos = JSON.parse((existingPt.dos as string) || '[]') as string[];
@@ -170,7 +184,6 @@ export async function POST(
     // Mark dump status as saved
     db.prepare("UPDATE knowledge_dumps SET status = 'saved' WHERE id = ?").run(id);
 
-    // Build human-readable summary
     const summaryParts: string[] = [];
     if (pillarsCount > 0) summaryParts.push(`${pillarsCount} Post Pillar${pillarsCount > 1 ? 's' : ''}`);
     if (anatomyCount > 0) summaryParts.push(`${anatomyCount} Anatomy Section${anatomyCount > 1 ? 's' : ''}`);

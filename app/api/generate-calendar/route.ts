@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callWithGeminiFallback } from '@/lib/gemini';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(req: NextRequest) {
@@ -177,9 +178,14 @@ ${rawDump}
 
 Generate exactly ${durationDays} entries. Capstone day is Day ${capstoneDayIndex === -1 ? durationDays : capstoneDayIndex}.`;
 
-    const result = await model.generateContent(calendarPrompt);
-    const text = result.response.text().trim();
-    const jsonText = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+    const jsonText = await callWithGeminiFallback(async (genAI) => {
+      const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(calendarPrompt);
+      const text = result.response.text().trim();
+      return text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+    });
+
     const parsed = JSON.parse(jsonText);
 
     const validationWarnings: string[] = [...(parsed.validation?.warnings ?? [])];
