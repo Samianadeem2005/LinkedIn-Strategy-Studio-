@@ -1,14 +1,23 @@
-﻿'use client';
+'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useApp, PostType, AnatomySection } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import TagInput from '@/components/TagInput';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Settings, Plus, Pencil, Trash2, GripVertical, ChevronDown, Save, Loader2 } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, GripVertical, ChevronDown, Save, Loader2, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
 
-// â”€â”€â”€ Post Type Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export interface WritingMechanic {
+  id: string;
+  rule_name: string;
+  description: string;
+  prompt_directive: string;
+  enabled: number;
+  order_index: number;
+}
+
+// ── Post Type Modal ────────────────────────────────────────────────────────
 function PostTypeModal({ existing, onClose, onSaved }: {
   existing?: PostType;
   onClose: () => void;
@@ -28,9 +37,9 @@ function PostTypeModal({ existing, onClose, onSaved }: {
   const validate = (): boolean => {
     let ok = true;
     if (!name.trim()) { setNameError('Name is required.'); ok = false; } else setNameError('');
-    if (!coreFocus.trim()) { setCoreFocusError('Core Focus is mandatory â€” describe what this post type is for.'); ok = false; } else setCoreFocusError('');
-    if (dos.length === 0) { setDosError('DOs are mandatory â€” add at least one item.'); ok = false; } else setDosError('');
-    if (donts.length === 0) { setDontsError("DON'Ts are mandatory â€” add at least one item."); ok = false; } else setDontsError('');
+    if (!coreFocus.trim()) { setCoreFocusError('Core Focus is mandatory - describe what this post type is for.'); ok = false; } else setCoreFocusError('');
+    if (dos.length === 0) { setDosError('DOs are mandatory - add at least one item.'); ok = false; } else setDosError('');
+    if (donts.length === 0) { setDontsError("DON'Ts are mandatory - add at least one item."); ok = false; } else setDontsError('');
     return ok;
   };
 
@@ -77,19 +86,18 @@ function PostTypeModal({ existing, onClose, onSaved }: {
           {nameError && <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>{nameError}</p>}
         </div>
 
-        {/* Core Focus â€” the key new field */}
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
             Core Focus
-            <span className="ml-1 font-normal" style={{ color: 'var(--text-muted)' }}>â€” what is this post type fundamentally for?</span>
+            <span className="ml-1 font-normal" style={{ color: 'var(--text-muted)' }}>- what is this post type fundamentally for?</span>
           </label>
           <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
-            This is the first thing Gemini reads. Describe the purpose, the reader outcome, and the strategic intent â€” not just rules.
+            This is the first thing Gemini reads. Describe the purpose, the reader outcome, and the strategic intent - not just rules.
           </p>
           <textarea
             value={coreFocus}
             onChange={e => setCoreFocus(e.target.value)}
-            placeholder={`e.g. Educate the audience on one specific concept. The reader should finish knowing something actionable they didn't before. Pure knowledge transfer â€” no selling, no storytelling detour.`}
+            placeholder={`e.g. Educate the audience on one specific concept. The reader should finish knowing something actionable they didn't before. Pure knowledge transfer - no selling, no storytelling detour.`}
             rows={4}
             className="w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none resize-none"
             style={{ background: 'var(--bg-primary)', borderColor: coreFocusError ? 'var(--danger)' : 'var(--border)', color: 'var(--text-primary)' }}
@@ -100,7 +108,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
         </div>
 
         <TagInput
-          label="DOs â€” what this post type should always do"
+          label="DOs - what this post type should always do"
           tags={dos}
           onChange={setDos}
           placeholder="Type a rule and press Enter"
@@ -109,7 +117,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
         />
 
         <TagInput
-          label="DON'Ts â€” what this post type must never do"
+          label="DON'Ts - what this post type must never do"
           tags={donts}
           onChange={setDonts}
           placeholder="Type a rule and press Enter"
@@ -123,7 +131,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
           <button onClick={save} disabled={saving}
             className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
             style={{ background: 'var(--accent)', color: 'white' }}>
-            {saving ? <><Loader2 size={14} className="spinner" /> Savingâ€¦</> : <><Save size={14} /> Save Post Type</>}
+            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Post Type</>}
           </button>
         </div>
       </div>
@@ -131,7 +139,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
   );
 }
 
-// â”€â”€â”€ Anatomy Section Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Anatomy Section Modal ──────────────────────────────────────────────────
 function AnatomyModal({ existing, maxOrder, onClose, onSaved }: {
   existing?: AnatomySection;
   maxOrder: number;
@@ -184,7 +192,7 @@ function AnatomyModal({ existing, maxOrder, onClose, onSaved }: {
         <div>
           <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Generator Rule / Instructions</label>
           <textarea value={ruleDescription} onChange={e => setRuleDescription(e.target.value)}
-            placeholder="Tell the AI exactly what to write in this sectionâ€¦"
+            placeholder="Tell the AI exactly what to write in this section..."
             rows={4}
             className="w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none resize-none"
             style={{ background: 'var(--bg-primary)', borderColor: ruleError ? 'var(--danger)' : 'var(--border)', color: 'var(--text-primary)' }} />
@@ -196,7 +204,7 @@ function AnatomyModal({ existing, maxOrder, onClose, onSaved }: {
           <button onClick={save} disabled={saving}
             className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
             style={{ background: 'var(--accent)', color: 'white' }}>
-            {saving ? <><Loader2 size={14} className="spinner" /> Savingâ€¦</> : <><Save size={14} /> Save Section</>}
+            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Section</>}
           </button>
         </div>
       </div>
@@ -204,14 +212,133 @@ function AnatomyModal({ existing, maxOrder, onClose, onSaved }: {
   );
 }
 
-// â”€â”€â”€ Main Settings Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Writing Mechanics Modal ────────────────────────────────────────────────
+function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
+  existing?: WritingMechanic;
+  maxOrder: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { show: showToast, ToastEl } = useToast();
+  const [ruleName, setRuleName] = useState(existing?.rule_name ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
+  const [promptDirective, setPromptDirective] = useState(existing?.prompt_directive ?? '');
+  const [enabled, setEnabled] = useState<boolean>(existing ? existing.enabled === 1 : true);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!ruleName.trim() || !description.trim() || !promptDirective.trim()) {
+      showToast('All fields are required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const url = existing ? `/api/writing-mechanics/${existing.id}` : '/api/writing-mechanics';
+      const method = existing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rule_name: ruleName,
+          description,
+          prompt_directive: promptDirective,
+          enabled: enabled ? 1 : 0,
+          order_index: existing?.order_index ?? maxOrder + 1
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error ?? 'Save failed.', 'error'); return; }
+      onSaved();
+      onClose();
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={existing ? `Edit Mechanic: ${existing.rule_name}` : 'New Writing Mechanic'} onClose={onClose}>
+      {ToastEl}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Rule Name</label>
+          <input
+            value={ruleName}
+            onChange={e => setRuleName(e.target.value)}
+            placeholder="e.g. One-Sentence Paragraph Rule"
+            className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Human Description (UI Reference)</label>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Detailed explanation of what this writing rule achieves..."
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none resize-none"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Prompt Directive (Sent to Gemini AI)
+          </label>
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+            Compact, imperative instruction injected into post generation prompt.
+          </p>
+          <textarea
+            value={promptDirective}
+            onChange={e => setPromptDirective(e.target.value)}
+            placeholder="e.g. Format content with 1-2 sentence short paragraphs and single line breaks."
+            rows={3}
+            className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none resize-none font-mono text-xs"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        <div className="flex items-center gap-2 pt-1">
+          <input
+            type="checkbox"
+            id="mech-enabled"
+            checked={enabled}
+            onChange={e => setEnabled(e.target.checked)}
+            className="rounded accent-purple-600"
+          />
+          <label htmlFor="mech-enabled" className="text-xs font-medium cursor-pointer" style={{ color: 'var(--text-primary)' }}>
+            Enable this rule in generation prompts
+          </label>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-white/5 border"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            style={{ background: 'var(--accent)', color: 'white' }}>
+            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Mechanic</>}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Main Settings Page ─────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { postTypes, anatomy, settings, refreshPostTypes, refreshAnatomy, refreshSettings } = useApp();
   const { show: showToast, ToastEl } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'pillars' | 'anatomy' | 'tone'>('pillars');
+  const [activeTab, setActiveTab] = useState<'pillars' | 'anatomy' | 'tone' | 'mechanics'>('pillars');
   const [ptModal, setPtModal] = useState<{ open: boolean; existing?: PostType }>({ open: false });
   const [aModal, setAModal] = useState<{ open: boolean; existing?: AnatomySection }>({ open: false });
+  const [wmModal, setWmModal] = useState<{ open: boolean; existing?: WritingMechanic }>({ open: false });
+  
+  const [writingMechanics, setWritingMechanics] = useState<WritingMechanic[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Tone form state
@@ -222,16 +349,27 @@ export default function SettingsPage() {
   const [savingTone, setSavingTone] = useState(false);
   const [anatomyScope, setAnatomyScope] = useState<'global' | 'per_post_type'>(settings?.anatomy_scope ?? 'global');
 
-  // Sync tone state when settings load
-  useState(() => {
-    if (settings) {
-      setFormality(settings.tone_profile?.formality ?? 'mixed');
-      setSentenceLength(settings.tone_profile?.sentenceLength ?? 'short');
-      setBannedPhrases(settings.tone_profile?.bannedPhrases ?? []);
-      setLanguageMix(settings.tone_profile?.languageMix ?? '');
-      setAnatomyScope(settings.anatomy_scope ?? 'global');
-    }
-  });
+  const fetchMechanics = useCallback(async () => {
+    try {
+      const res = await fetch('/api/writing-mechanics');
+      if (res.ok) setWritingMechanics(await res.json());
+    } catch { /* fall through */ }
+  }, []);
+
+  const { refreshAll } = useApp();
+
+  useEffect(() => {
+    refreshAll();
+    fetchMechanics();
+
+    const handleStrategyUpdated = () => {
+      refreshAll();
+      fetchMechanics();
+    };
+
+    window.addEventListener('strategy_updated', handleStrategyUpdated);
+    return () => window.removeEventListener('strategy_updated', handleStrategyUpdated);
+  }, [fetchMechanics, refreshAll]);
 
   const saveTone = async () => {
     setSavingTone(true);
@@ -277,7 +415,24 @@ export default function SettingsPage() {
     else showToast('Delete failed.', 'error');
   };
 
-  const onDragEnd = useCallback(async (result: DropResult) => {
+  const deleteMechanic = async (id: string) => {
+    if (!confirm('Delete this writing mechanic rule?')) return;
+    const res = await fetch(`/api/writing-mechanics/${id}`, { method: 'DELETE' });
+    if (res.ok) { await fetchMechanics(); showToast('Rule deleted.', 'success'); }
+    else showToast('Delete failed.', 'error');
+  };
+
+  const toggleMechanic = async (mechanic: WritingMechanic) => {
+    const newEnabled = mechanic.enabled === 1 ? 0 : 1;
+    setWritingMechanics(prev => prev.map(m => m.id === mechanic.id ? { ...m, enabled: newEnabled } : m));
+    await fetch(`/api/writing-mechanics/${mechanic.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: newEnabled })
+    });
+  };
+
+  const onDragEndAnatomy = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
     const items = Array.from(anatomy);
     const [moved] = items.splice(result.source.index, 1);
@@ -291,6 +446,20 @@ export default function SettingsPage() {
     await refreshAnatomy();
   }, [anatomy, refreshAnatomy]);
 
+  const onDragEndMechanics = useCallback(async (result: DropResult) => {
+    if (!result.destination) return;
+    const items = Array.from(writingMechanics);
+    const [moved] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, moved);
+    const reordered = items.map((item, i) => ({ ...item, order_index: i }));
+    setWritingMechanics(reordered);
+    await fetch('/api/writing-mechanics', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reordered.map((item, i) => ({ id: item.id, order_index: i })))
+    });
+  }, [writingMechanics]);
+
   const selectStyle = {
     background: 'var(--bg-primary)',
     border: '1px solid var(--border)',
@@ -302,9 +471,10 @@ export default function SettingsPage() {
   };
 
   const tabs = [
-    { id: 'pillars' as const, label: 'Post Pillars', icon: 'â—ˆ' },
-    { id: 'anatomy' as const, label: 'Post Anatomy', icon: 'âŠž' },
-    { id: 'tone'    as const, label: 'Tone & Voice', icon: 'â™ª' },
+    { id: 'pillars' as const, label: 'Post Pillars', icon: 'P' },
+    { id: 'anatomy' as const, label: 'Post Anatomy', icon: 'A' },
+    { id: 'tone'    as const, label: 'Tone & Voice', icon: 'T' },
+    { id: 'mechanics' as const, label: 'Writing Mechanics', icon: 'W' },
   ];
 
   return (
@@ -325,8 +495,16 @@ export default function SettingsPage() {
           onSaved={refreshAnatomy}
         />
       )}
+      {wmModal.open && (
+        <WritingMechanicsModal
+          existing={wmModal.existing}
+          maxOrder={writingMechanics.length}
+          onClose={() => setWmModal({ open: false })}
+          onSaved={fetchMechanics}
+        />
+      )}
 
-      {/* â”€â”€ Page Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Page Header */}
       <div className="flex-shrink-0 border-b px-6 py-4"
         style={{ background: 'rgba(10,10,15,0.9)', borderColor: 'var(--border)', backdropFilter: 'blur(8px)' }}>
         <div className="flex items-center gap-3">
@@ -335,7 +513,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* â”€â”€ Tab Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Tab Bar */}
       <div className="flex-shrink-0 border-b px-6" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
         <div className="flex gap-1 -mb-px">
           {tabs.map(tab => (
@@ -349,18 +527,18 @@ export default function SettingsPage() {
                 background: 'transparent',
               }}
             >
-              <span className="text-xs">{tab.icon}</span>
+              <span className="text-xs font-bold">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* â”€â”€ Tab Content â€” scrollable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Tab Content - scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-8">
 
-          {/* â”€â”€ TAB 1: Post Pillars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* TAB 1: Post Pillars */}
           {activeTab === 'pillars' && (
             <div>
               <div className="flex items-center justify-between mb-6">
@@ -388,10 +566,10 @@ export default function SettingsPage() {
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-sm">{pt.name}</span>
                         <div className="flex gap-3 mt-1">
-                          <span className="text-xs" style={{ color: 'var(--success)' }}>âœ“ {pt.dos.length} DOs</span>
-                          <span className="text-xs" style={{ color: '#ef4444' }}>âœ— {pt.donts.length} DON&apos;Ts</span>
+                          <span className="text-xs" style={{ color: 'var(--success)' }}>+ {pt.dos.length} DOs</span>
+                          <span className="text-xs" style={{ color: '#ef4444' }}>x {pt.donts.length} DON&apos;Ts</span>
                           {pt.core_focus && (
-                            <span className="text-xs" style={{ color: 'var(--accent)' }}>â—ˆ Core Focus set</span>
+                            <span className="text-xs" style={{ color: 'var(--accent)' }}>* Core Focus set</span>
                           )}
                         </div>
                       </div>
@@ -418,7 +596,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* â”€â”€ TAB 2: Post Anatomy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* TAB 2: Post Anatomy */}
           {activeTab === 'anatomy' && (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -433,7 +611,6 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Anatomy scope toggle */}
               <div className="flex items-center gap-3 mb-5 p-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
                 <div className="flex-1">
                   <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Anatomy Scope</span>
@@ -445,7 +622,7 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <DragDropContext onDragEnd={onDragEnd}>
+              <DragDropContext onDragEnd={onDragEndAnatomy}>
                 <Droppable droppableId="anatomy">
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
@@ -496,7 +673,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* â”€â”€ TAB 3: Tone & Voice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* TAB 3: Tone & Voice */}
           {activeTab === 'tone' && (
             <div>
               <h2 className="font-semibold text-base mb-1">Tone &amp; Voice Profile</h2>
@@ -540,7 +717,7 @@ export default function SettingsPage() {
 
               <div className="mb-6">
                 <TagInput
-                  label="Banned Phrases â€” never use these in any post"
+                  label="Banned Phrases - never use these in any post"
                   tags={bannedPhrases}
                   onChange={setBannedPhrases}
                   placeholder="Type a phrase and press Enter"
@@ -551,8 +728,105 @@ export default function SettingsPage() {
               <button onClick={saveTone} disabled={savingTone}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 style={{ background: 'var(--accent)', color: 'white' }}>
-                {savingTone ? <><Loader2 size={14} className="spinner" /> Savingâ€¦</> : <><Save size={14} /> Save Tone Profile &amp; Scope</>}
+                {savingTone ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Tone Profile &amp; Scope</>}
               </button>
+            </div>
+          )}
+
+          {/* TAB 4: Writing Mechanics */}
+          {activeTab === 'mechanics' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold text-base">Writing Mechanics Rules</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Reusable formatting constraints &amp; writing principles. Enabled directives get injected into Gemini generation calls.
+                  </p>
+                </div>
+                <button onClick={() => setWmModal({ open: true })}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                  style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent)', color: 'var(--accent)' }}>
+                  <Plus size={14} /> Add Mechanic
+                </button>
+              </div>
+
+              <DragDropContext onDragEnd={onDragEndMechanics}>
+                <Droppable droppableId="mechanics">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
+                      {writingMechanics.length === 0 && (
+                        <p className="text-sm text-center py-12" style={{ color: 'var(--text-muted)' }}>
+                          No writing mechanics defined. Add one above.
+                        </p>
+                      )}
+                      {writingMechanics.map((mech, index) => (
+                        <Draggable key={mech.id} draggableId={mech.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="rounded-xl p-4 transition-all"
+                              style={{
+                                background: snapshot.isDragging ? 'var(--bg-hover)' : 'var(--bg-elevated)',
+                                border: `1px solid ${snapshot.isDragging ? 'var(--accent)' : 'var(--border)'}`,
+                                opacity: mech.enabled ? 1 : 0.6,
+                                ...provided.draggableProps.style,
+                              }}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing pt-1" style={{ color: 'var(--text-muted)' }}>
+                                  <GripVertical size={14} />
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                                      {mech.rule_name}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs mb-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                    {mech.description}
+                                  </p>
+                                  <div className="p-2 rounded-lg text-xs font-mono" style={{ background: 'var(--bg-primary)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+                                    <span className="font-bold text-[10px] uppercase tracking-wider block mb-0.5" style={{ color: 'var(--accent)' }}>Directive:</span>
+                                    {mech.prompt_directive}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <button
+                                    onClick={() => toggleMechanic(mech)}
+                                    title={mech.enabled ? 'Disable directive' : 'Enable directive'}
+                                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+                                    style={{ color: mech.enabled ? 'var(--success)' : 'var(--text-muted)' }}
+                                  >
+                                    {mech.enabled ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                                  </button>
+                                  <button
+                                    onClick={() => setWmModal({ open: true, existing: mech })}
+                                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+                                    style={{ color: 'var(--text-muted)' }}
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteMechanic(mech.id)}
+                                    className="p-1.5 rounded-lg transition-colors hover:bg-red-900/20"
+                                    style={{ color: '#ef4444' }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
             </div>
           )}
 

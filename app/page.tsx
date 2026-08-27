@@ -61,6 +61,42 @@ export default function StudioPage() {
     pillarName: string;
   }[]>([]);
 
+  // ── Hook Bank state ───────────────────────────────────────────
+  const [hooks, setHooks] = useState<{ id: string; hook_text: string; category: string }[]>([]);
+  const [selectedHookIds, setSelectedHookIds] = useState<string[]>([]);
+  const [loadingHooks, setLoadingHooks] = useState(false);
+
+  const fetchHooks = async (categoryName?: string) => {
+    setLoadingHooks(true);
+    try {
+      const query = categoryName ? `?category=${encodeURIComponent(categoryName)}` : '';
+      const res = await fetch(`/api/hooks${query}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHooks(data);
+      }
+    } catch { /* fall through */ }
+    finally { setLoadingHooks(false); }
+  };
+
+  useEffect(() => {
+    const selectedType = postTypes.find(pt => pt.id === selectedPostTypeId);
+    fetchHooks(selectedType?.name);
+
+    const handleStrategyUpdated = () => {
+      fetchHooks(selectedType?.name);
+    };
+
+    window.addEventListener('strategy_updated', handleStrategyUpdated);
+    return () => window.removeEventListener('strategy_updated', handleStrategyUpdated);
+  }, [selectedPostTypeId, postTypes]);
+
+  const toggleHookSelection = (id: string) => {
+    setSelectedHookIds(prev =>
+      prev.includes(id) ? prev.filter(hId => hId !== id) : [...prev, id]
+    );
+  };
+
   // Load weekly schedule for vertical ovals & resolution order
   useEffect(() => {
     async function resolveToday() {
@@ -140,10 +176,17 @@ export default function StudioPage() {
     setRepeatWarning(null);
     setPostId(null);
     try {
+      const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
       const res = await fetch('/api/generate-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawNotes, postTypeId: selectedPostTypeId, date: today })
+        body: JSON.stringify({
+          rawNotes,
+          postTypeId: selectedPostTypeId,
+          date: today,
+          selectedHooks: activeSelectedHookTexts,
+          selectedHookIds
+        })
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.error ?? 'Generation failed.', 'error'); return; }
@@ -224,6 +267,7 @@ export default function StudioPage() {
       }
 
       // ── Step 2: generate post with web results ──────────────
+      const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
       const genRes = await fetch('/api/generate-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -232,6 +276,8 @@ export default function StudioPage() {
           postTypeId: selectedPostTypeId,
           date: today,
           webResults: resultsText,
+          selectedHooks: activeSelectedHookTexts,
+          selectedHookIds
         }),
       });
       const data = await genRes.json();
@@ -571,12 +617,56 @@ export default function StudioPage() {
             </div>
           )}
 
-          {/* Web search status badge */}
-          {webSearchStatus && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs animate-fade-in"
-              style={{ background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.25)', color: 'var(--text-secondary)' }}>
-              <Loader2 size={12} className="spinner flex-shrink-0" style={{ color: 'var(--accent)' }} />
-              {webSearchStatus}
+          {/* Hook Bank Selector */}
+          {hooks.length > 0 && (
+            <div
+              className="p-3.5 rounded-xl border space-y-2"
+              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} style={{ color: 'var(--accent)' }} />
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Hook Suggestions (Click to select for generation)
+                  </span>
+                </div>
+                <button
+                  onClick={() => fetchHooks(selectedType?.name)}
+                  disabled={loadingHooks}
+                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors hover:bg-white/5"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  <RefreshCw size={11} className={loadingHooks ? 'spinner' : ''} />
+                  Shuffle
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {hooks.map(h => {
+                  const isSelected = selectedHookIds.includes(h.id);
+                  return (
+                    <button
+                      key={h.id}
+                      type="button"
+                      onClick={() => toggleHookSelection(h.id)}
+                      className="p-2.5 rounded-lg text-left text-xs transition-all border flex items-start gap-2"
+                      style={{
+                        background: isSelected ? 'rgba(124, 58, 237, 0.15)' : 'var(--bg-primary)',
+                        borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="mt-0.5 accent-purple-600 rounded"
+                      />
+                      <span className="line-clamp-2 leading-relaxed flex-1">{h.hook_text}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

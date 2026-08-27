@@ -89,6 +89,21 @@ export async function POST(req: NextRequest) {
     const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
     const model = genAI.getGenerativeModel({ model: modelName });
 
+    // Load enabled writing mechanics directives
+    const writingMechanics = db.prepare(
+      'SELECT prompt_directive FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
+    ).all() as { prompt_directive: string }[];
+
+    // Handle selected hooks if provided
+    const selectedHooks = (body.selectedHooks as string[] | undefined) ?? [];
+    const selectedHookIds = (body.selectedHookIds as string[] | undefined) ?? [];
+    if (selectedHookIds.length > 0) {
+      const updateHookStmt = db.prepare('UPDATE hook_bank SET used_count = used_count + 1 WHERE id = ?');
+      for (const hid of selectedHookIds) {
+        updateHookStmt.run(hid);
+      }
+    }
+
     const anatomyPrompt = anatomySections.map((s, i) =>
       `${i + 1}. **${s.section_name}**: ${s.rule_description}`
     ).join('\n');
@@ -115,6 +130,11 @@ ${donts.map((d: string) => `✗ ${d}`).join('\n')}
 
 ACTIVE POST ANATOMY (output every section in this exact order for EVERY version):
 ${anatomyPrompt}
+
+WRITING MECHANICS DIRECTIVES (mandatory formatting & structural constraints):
+${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive}`).join('\n') : '• Keep lines short and scannable. Avoid wall of text blocks.'}
+
+${selectedHooks.length > 0 ? `SELECTED HOOK EXAMPLES FOR INSPIRATION:\n${selectedHooks.map(h => `• "${h}"`).join('\n')}` : ''}
 
 TONE & VOICE PROFILE:
 - Formality: ${tone.formality}

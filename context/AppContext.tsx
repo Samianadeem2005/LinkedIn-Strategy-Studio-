@@ -88,7 +88,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, [refreshPostTypes, refreshAnatomy, refreshSettings, refreshWeeklyMapping]);
 
-  useEffect(() => { refreshAll(); }, [refreshAll]);
+  useEffect(() => {
+    refreshAll();
+
+    const handleStrategyUpdated = () => {
+      refreshAll();
+    };
+
+    window.addEventListener('strategy_updated', handleStrategyUpdated);
+    return () => {
+      window.removeEventListener('strategy_updated', handleStrategyUpdated);
+    };
+  }, [refreshAll]);
 
   return (
     <AppContext.Provider value={{ postTypes, anatomy, settings, weeklyMapping, loading, refreshPostTypes, refreshAnatomy, refreshSettings, refreshWeeklyMapping, refreshAll }}>
