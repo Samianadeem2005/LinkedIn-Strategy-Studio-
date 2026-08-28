@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Zap, Settings, LayoutGrid, Clock, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark, FileText } from 'lucide-react';
+import { Zap, Settings, LayoutGrid, Calendar, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark, FileText } from 'lucide-react';
 
 const navItems = [
   { href: '/', icon: Zap, label: 'Studio', desc: 'Daily post generation' },
+  { href: '/calendar', icon: Calendar, label: 'Calendar', desc: 'Monthly schedule & plan' },
+  { href: '/calendar-maker', icon: Sparkles, label: 'Calendar Maker', desc: 'AI content schedule generator' },
   { href: '/drafts', icon: FileText, label: 'Drafts', desc: 'Saved draft posts' },
-  { href: '/ingest', icon: Sparkles, label: 'Ingest', desc: 'Extract raw strategy' },
+  { href: '/ingest', icon: Layers, label: 'Ingest', desc: 'Extract raw strategy' },
   { href: '/hooks', icon: Bookmark, label: 'Hook Bank', desc: 'Scroll-stopping hooks library' },
   { href: '/settings', icon: Settings, label: 'Settings', desc: 'Post types & anatomy' },
-  { href: '/strategy', icon: LayoutGrid, label: 'Strategy', desc: 'Weekly template & calendar' },
-  { href: '/history', icon: Clock, label: 'History', desc: 'All generated posts' },
+  { href: '/strategy', icon: LayoutGrid, label: 'Strategy', desc: 'Weekly template & rules' },
 ];
 
 export default function Sidebar() {
@@ -65,7 +66,7 @@ export default function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map(({ href, icon: Icon, label, desc }) => {
-          const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const active = href === '/' ? pathname === '/' : pathname === href || (href !== '/' && pathname.startsWith(href + '/'));
           return (
             <Link
               key={href}

@@ -163,6 +163,15 @@ function initSchema(db: Database.Database) {
     db.exec("ALTER TABLE extraction_review ADD COLUMN reason TEXT DEFAULT NULL");
   }
 
+  // Runtime migration — add about_me column to settings table for brand context
+  const settingsColumns = (db.prepare("PRAGMA table_info(settings)").all() as { name: string }[]).map(c => c.name);
+  if (!settingsColumns.includes('about_me')) {
+    db.exec("ALTER TABLE settings ADD COLUMN about_me TEXT DEFAULT NULL");
+  }
+  const defaultAboutMe = "I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.";
+  db.exec(`UPDATE settings SET about_me = '${defaultAboutMe.replace(/'/g, "''")}' WHERE id = 1 AND (about_me IS NULL OR about_me = '')`);
+
+
   // Runtime migration — create pillar_quotas table if not exists
   db.exec(`
     CREATE TABLE IF NOT EXISTS pillar_quotas (
@@ -171,13 +180,41 @@ function initSchema(db: Database.Database) {
     );
   `);
 
-  // Runtime migration — add post_format and character_count to posts table
-  const postColumns = (db.prepare("PRAGMA table_info(posts)").all() as { name: string }[]).map(c => c.name);
-  if (!postColumns.includes('post_format')) {
-    db.exec("ALTER TABLE posts ADD COLUMN post_format TEXT DEFAULT 'text_post'");
-  }
-  if (!postColumns.includes('character_count')) {
-    db.exec("ALTER TABLE posts ADD COLUMN character_count INTEGER DEFAULT 0");
+  // Runtime migration — create custom_pillar_rules table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS custom_pillar_rules (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      pillar_ids TEXT NOT NULL,
+      target_count INTEGER DEFAULT 1,
+      created_at TEXT
+    );
+  `);
+
+  // Seed default custom_pillar_rules for existing post_types if table is empty
+  const ruleCount = (db.prepare('SELECT COUNT(*) as c FROM custom_pillar_rules').get() as { c: number }).c;
+  if (ruleCount === 0) {
+    const existingPts = db.prepare('SELECT id, name FROM post_types').all() as { id: string; name: string }[];
+    const quotaRows = db.prepare('SELECT post_type_id, target_count FROM pillar_quotas').all() as { post_type_id: string; target_count: number }[];
+    const quotaMap: Record<string, number> = {};
+    quotaRows.forEach(q => { quotaMap[q.post_type_id] = q.target_count; });
+
+    const insertRule = db.prepare(`
+      INSERT INTO custom_pillar_rules (id, name, pillar_ids, target_count, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    db.transaction(() => {
+      existingPts.forEach(pt => {
+        insertRule.run(
+          pt.id,
+          pt.name,
+          JSON.stringify([pt.id]),
+          quotaMap[pt.id] ?? 1,
+          new Date().toISOString()
+        );
+      });
+    })();
   }
 }
 

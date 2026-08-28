@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'LinkedIn Content OS',
-  description: 'Personal content-operations tool — strategy, drafting, and history in one place.',
+  description: 'Personal content-operations tool — strategy, calendar, and drafting in one place.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

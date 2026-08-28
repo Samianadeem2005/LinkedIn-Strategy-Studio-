@@ -23,12 +23,50 @@ export async function POST(req: NextRequest) {
 
     const db = getDb();
 
-    // Load post type
-    const postType = db.prepare('SELECT * FROM post_types WHERE id = ?').get(postTypeId) as Record<string, unknown> | undefined;
-    if (!postType) return NextResponse.json({ error: 'Post type not found.' }, { status: 404 });
-    const dos = JSON.parse(postType.dos as string) as string[];
-    const donts = JSON.parse(postType.donts as string) as string[];
-    const coreFocus = (postType.core_focus as string | null) ?? '';
+    // Check if postTypeId matches a custom_pillar_rules row
+    const rule = db.prepare('SELECT * FROM custom_pillar_rules WHERE id = ?').get(postTypeId) as { id: string; name: string; pillar_ids: string } | undefined;
+
+    let targetPillarIds: string[] = [];
+    let ruleName = '';
+
+    if (rule) {
+      ruleName = rule.name;
+      try { targetPillarIds = JSON.parse(rule.pillar_ids); } catch { targetPillarIds = [postTypeId]; }
+    } else {
+      targetPillarIds = [postTypeId];
+    }
+
+    // Load referenced post types
+    const postTypesList = db.prepare(
+      `SELECT * FROM post_types WHERE id IN (${targetPillarIds.map(() => '?').join(',')})`
+    ).all(...targetPillarIds) as Record<string, unknown>[];
+
+    if (postTypesList.length === 0) return NextResponse.json({ error: 'Post type not found.' }, { status: 404 });
+
+    const combinedDos: string[] = [];
+    const combinedDonts: string[] = [];
+    const focusParts: string[] = [];
+
+    postTypesList.forEach(pt => {
+      try {
+        const d = JSON.parse(pt.dos as string) as string[];
+        combinedDos.push(...d);
+      } catch {}
+      try {
+        const dt = JSON.parse(pt.donts as string) as string[];
+        combinedDonts.push(...dt);
+      } catch {}
+      if (pt.core_focus) focusParts.push(`${pt.name}: ${pt.core_focus}`);
+    });
+
+    const postType = {
+      id: postTypeId,
+      name: ruleName || postTypesList.map(pt => pt.name).join(' + '),
+      core_focus: focusParts.join('\n\n')
+    };
+    const dos = Array.from(new Set(combinedDos));
+    const donts = Array.from(new Set(combinedDonts));
+    const coreFocus = postType.core_focus;
 
     // Load anatomy - respect scope
     const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Record<string, unknown> | undefined;

@@ -27,13 +27,14 @@ export default function StudioPage() {
   const [selectedPostTypeId, setSelectedPostTypeId] = useState('');
   const [postFormat, setPostFormat] = useState<'text_post' | 'image_post' | 'carousel' | 'video_post'>('text_post');
   const [rawNotes, setRawNotes] = useState('');
-  const [today] = useState(() => new Date().toISOString().split('T')[0]);
+  const [postDate, setPostDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const today = postDate;
   const [calendarEntry, setCalendarEntry] = useState<CalendarEntry | null>(null);
   const [resolvedLabel, setResolvedLabel] = useState('');
   const [resolvedSource, setResolvedSource] = useState<'calendar' | 'weekly' | 'manual'>('manual');
 
   // Quota & Weekly Saved Tracking
-  const [quotaList, setQuotaList] = useState<{ post_type_id: string; name: string; target_count: number; used_this_week: number }[]>([]);
+  const [ruleList, setRuleList] = useState<{ id: string; name: string; target_count: number; used_this_week: number; is_hybrid: boolean }[]>([]);
   const [daySavedMap, setDaySavedMap] = useState<Record<string, { pillar_name: string; post_id: string; topic: string }>>({});
 
   const fetchQuotas = async () => {
@@ -41,7 +42,7 @@ export default function StudioPage() {
       const res = await fetch('/api/pillar-quotas');
       if (res.ok) {
         const data = await res.json();
-        if (data.quotas) setQuotaList(data.quotas);
+        if (data.rules) setRuleList(data.rules);
         if (data.daySavedMap) setDaySavedMap(data.daySavedMap);
       }
     } catch { /* fall through */ }
@@ -204,7 +205,7 @@ export default function StudioPage() {
           rawNotes,
           postTypeId: selectedPostTypeId,
           postFormat,
-          date: today,
+          date: postDate,
           selectedHooks: activeSelectedHookTexts,
           selectedHookIds
         })
@@ -411,7 +412,7 @@ export default function StudioPage() {
   };
 
   const selectedType = postTypes.find(pt => pt.id === selectedPostTypeId);
-  const selectedQuota = quotaList.find(q => q.post_type_id === selectedPostTypeId);
+  const selectedQuota = ruleList.find(r => r.id === selectedPostTypeId);
   const isQuotaExceeded = selectedQuota ? selectedQuota.target_count > 0 && selectedQuota.used_this_week >= selectedQuota.target_count : false;
 
   const activeAnatomy = settings?.anatomy_scope === 'per_post_type'
@@ -533,9 +534,11 @@ export default function StudioPage() {
                       onChange={e => { setSelectedPostTypeId(e.target.value); setResolvedSource('manual'); setClassification(null); }}
                       className="w-full px-3 py-2 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-colors"
                       style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                      <option value="">— Select Custom Pillar —</option>
-                      {postTypes.map(pt => (
-                        <option key={pt.id} value={pt.id}>{pt.name}</option>
+                      <option value="">— Select Pillar Option —</option>
+                      {ruleList.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} {r.is_hybrid ? ' (Merged Combo)' : ''} ({r.used_this_week}/{r.target_count})
+                        </option>
                       ))}
                     </select>
                     <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
@@ -560,6 +563,20 @@ export default function StudioPage() {
                     </select>
                     <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                   </div>
+                </div>
+
+                {/* Scheduled Date Picker */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    Target Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={postDate}
+                    onChange={e => setPostDate(e.target.value)}
+                    className="px-3 py-2 rounded-lg border text-xs font-mono font-medium cursor-pointer transition-colors"
+                    style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                  />
                 </div>
 
                 {/* Suggest Pillar Button */}

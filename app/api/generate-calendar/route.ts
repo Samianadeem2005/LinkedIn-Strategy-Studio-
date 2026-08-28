@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { callWithGeminiFallback } from '@/lib/gemini';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,68 +17,73 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY is not configured.' }, { status: 500 });
 
     const db = getDb();
+
+    // Query user settings for dynamic author profile / positioning
+    const settingsRow = db.prepare('SELECT tone_profile FROM settings WHERE id = 1').get() as { tone_profile?: string } | undefined;
+    const authorProfile = settingsRow?.tone_profile?.trim()
+      ? settingsRow.tone_profile.trim()
+      : 'I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.';
+
+    // Fetch custom pillar rules configured dynamically from Strategy & Pillar Quotas page
+    const customRules = db.prepare('SELECT * FROM custom_pillar_rules ORDER BY created_at ASC').all() as {
+      id: string;
+      name: string;
+      pillar_ids: string;
+      target_count: number;
+      is_hybrid: number;
+    }[];
+
     const postTypes = db.prepare('SELECT * FROM post_types').all() as Record<string, unknown>[];
-    if (postTypes.length === 0) return NextResponse.json({ error: 'No post types defined. Add post types in Settings first.' }, { status: 400 });
-
-    const typeByName: Record<string, { id: string; name: string }> = {};
-    for (const pt of postTypes) {
-      typeByName[(pt.name as string).toLowerCase()] = { id: pt.id as string, name: pt.name as string };
+    if (postTypes.length === 0 && customRules.length === 0) {
+      return NextResponse.json({ error: 'No pillar rules defined. Add rules in Strategy page first.' }, { status: 400 });
     }
-    const defaultType = postTypes[0] ? { id: postTypes[0].id as string, name: postTypes[0].name as string } : { id: '', name: 'Value' };
 
-    // ─────────────────────────────────────────────────────────────
-    // PHASE A: RESOLVE WEEKLY TYPE SCHEDULE (Independent of topics)
-    // ─────────────────────────────────────────────────────────────
-    const weeklyRows = db.prepare(`
-      SELECT wm.day_of_week, wm.post_type_id, pt.name as post_type_name
-      FROM weekly_mapping wm
-      LEFT JOIN post_types pt ON wm.post_type_id = pt.id
-    `).all() as { day_of_week: string; post_type_id: string | null; post_type_name: string | null }[];
+    // Build pool of active rules respecting user target counts dynamically at runtime
+    const activeRules: { id: string; name: string; target_count: number; is_hybrid: boolean }[] = [];
+    if (customRules.length > 0) {
+      customRules.forEach(r => {
+        activeRules.push({
+          id: r.id,
+          name: r.name,
+          target_count: r.target_count > 0 ? r.target_count : 1,
+          is_hybrid: Boolean(r.is_hybrid)
+        });
+      });
+    } else {
+      postTypes.forEach(pt => {
+        activeRules.push({
+          id: pt.id as string,
+          name: pt.name as string,
+          target_count: 1,
+          is_hybrid: false
+        });
+      });
+    }
 
-    const weeklyMap: Record<string, { id: string; name: string }> = {};
-    for (const r of weeklyRows) {
-      if (r.post_type_id && r.post_type_name) {
-        weeklyMap[r.day_of_week] = { id: r.post_type_id, name: r.post_type_name };
+    // Expand rule pool dynamically according to user target counts
+    const expandedPool: { id: string; name: string }[] = [];
+    activeRules.forEach(r => {
+      for (let i = 0; i < r.target_count; i++) {
+        expandedPool.push({ id: r.id, name: r.name });
       }
+    });
+
+    if (expandedPool.length === 0) {
+      expandedPool.push({ id: activeRules[0].id, name: activeRules[0].name });
     }
 
-    // Default 7-day ratio mix — exact 2/2/2/1 strategy:
-    //   2 Value/Educational (Mon, Thu)
-    //   2 Lead Magnet (Tue, Sat)
-    //   2 Showcase/Authority (Wed=Showcase, Fri=Value+Authority weekly borrow)
-    //   1 Personal (Sun — NON-NEGOTIABLE, never override)
-    const defaultMix: Record<string, string> = {
-      'Monday':    'Value',
-      'Tuesday':   'Lead Magnet',
-      'Wednesday': 'Showcase',
-      'Thursday':  'Value',
-      'Friday':    'Authority',
-      'Saturday':  'Lead Magnet',
-      'Sunday':    'Personal'
-    };
-
-    // Resolve Personal post type id — needed for hard Sunday enforcement
-    const personalType =
-      typeByName['personal'] ||
-      Object.values(typeByName).find(t => t.name.toLowerCase().includes('personal')) ||
-      defaultType;
+    // Deterministic shuffle per start date to assign rotated days to pillar types
+    const seed = startDate.split('-').reduce((acc: number, part: string) => acc + parseInt(part), 0);
+    const shuffledPool = [...expandedPool].sort((a, b) => {
+      const hashA = (a.id.charCodeAt(0) + seed) % 17;
+      const hashB = (b.id.charCodeAt(0) + seed) % 17;
+      return hashA - hashB;
+    });
 
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const phaseASchedule = daysOfWeek.map(dayName => {
-      // Sunday is ALWAYS Personal — hard rule, no weekly_mapping override allowed
-      if (dayName === 'Sunday') {
-        return { day_of_week: 'Sunday', post_type_id: personalType.id, post_type_name: personalType.name };
-      }
-      const custom = weeklyMap[dayName];
-      // If weekly_mapping assigned Personal to a non-Sunday day, ignore it and use the default.
-      // Personal is exclusively reserved for Sunday — having it on any other day breaks the 2/2/2/1 ratio.
-      const isPersonalOnWeekday = custom && custom.name.toLowerCase().includes('personal');
-      if (custom && !isPersonalOnWeekday) {
-        return { day_of_week: dayName, post_type_id: custom.id, post_type_name: custom.name };
-      }
-      const fallbackName = defaultMix[dayName] || 'Value';
-      const resolvedType = typeByName[fallbackName.toLowerCase()] || defaultType;
-      return { day_of_week: dayName, post_type_id: resolvedType.id, post_type_name: resolvedType.name };
+    const phaseASchedule = daysOfWeek.map((dayName, idx) => {
+      const rule = shuffledPool[idx % shuffledPool.length];
+      return { day_of_week: dayName, post_type_id: rule.id, post_type_name: rule.name };
     });
 
     const startDateObj = new Date(startDate);
@@ -88,18 +93,8 @@ export async function POST(req: NextRequest) {
       d.setDate(d.getDate() + i);
       const dateStr = d.toISOString().split('T')[0];
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
-      // Hard-enforce Sunday = Personal at schedule level
-      if (dayName === 'Sunday') {
-        return {
-          day_index: i + 1,
-          date: dateStr,
-          day_name: dayName,
-          post_type_id: personalType.id,
-          post_type_name: personalType.name,
-          is_capstone: false
-        };
-      }
-      const matched = phaseASchedule.find(p => p.day_of_week === dayName) || phaseASchedule[0];
+      const matched = phaseASchedule.find(p => p.day_of_week === dayName) || phaseASchedule[i % phaseASchedule.length];
+
       return {
         day_index: i + 1,
         date: dateStr,
@@ -111,79 +106,97 @@ export async function POST(req: NextRequest) {
     });
 
     // ─────────────────────────────────────────────────────────────
-    // PHASE B: TOPIC CLUSTERING (Fitted into Phase A's pre-assigned post types)
+    // PHASE B: TOPIC CLUSTERING & LOGICAL FLOW ARCS
     // ─────────────────────────────────────────────────────────────
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const capstoneDayIndex = daysSchedule.find(d => d.is_capstone)?.day_index ?? durationDays;
+    const activeQuotasSummary = activeRules.map(r => `"${r.name}": ${r.target_count} post(s)/week`).join(', ');
 
-    const capstoneDayIndex = daysSchedule.find(d => d.is_capstone)?.day_index ?? -1;
+    const calendarPrompt = `Act as an expert AI Personal Brand Strategist and Developer Growth Coach.
 
-    const calendarPrompt = `You are an AI Personal Brand Strategist building a LinkedIn content calendar for an AI Engineer (Software Engineering student, class of 2027) who builds in public — working with LLMs, multi-agent systems, RAG architectures, and full-stack AI apps. Their primary proof-of-work is a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory.
+CONTEXT ABOUT ME:
+${authorProfile}
 
-**LOCKED PHASE A POST-TYPE SCHEDULE — DO NOT CHANGE ANY TYPE, DATE, OR ORDER:**
-${daysSchedule.map(d => `Day ${d.day_index} (${d.day_name}, ${d.date}): "${d.post_type_name}"${d.is_capstone ? ' [CAPSTONE — final day of batch]' : ''}`).join('\n')}
-
-**PILLAR DEFINITIONS — THESE MUST NEVER OVERLAP:**
-- Value/Educational: Explains ONE concept generically, no project name attached. Teaches "how something works." Format: diagrams, numbered steps, plain-English explanations.
-- Lead Magnet: A ready-to-use resource — checklist, cheat sheet, comparison table, or framework. Save-worthy, list-format, NOT narrative. Must include a clear CTA to save/comment.
-- Showcase/Authority: "Problem → Decision → Result" using REAL code or architecture from the author's own project. Proof of execution — not hypothetical.
-- Personal: Raw struggle, confusion, or realization. No polish, no teaching. Just a relatable honest human moment from the author's journey.
-- Authority (Value+Authority slot): Reference a major AI company or researcher (Anthropic, OpenAI, LangChain team, Andrej Karpathy, etc.) with the author's own original angle added — never just a summary or repost.
-
-**NON-NEGOTIABLE GENERATION RULES:**
+NON-NEGOTIABLE GROWTH RULES:
 1. ENGLISH ONLY — All titles, topics, bridge logic, and visual suggestions must be in clear English. No Roman Urdu, Hindi, or non-English phrases anywhere.
-2. SUNDAY IS ALWAYS PERSONAL — Sunday posts are cluster-neutral resets (candid personal moment, raw reflection). A new topic cluster may start fresh the next Monday.
-3. WEEKLY MIX PER 7-DAY BLOCK: exactly 2 Lead Magnet, 2 Value/Educational, 2 Showcase/Authority (of which 1 must be the Authority/borrow slot), 1 Personal.
-4. AUTHORITY BORROWING: Exactly ONE post per 7-day window must reference a major AI company or researcher with the author's own angle. Set is_authority_borrow=true for that entry.
-5. TOPIC CLUSTER ARCS (2-3 Consecutive Days):
-   - Group the raw content dump IN ORDER into tight 2-3 consecutive day clusters.
-   - Each cluster covers ONE specific topic (tool, framework, technique — e.g. "LangChain", "LangGraph", "Text-to-SQL").
-   - A cluster MUST FULLY CLOSE before the next one begins. Once closed, a topic MUST NOT reappear later.
-   - Exception: the final day of a cluster may list EXACTLY TWO items as a combination/showcase (e.g. ["LangChain","LangGraph"]). Never more than 2.
-   - Tightly-related sub-topics (e.g. AI Memory + Persistent Chat History + Mem0) may share one cluster — do NOT force them into separate far-apart days.
-6. LOGICAL BRIDGING: Each post must bridge from the previous day. Bridge logic should be one short phrase explaining WHY this topic follows (e.g. "X's limitation is exactly why Y exists", "once X is solved, Y becomes the next problem").
-7. FIT CONTENT TO PRE-ASSIGNED POST TYPE: The title and visual must match the locked post type for that date.
-8. VISUALS — match visual type to post type using this rule:
-   - Value/Educational → flowchart, architecture diagram, or annotated code snippet
-   - Lead Magnet → checklist card, cheat-sheet graphic, or comparison table image
-   - Showcase/Authority → real code screenshot or full architecture diagram from author's project
-   - Personal → candid photo of author's workspace, screen, or a real moment
-   - Authority (borrow slot) → quote card or diagram with author's own annotation overlaid
-9. CAPSTONE POST: If a day is marked [CAPSTONE], it must be a Showcase post that ties together ALL major concepts covered in the batch into one architecture diagram post. Title must reference the full system (e.g. "I built X with [Tech1 + Tech2 + Tech3]. Here's the full architecture.").
+2. Posting Frequency: Once a day, every day, including weekends. Sunday is a high-performing day — never skip it.
+3. **LOCKED PHASE A POST-TYPE SCHEDULE — DO NOT CHANGE ANY TYPE, DATE, OR ORDER:**
+${daysSchedule.map(d => `Day ${d.day_index} (${d.day_name}, ${d.date}): "${d.post_type_name}"${d.is_capstone ? ' [CAPSTONE — final day of batch]' : ''}`).join('\n')}
+4. WEEKLY MIX PER 7-DAY BLOCK — Respect the exact target numbers configured in Strategy & Pillar Quotas (${activeQuotasSummary}).
+5. Visual Requirement: Every post needs an image (code screenshot, architecture diagram, cheat-sheet graphic, comparison table, or a candid personal photo). No text-only posts.
+6. Topic Pacing & Logical Flow Rule: Do NOT drag a single tool/library/topic for more than 2-3 consecutive days. But also do NOT scatter unrelated topics randomly — each new topic should logically bridge from the previous one (e.g., "X's limitation is exactly why Y exists" or "once X is solved, Y becomes the next problem").
+7. Cluster tightly-related sub-topics together (e.g., AI Memory + Persistent Chat History + Mem0 are one conceptual family — don't force them into separate far-apart days if it creates repetition).
 
-**RAW CONTENT DUMP (walk through in order, extract and cluster topics):**
+PILLAR DEFINITIONS (must never overlap):
+- Value/Educational = explains a concept generically, no project/name attached, teaches "how something works."
+- Lead Magnet = a ready-to-use resource (checklist, cheat sheet, comparison table, framework) — save-worthy, list-format, not narrative.
+- Showcase/Authority = "Problem → Decision → Result" — real code/architecture from MY project, proof of execution.
+- Personal = my raw struggle/confusion/realization — no polish, no teaching, just relatable human moment.
+
+MY RAW TOPIC LIST FOR THIS BATCH:
 ${rawDump}
 
-**OUTPUT FORMAT** — respond with ONLY valid JSON, no markdown fences:
-{
-  "entries": [
-    {
-      "day_index": 1,
-      "date": "YYYY-MM-DD",
-      "day_name": "Monday",
-      "post_type_id": "<must match locked id from Phase A schedule>",
-      "post_type_name": "<must match locked name from Phase A schedule>",
-      "post_title": "Specific, compelling English headline — not just the topic name",
-      "topics_covered": ["SpecificToolOrTechnique"],
-      "bridge_logic": "One short phrase explaining why this follows logically from yesterday",
-      "visual_suggestion": "Specific visual type and what it should show — matched to post type",
-      "is_authority_borrow": false
-    }
-  ],
-  "validation": {
-    "warnings": []
-  }
-}
+TASK:
+Build a ${durationDays}-day content calendar using these exact rules and columns:
+| Day | Type | Post (hook + topic) | Topic(s) Covered | Visual |
+- "post_type_name" must match the locked pillar defined in Strategy & Pillar Quotas.
+- "post_title" column should give a specific, compelling headline/angle — not just the topic name.
+- "bridge_logic" column must explain in one short phrase why this topic follows logically from the previous day's topic.
+- Ensure the weekly mix ratio (${activeQuotasSummary}) defined is hit for every 7-day block.
+- Ensure no topic runs more than 2-3 consecutive days.
+- End the batch (Day ${capstoneDayIndex}) with a capstone Showcase post if this is the final block of a topic set, tying multiple concepts into one architecture diagram.
+- "visual_suggestion" column describing exactly what kind of image should accompany each post (e.g., code screenshot, flow diagram, cheat-sheet card, comparison table graphic, candid personal photo) — matched to the post type using this rule of thumb: Value → diagrams/flowcharts, Lead Magnet → checklist/cheat-sheet cards, Showcase → real code/architecture screenshots, Personal → authentic candid photos.
 
-Generate exactly ${durationDays} entries. Capstone day is Day ${capstoneDayIndex === -1 ? durationDays : capstoneDayIndex}.`;
+Generate exactly ${durationDays} entries.
+Keep the output as a single clean markdown table, no extra commentary before 
+or after unless I ask for strategy notes too.`;
 
+    // Strictly enforce SchemaType output for zero prose, zero markdown fences, 100% structured JSON (TS equivalent of Pydantic)
     const jsonText = await callWithGeminiFallback(async (genAI) => {
       const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+              entries: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    day_index: { type: SchemaType.NUMBER },
+                    date: { type: SchemaType.STRING },
+                    day_name: { type: SchemaType.STRING },
+                    post_type_id: { type: SchemaType.STRING },
+                    post_type_name: { type: SchemaType.STRING },
+                    post_title: { type: SchemaType.STRING },
+                    topics_covered: {
+                      type: SchemaType.ARRAY,
+                      items: { type: SchemaType.STRING }
+                    },
+                    bridge_logic: { type: SchemaType.STRING },
+                    visual_suggestion: { type: SchemaType.STRING }
+                  },
+                  required: ['day_index', 'date', 'day_name', 'post_type_id', 'post_type_name', 'post_title', 'topics_covered', 'bridge_logic', 'visual_suggestion']
+                }
+              },
+              validation: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  warnings: {
+                    type: SchemaType.ARRAY,
+                    items: { type: SchemaType.STRING }
+                  }
+                }
+              }
+            },
+            required: ['entries']
+          }
+        }
+      });
       const result = await model.generateContent(calendarPrompt);
-      const text = result.response.text().trim();
-      return text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      return result.response.text().trim();
     });
 
     const parsed = JSON.parse(jsonText);
@@ -192,9 +205,8 @@ Generate exactly ${durationDays} entries. Capstone day is Day ${capstoneDayIndex
     const entries = (parsed.entries as {
       day_index: number; date: string; day_name: string; post_type_id: string;
       post_type_name: string; post_title: string; topics_covered: string[];
-      bridge_logic: string; visual_suggestion: string; is_authority_borrow: boolean;
+      bridge_logic: string; visual_suggestion: string;
     }[]).map((entry, i) => {
-      // Guarantee Phase A locked type integrity
       const locked = daysSchedule[i] || daysSchedule[0];
       return {
         ...entry,
@@ -212,35 +224,26 @@ Generate exactly ${durationDays} entries. Capstone day is Day ${capstoneDayIndex
     const topicTracker: Record<string, { firstSeen: number; lastSeen: number }> = {};
     const closedTopics = new Set<string>();
 
-    // Post-type names must never be treated as content topics.
-    // The LLM sometimes outputs topics_covered: ["Personal"] for Personal days — skip these.
     const postTypeNameSet = new Set(
-      postTypes.map(pt => (pt.name as string).toLowerCase())
+      activeRules.map(r => r.name.toLowerCase())
     );
 
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       const topics = Array.isArray(entry.topics_covered) ? entry.topics_covered : [entry.topics_covered];
 
-      // Skip topic tracking entirely for Personal days — they are cluster-neutral resets
-      if (entry.post_type_name.toLowerCase().includes('personal')) continue;
-
       for (const rawTopic of topics) {
         if (!rawTopic) continue;
         const topic = rawTopic.trim().toLowerCase();
 
-        // Skip strings that are post-type names, not content topics
         if (postTypeNameSet.has(topic)) continue;
-        // Also skip common non-topic catch-alls
         if (['personal story', 'reflection', 'personal experience'].includes(topic)) continue;
 
-        // Check if this topic was previously closed
         if (closedTopics.has(topic)) {
           validationWarnings.push(
             `Day ${entry.day_index}: Topic "${rawTopic}" reappears after its cluster had already closed (First seen Day ${topicTracker[topic].firstSeen}, last closed Day ${topicTracker[topic].lastSeen}). Topics must stay in tight 2-3 day clusters without scattering.`
           );
         } else if (topicTracker[topic]) {
-          // Check if gap is greater than 2 days
           const gap = entry.day_index - topicTracker[topic].lastSeen;
           if (gap > 2) {
             closedTopics.add(topic);
@@ -255,45 +258,10 @@ Generate exactly ${durationDays} entries. Capstone day is Day ${capstoneDayIndex
         }
       }
 
-      // Check if previous topics should be closed because current day has a completely different topic
       for (const [t, data] of Object.entries(topicTracker)) {
         if (!closedTopics.has(t) && entry.day_index - data.lastSeen >= 2) {
           closedTopics.add(t);
         }
-      }
-    }
-
-    // Check rolling 7-day windows for authority borrow + Sunday=Personal + mix ratio
-    for (let windowStart = 0; windowStart < entries.length; windowStart += 7) {
-      const window = entries.slice(windowStart, windowStart + 7);
-      if (window.length < 7) break;
-      const wStart = windowStart + 1;
-      const wEnd = windowStart + 7;
-
-      // Authority borrow: exactly 1 per 7-day window
-      const authorityCount = window.filter(e => e.is_authority_borrow).length;
-      if (authorityCount === 0) {
-        validationWarnings.push(`Days ${wStart}-${wEnd}: No authority-borrow post found. Exactly 1 required per 7-day window.`);
-      } else if (authorityCount > 1) {
-        validationWarnings.push(`Days ${wStart}-${wEnd}: ${authorityCount} authority-borrow posts found — only 1 allowed per 7-day window.`);
-      }
-
-      // Sunday = Personal check
-      for (const e of window) {
-        if (e.day_name === 'Sunday' && !e.post_type_name.toLowerCase().includes('personal')) {
-          validationWarnings.push(`Day ${e.day_index} (Sunday): Post type is "${e.post_type_name}" — Sunday must always be Personal.`);
-        }
-      }
-
-      // Weekly mix ratio check: 2 Lead Magnet, 2 Value, 2 Showcase/Authority, 1 Personal
-      const typeCounts: Record<string, number> = {};
-      for (const e of window) {
-        const t = e.post_type_name.toLowerCase();
-        typeCounts[t] = (typeCounts[t] ?? 0) + 1;
-      }
-      const personalCount = Object.entries(typeCounts).filter(([k]) => k.includes('personal')).reduce((s, [, v]) => s + v, 0);
-      if (personalCount !== 1) {
-        validationWarnings.push(`Days ${wStart}-${wEnd}: Found ${personalCount} Personal post(s) — exactly 1 required per 7-day window.`);
       }
     }
 
@@ -303,7 +271,6 @@ Generate exactly ${durationDays} entries. Capstone day is Day ${capstoneDayIndex
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
-
 
 // Save calendar entries to DB
 export async function PUT(req: NextRequest) {
@@ -316,15 +283,15 @@ export async function PUT(req: NextRequest) {
       planId, new Date().toISOString(), startDate, durationDays, rawDump
     );
     const insertEntry = db.prepare(`
-      INSERT INTO calendar_entries (id, plan_id, day_index, date, post_type_id, post_title, topics_covered, bridge_logic, visual_suggestion, is_authority_borrow, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned')
+      INSERT INTO calendar_entries (id, plan_id, day_index, date, post_type_id, post_title, topics_covered, bridge_logic, visual_suggestion, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned')
     `);
     const tx = db.transaction((items: typeof entries) => {
       for (const e of items) {
         insertEntry.run(
           uuidv4(), planId, e.day_index, e.date, e.post_type_id,
           e.post_title, JSON.stringify(e.topics_covered ?? []),
-          e.bridge_logic ?? '', e.visual_suggestion ?? '', e.is_authority_borrow ? 1 : 0
+          e.bridge_logic ?? '', e.visual_suggestion ?? ''
         );
       }
     });
