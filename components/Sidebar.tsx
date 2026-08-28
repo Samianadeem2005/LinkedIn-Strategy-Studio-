@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Zap, Settings, LayoutGrid, Clock, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark } from 'lucide-react';
+import { Zap, Settings, LayoutGrid, Clock, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark, FileText } from 'lucide-react';
 
 const navItems = [
   { href: '/', icon: Zap, label: 'Studio', desc: 'Daily post generation' },
+  { href: '/drafts', icon: FileText, label: 'Drafts', desc: 'Saved draft posts' },
   { href: '/ingest', icon: Sparkles, label: 'Ingest', desc: 'Extract raw strategy' },
   { href: '/hooks', icon: Bookmark, label: 'Hook Bank', desc: 'Scroll-stopping hooks library' },
   { href: '/settings', icon: Settings, label: 'Settings', desc: 'Post types & anatomy' },

@@ -7,7 +7,16 @@ import { callWithGeminiFallback } from '@/lib/gemini';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { rawNotes, postTypeId, date, sectionId } = body;
+    const { rawNotes, postTypeId, date, sectionId, postFormat } = body;
+
+    const format = postFormat || 'text_post';
+    const formatConstraints: Record<string, { name: string; min: number; max: number }> = {
+      'text_post': { name: 'Text Post', min: 600, max: 1200 },
+      'image_post': { name: 'Image Post', min: 900, max: 1500 },
+      'carousel': { name: 'Carousel', min: 1200, max: 1500 },
+      'video_post': { name: 'Video Post', min: 500, max: 800 }
+    };
+    const activeFormat = formatConstraints[format] || formatConstraints['text_post'];
 
     if (!rawNotes?.trim()) return NextResponse.json({ error: 'Raw notes are required.' }, { status: 400 });
     if (!postTypeId) return NextResponse.json({ error: 'Post type is required.' }, { status: 400 });
@@ -113,6 +122,7 @@ export async function POST(req: NextRequest) {
     const sharedContext = `
 ACTIVE MODE: ${mode === 'A' ? 'A — Generate from Notes' : 'B — Research & Generate via Web Search'}
 TODAY'S PILLAR: ${postType.name}
+TARGET POST FORMAT: ${activeFormat.name} (Mandatory Length: STRICTLY between ${activeFormat.min} and ${activeFormat.max} characters across all sections combined)
 
 PILLAR DEFINITIONS (internalize these before writing):
 - Value/Educational = explains a concept generically, no specific project name attached, teaches "how something works."
@@ -251,15 +261,19 @@ CRITICAL RULES:
     // Auto-extract topic summary from raw notes (first 200 chars)
     const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim();
 
+    // Calculate total character count for first version
+    const firstVersionSections = parsed.versions[0]?.sections || {};
+    const totalCharCount = Object.values(firstVersionSections).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
+
     // Persist post to DB
     const postId = uuidv4();
     const today = date ?? new Date().toISOString().split('T')[0];
     db.prepare(`
-      INSERT INTO posts (id, date, post_type_id, raw_notes_used, topic_summary, versions, selected_version, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?)
-    `).run(postId, today, postTypeId, rawNotes, topicSummary, JSON.stringify(parsed.versions), new Date().toISOString());
+      INSERT INTO posts (id, date, post_type_id, raw_notes_used, topic_summary, versions, selected_version, status, post_format, character_count, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?, ?)
+    `).run(postId, today, postTypeId, rawNotes, topicSummary, JSON.stringify(parsed.versions), format, totalCharCount, new Date().toISOString());
 
-    return NextResponse.json({ postId, versions: parsed.versions, repeatWarning });
+    return NextResponse.json({ postId, versions: parsed.versions, repeatWarning, postFormat: format, characterCount: totalCharCount });
   } catch (e) {
     console.error('generate-post error:', e);
     return NextResponse.json({ error: String(e) }, { status: 500 });

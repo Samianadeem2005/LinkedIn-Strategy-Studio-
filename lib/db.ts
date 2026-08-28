@@ -157,6 +157,28 @@ function initSchema(db: Database.Database) {
   if (!reviewColumns.includes('suggested_order_index')) {
     db.exec("ALTER TABLE extraction_review ADD COLUMN suggested_order_index INTEGER DEFAULT NULL");
   }
+
+  // Runtime migration — add reason column to extraction_review for error tracking and LLM reasons
+  if (!reviewColumns.includes('reason')) {
+    db.exec("ALTER TABLE extraction_review ADD COLUMN reason TEXT DEFAULT NULL");
+  }
+
+  // Runtime migration — create pillar_quotas table if not exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pillar_quotas (
+      post_type_id TEXT PRIMARY KEY REFERENCES post_types(id),
+      target_count INTEGER DEFAULT 1
+    );
+  `);
+
+  // Runtime migration — add post_format and character_count to posts table
+  const postColumns = (db.prepare("PRAGMA table_info(posts)").all() as { name: string }[]).map(c => c.name);
+  if (!postColumns.includes('post_format')) {
+    db.exec("ALTER TABLE posts ADD COLUMN post_format TEXT DEFAULT 'text_post'");
+  }
+  if (!postColumns.includes('character_count')) {
+    db.exec("ALTER TABLE posts ADD COLUMN character_count INTEGER DEFAULT 0");
+  }
 }
 
 function seedIfEmpty(db: Database.Database) {

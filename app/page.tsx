@@ -25,11 +25,31 @@ export default function StudioPage() {
   const { show: showToast, ToastEl } = useToast();
 
   const [selectedPostTypeId, setSelectedPostTypeId] = useState('');
+  const [postFormat, setPostFormat] = useState<'text_post' | 'image_post' | 'carousel' | 'video_post'>('text_post');
   const [rawNotes, setRawNotes] = useState('');
   const [today] = useState(() => new Date().toISOString().split('T')[0]);
   const [calendarEntry, setCalendarEntry] = useState<CalendarEntry | null>(null);
   const [resolvedLabel, setResolvedLabel] = useState('');
   const [resolvedSource, setResolvedSource] = useState<'calendar' | 'weekly' | 'manual'>('manual');
+
+  // Quota & Weekly Saved Tracking
+  const [quotaList, setQuotaList] = useState<{ post_type_id: string; name: string; target_count: number; used_this_week: number }[]>([]);
+  const [daySavedMap, setDaySavedMap] = useState<Record<string, { pillar_name: string; post_id: string; topic: string }>>({});
+
+  const fetchQuotas = async () => {
+    try {
+      const res = await fetch('/api/pillar-quotas');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.quotas) setQuotaList(data.quotas);
+        if (data.daySavedMap) setDaySavedMap(data.daySavedMap);
+      }
+    } catch { /* fall through */ }
+  };
+
+  useEffect(() => {
+    fetchQuotas();
+  }, []);
 
   const [generating, setGenerating] = useState(false);
   const [webSearchStatus, setWebSearchStatus] = useState<string | null>(null); // null = idle, string = current step label
@@ -183,6 +203,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           rawNotes,
           postTypeId: selectedPostTypeId,
+          postFormat,
           date: today,
           selectedHooks: activeSelectedHookTexts,
           selectedHookIds
@@ -195,6 +216,7 @@ export default function StudioPage() {
       setEditedSections(data.versions[0].sections);
       setPostId(data.postId);
       setPostStatus('draft');
+      fetchQuotas();
       if (data.repeatWarning) setRepeatWarning(data.repeatWarning);
     } catch (e) {
       showToast(String(e), 'error');
@@ -274,6 +296,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           rawNotes,
           postTypeId: selectedPostTypeId,
+          postFormat,
           date: today,
           webResults: resultsText,
           selectedHooks: activeSelectedHookTexts,
@@ -288,6 +311,7 @@ export default function StudioPage() {
       setEditedSections(data.versions[0].sections);
       setPostId(data.postId);
       setPostStatus('draft');
+      fetchQuotas();
       if (data.repeatWarning) setRepeatWarning(data.repeatWarning);
     } catch (e) {
       showToast(String(e), 'error');
@@ -363,10 +387,12 @@ export default function StudioPage() {
     await fetch(`/api/posts/${postId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ versions: updatedVersions, selected_version: activeVersion })
+      body: JSON.stringify({ versions: updatedVersions, selected_version: activeVersion, status: 'draft' })
     });
     setVersions(updatedVersions);
-    showToast('Changes saved.', 'success');
+    setPostStatus('draft');
+    fetchQuotas();
+    showToast('Saved to Drafts!', 'success');
   };
 
   const handleStatusChange = async (status: 'draft' | 'approved' | 'published') => {
@@ -385,6 +411,9 @@ export default function StudioPage() {
   };
 
   const selectedType = postTypes.find(pt => pt.id === selectedPostTypeId);
+  const selectedQuota = quotaList.find(q => q.post_type_id === selectedPostTypeId);
+  const isQuotaExceeded = selectedQuota ? selectedQuota.target_count > 0 && selectedQuota.used_this_week >= selectedQuota.target_count : false;
+
   const activeAnatomy = settings?.anatomy_scope === 'per_post_type'
     ? anatomy.filter(s => !s.applies_to_post_type_id || s.applies_to_post_type_id === selectedPostTypeId)
     : anatomy.filter(s => !s.applies_to_post_type_id);
@@ -450,51 +479,47 @@ export default function StudioPage() {
                 <span>Weekly Schedule</span>
               </div>
               
-              {weeklySchedule.map(item => (
-                <div
-                  key={item.dayName}
-                  className={`px-3 py-2.5 rounded-full border text-xs flex items-center justify-between transition-all ${
-                    item.isToday ? 'shadow-lg shadow-indigo-500/20' : ''
-                  }`}
-                  style={{
-                    background: item.isToday
-                      ? 'linear-gradient(135deg, rgba(108,99,255,0.22), rgba(167,139,250,0.12))'
-                      : item.isPast
-                      ? 'var(--bg-elevated)'
-                      : 'var(--bg-surface)',
-                    borderColor: item.isToday ? 'var(--accent)' : 'var(--border-subtle)',
-                    color: item.isToday ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    fontWeight: item.isToday ? 600 : 500
-                  }}>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {item.isToday && (
-                      <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: 'var(--accent)' }} />
+              {weeklySchedule.map(item => {
+                const savedForDay = daySavedMap[item.dayName];
+                return (
+                  <div
+                    key={item.dayName}
+                    className={`px-3 py-2.5 rounded-full border text-xs flex items-center justify-between transition-all ${
+                      item.isToday ? 'shadow-lg shadow-indigo-500/20' : ''
+                    }`}
+                    style={{
+                      background: item.isToday
+                        ? 'linear-gradient(135deg, rgba(108,99,255,0.22), rgba(167,139,250,0.12))'
+                        : item.isPast
+                        ? 'var(--bg-elevated)'
+                        : 'var(--bg-surface)',
+                      borderColor: item.isToday ? 'var(--accent)' : 'var(--border-subtle)',
+                      color: item.isToday ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      fontWeight: item.isToday ? 600 : 500
+                    }}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {item.isToday && (
+                        <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: 'var(--accent)' }} />
+                      )}
+                      <span className="truncate">{item.dayName}</span>
+                    </div>
+
+                    {savedForDay && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                        style={{ background: 'var(--accent)', color: '#fff' }}>
+                        {savedForDay.pillar_name}
+                      </span>
                     )}
-                    <span className="truncate">{item.dayName}</span>
                   </div>
-
-                  {item.isPast && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
-                      {item.pillarName}
-                    </span>
-                  )}
-
-                  {item.isToday && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                      style={{ background: 'var(--accent)', color: '#fff' }}>
-                      {selectedType?.name || item.pillarName}
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Main Area: Raw Notes Box + Pillar Selector & AI Suggest Button */}
             <div className="lg:col-span-3 flex flex-col gap-3">
               
-              {/* Controls bar: Custom Pillar Dropdown + Suggest Pillar AI Button */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-xl border"
+              {/* Controls bar: Custom Pillar Dropdown + Post Format + Suggest Pillar AI Button */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 p-3 rounded-xl border"
                 style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
                 
                 {/* Custom Pillar Dropdown */}
@@ -517,6 +542,26 @@ export default function StudioPage() {
                   </div>
                 </div>
 
+                {/* Post Format Selector */}
+                <div className="flex-1 flex items-center gap-2">
+                  <label className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    Format:
+                  </label>
+                  <div className="relative flex-1">
+                    <select
+                      value={postFormat}
+                      onChange={e => setPostFormat(e.target.value as any)}
+                      className="w-full px-3 py-2 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-colors"
+                      style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                      <option value="text_post">Text Post (600–1,200 chars)</option>
+                      <option value="image_post">Image Post (900–1,500 chars)</option>
+                      <option value="carousel">Carousel (1,200–1,500 chars)</option>
+                      <option value="video_post">Video Post (500–800 chars)</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                  </div>
+                </div>
+
                 {/* Suggest Pillar Button */}
                 <button
                   onClick={classifyTopic}
@@ -527,6 +572,20 @@ export default function StudioPage() {
                   {classifying ? 'Analyzing Notes…' : 'Suggest Pillar'}
                 </button>
               </div>
+
+              {/* Quota Exceeded Warning Banner */}
+              {isQuotaExceeded && selectedQuota && (
+                <div className="p-3.5 rounded-xl border flex items-center gap-3 text-xs animate-fade-in"
+                  style={{ background: 'rgba(239, 68, 68, 0.12)', borderColor: '#ef4444', color: '#f87171' }}>
+                  <AlertTriangle size={18} className="flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-sm">Weekly Quota Reached for &quot;{selectedQuota.name}&quot;</p>
+                    <p className="font-normal text-xs mt-0.5" style={{ color: '#fca5a5' }}>
+                      You have saved {selectedQuota.used_this_week} of {selectedQuota.target_count} posts for this pillar this week. Generation for this pillar is blocked to enforce your weekly quota. Choose another pillar or update targets in Strategy.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Classification Suggestion Banner */}
               {classification && (
@@ -676,7 +735,7 @@ export default function StudioPage() {
             <button
               id="btn-generate-notes"
               onClick={handleGenerate}
-              disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
+              disabled={generating || !selectedPostTypeId || !rawNotes.trim() || isQuotaExceeded}
               className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
@@ -694,7 +753,7 @@ export default function StudioPage() {
             <button
               id="btn-generate-websearch"
               onClick={handleWebSearchGenerate}
-              disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
+              disabled={generating || !selectedPostTypeId || !rawNotes.trim() || isQuotaExceeded}
               className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: generating && webSearchStatus
@@ -808,38 +867,22 @@ export default function StudioPage() {
               </div>
 
               {/* Footer actions */}
-              <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium"
+              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
                   style={{
-                    background: postStatus === 'published' ? '#0d2e22' : postStatus === 'approved' ? '#1a1f0d' : 'var(--bg-elevated)',
-                    color: postStatus === 'published' ? 'var(--success)' : postStatus === 'approved' ? '#bef264' : 'var(--text-muted)',
-                    border: `1px solid ${postStatus === 'published' ? 'var(--success)' : postStatus === 'approved' ? '#4d7c0f' : 'var(--border)'}`,
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border)',
                   }}>
                   <Eye size={12} />
-                  {postStatus}
+                  Draft
                 </div>
 
                 <button onClick={handleSaveEdits}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/5"
-                  style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                  <Save size={12} /> Save Edits
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                  style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 2px 10px rgba(108,99,255,0.3)' }}>
+                  <Save size={14} /> Save to Drafts
                 </button>
-
-                {postStatus === 'draft' && (
-                  <button onClick={() => handleStatusChange('approved')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                    style={{ background: '#1a2e0d', border: '1px solid #4d7c0f', color: '#bef264' }}>
-                    <CheckCircle size={12} /> Mark Approved
-                  </button>
-                )}
-
-                {postStatus === 'approved' && (
-                  <button onClick={() => handleStatusChange('published')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                    style={{ background: '#0d2e22', border: '1px solid var(--success)', color: 'var(--success)' }}>
-                    <Rocket size={12} /> Mark Published
-                  </button>
-                )}
               </div>
             </>
           )}

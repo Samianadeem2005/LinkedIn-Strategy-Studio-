@@ -29,43 +29,45 @@ export default function StrategyPage() {
   const { show: showToast, ToastEl } = useToast();
   const [activeTab, setActiveTab] = useState<'weekly' | 'calendar'>('weekly');
 
-  // ── Tab A state ────────────────────────────────────────────────
-  const [mappings, setMappings] = useState<Record<string, { post_type_id: string; series_length: number; is_continuation_of: string }>>({});
-  const [savingWeekly, setSavingWeekly] = useState(false);
+  // ── Tab A state (Pillar Weekly Quotas) ─────────────────────────
+  const [pillarQuotas, setPillarQuotas] = useState<{ post_type_id: string; name: string; target_count: number; used_this_week: number }[]>([]);
+  const [savingQuotas, setSavingQuotas] = useState(false);
+
+  const fetchQuotas = async () => {
+    try {
+      const res = await fetch('/api/pillar-quotas');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.quotas) setPillarQuotas(data.quotas);
+      }
+    } catch { /* fall through */ }
+  };
 
   useEffect(() => {
-    const init: typeof mappings = {};
-    for (const day of DAYS) {
-      const found = weeklyMapping.find(m => m.day_of_week === day);
-      init[day] = {
-        post_type_id: found?.post_type_id ?? '',
-        series_length: found?.series_length ?? 1,
-        is_continuation_of: found?.is_continuation_of ?? '',
-      };
-    }
-    setMappings(init);
-  }, [weeklyMapping]);
+    fetchQuotas();
+  }, [postTypes]);
 
-  const saveWeekly = async () => {
-    setSavingWeekly(true);
+  const saveWeeklyQuotas = async () => {
+    setSavingQuotas(true);
     try {
-      const payload = DAYS.map(day => ({
-        day_of_week: day,
-        post_type_id: mappings[day]?.post_type_id || null,
-        series_length: mappings[day]?.series_length ?? 1,
-        is_continuation_of: mappings[day]?.is_continuation_of || null,
-      }));
-      const res = await fetch('/api/weekly-mapping', {
+      const res = await fetch('/api/pillar-quotas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          quotas: pillarQuotas.map(q => ({ post_type_id: q.post_type_id, target_count: q.target_count }))
+        })
       });
-      if (res.ok) { await refreshWeeklyMapping(); showToast('Weekly template saved.', 'success'); }
-      else { const d = await res.json(); showToast(d.error ?? 'Save failed.', 'error'); }
+      if (res.ok) {
+        showToast('Weekly pillar quotas saved.', 'success');
+        fetchQuotas();
+      } else {
+        const d = await res.json();
+        showToast(d.error ?? 'Save failed.', 'error');
+      }
     } catch (e) {
       showToast(String(e), 'error');
     } finally {
-      setSavingWeekly(false);
+      setSavingQuotas(false);
     }
   };
 
@@ -186,59 +188,55 @@ export default function StrategyPage() {
         </button>
       </div>
 
-      {/* ── Tab A: Weekly Template ───────────────────────── */}
+      {/* ── Tab A: Weekly Pillar Quotas ───────────────────────── */}
       {activeTab === 'weekly' && (
         <div>
           <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-            Fallback schedule — used when no Calendar Maker entry exists for a given date.
+            Set how many posts for each content pillar you want to create per week. Studio will strictly enforce these target quotas during generation.
           </p>
           <div className="grid grid-cols-1 gap-3">
-            {DAYS.map(day => {
-              const m = mappings[day] ?? { post_type_id: '', series_length: 1, is_continuation_of: '' };
+            {pillarQuotas.map(pq => {
+              const isQuotaReached = pq.used_this_week >= pq.target_count && pq.target_count > 0;
               return (
-                <div key={day} className="flex items-center gap-4 px-5 py-4 rounded-xl"
-                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-                  <div className="w-24 flex-shrink-0">
-                    <span className="font-medium text-sm">{day}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="relative">
-                      <select
-                        value={m.post_type_id}
-                        onChange={e => setMappings(prev => ({ ...prev, [day]: { ...prev[day], post_type_id: e.target.value } }))}
-                        className="w-full appearance-none"
-                        style={selectStyle}>
-                        <option value="">— None —</option>
-                        {postTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
-                      </select>
-                      <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                <div key={pq.post_type_id} className="flex items-center justify-between px-5 py-4 rounded-xl border"
+                  style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs"
+                      style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
+                      {pq.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{pq.name}</h4>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        Status this week: <strong style={{ color: isQuotaReached ? '#ef4444' : 'var(--accent)' }}>{pq.used_this_week} of {pq.target_count} posts saved</strong>
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Series:</span>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Target / Week:</span>
                     <input
-                      type="number" min={1} max={10}
-                      value={m.series_length}
-                      onChange={e => setMappings(prev => ({ ...prev, [day]: { ...prev[day], series_length: parseInt(e.target.value) || 1 } }))}
-                      className="w-14 text-center text-sm rounded-lg px-2 py-1.5"
+                      type="number"
+                      min={0}
+                      max={7}
+                      value={pq.target_count}
+                      onChange={e => {
+                        const val = parseInt(e.target.value) || 0;
+                        setPillarQuotas(prev => prev.map(item => item.post_type_id === pq.post_type_id ? { ...item, target_count: val } : item));
+                      }}
+                      className="w-16 text-center text-sm font-bold rounded-lg px-2 py-1.5"
                       style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                     />
                   </div>
-                  {m.post_type_id && (
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center"
-                      style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent)' }}>
-                      <span className="text-xs" style={{ color: 'var(--accent)' }}>✓</span>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
           <div className="mt-6 flex justify-end">
-            <button onClick={saveWeekly} disabled={savingWeekly}
+            <button onClick={saveWeeklyQuotas} disabled={savingQuotas}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 transition-all"
               style={{ background: 'var(--accent)', color: 'white', boxShadow: '0 4px 16px var(--accent-glow)' }}>
-              {savingWeekly ? <><Loader2 size={14} className="spinner" /> Saving…</> : <><Save size={14} /> Save Weekly Template</>}
+              {savingQuotas ? <><Loader2 size={14} className="spinner" /> Saving…</> : <><Save size={14} /> Save Weekly Quotas</>}
             </button>
           </div>
         </div>

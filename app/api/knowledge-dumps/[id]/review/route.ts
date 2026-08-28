@@ -54,7 +54,8 @@ export async function GET(
       const isNew = Number(row.is_new_category) === 1;
       const targetRowId = row.target_row_id as string | null;
       let decision = (row.user_decision as string) || 'pending';
-      if (!isNew && (decision === 'pending' || decision === 'keep')) {
+      const isError = decision === 'error';
+      if (!isNew && !isError && (decision === 'pending' || decision === 'keep')) {
         decision = 'keep_previous';
       }
 
@@ -63,20 +64,23 @@ export async function GET(
         is_new_category: Number(row.is_new_category),
         apply_mode: (row.apply_mode as string) || 'merge',
         user_decision: decision,
+        reason: (row.reason as string) || null,
         suggested_order_index: row.suggested_order_index != null ? Number(row.suggested_order_index) : null,
         target_row_name: targetRowId ? (nameMap[targetRowId] ?? 'Existing Rule') : null,
         current_text: (!isNew && targetRowId) ? (currentTextMap[targetRowId] ?? 'Current rule value not found.') : null
       };
     });
 
-    const newItems = enrichedRows.filter(r => r.is_new_category === 1);
-    const updates = enrichedRows.filter(r => r.is_new_category === 0);
+    const newItems = enrichedRows.filter(r => r.is_new_category === 1 && r.user_decision !== 'error');
+    const updates = enrichedRows.filter(r => r.is_new_category === 0 && r.user_decision !== 'error');
+    const errorItems = enrichedRows.filter(r => r.user_decision === 'error');
 
     return NextResponse.json({
       dump,
       clean_summary: (dump.clean_summary as string) || null,
       newItems,
       updates,
+      errorItems,
       total: reviewRows.length
     });
   } catch (e) {

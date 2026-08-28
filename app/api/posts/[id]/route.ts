@@ -48,3 +48,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM posts WHERE id = ?').get(id);
+    if (!existing) return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
+
+    db.prepare('DELETE FROM posts WHERE id = ?').run(id);
+    return NextResponse.json({ success: true, message: 'Post deleted successfully.' });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}

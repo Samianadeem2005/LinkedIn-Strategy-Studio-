@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
-import { Sparkles, Loader2, CheckCircle2, XCircle, FileText, Database, BookOpen, GitMerge, Replace, ShieldCheck, Ban, Check } from 'lucide-react';
+import { Sparkles, Loader2, CheckCircle2, XCircle, FileText, Database, BookOpen, GitMerge, Replace, ShieldCheck, Check, AlertTriangle } from 'lucide-react';
 
 interface ReviewItem {
   id: string;
@@ -15,7 +15,8 @@ interface ReviewItem {
   current_text?: string | null;
   apply_mode?: 'merge' | 'replace';
   suggested_order_index?: number | null;
-  user_decision: 'keep' | 'discard' | 'pending' | 'apply_update' | 'keep_previous';
+  user_decision: 'keep' | 'discard' | 'pending' | 'apply_update' | 'keep_previous' | 'error';
+  reason?: string | null;
 }
 
 export default function IngestPage() {
@@ -27,6 +28,7 @@ export default function IngestPage() {
 
   const [newItems, setNewItems] = useState<ReviewItem[]>([]);
   const [updates, setUpdates] = useState<ReviewItem[]>([]);
+  const [errorItems, setErrorItems] = useState<ReviewItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
 
@@ -73,8 +75,14 @@ export default function IngestPage() {
           user_decision: (item.user_decision as ReviewItem['user_decision']) || 'keep_previous'
         }));
 
+        const initializedErrorItems = (reviewData.errorItems || []).map((item: ReviewItem) => ({
+          ...item,
+          user_decision: 'error' as const
+        }));
+
         setNewItems(initializedNew);
         setUpdates(initializedUpdates);
+        setErrorItems(initializedErrorItems);
         showToast(`Extraction complete! ${reviewData.total} items extracted.`, 'success');
       }
     } catch (e) {
@@ -249,7 +257,7 @@ export default function IngestPage() {
                 All confirmed items have been applied to your database. Studio, Settings, and Hook Bank are live-updated.
               </p>
               <button
-                onClick={() => { setRawText(''); setNewItems([]); setUpdates([]); setDumpId(null); setCleanSummary(null); setCompleted(false); }}
+                onClick={() => { setRawText(''); setNewItems([]); setUpdates([]); setErrorItems([]); setDumpId(null); setCleanSummary(null); setCompleted(false); }}
                 className="px-4 py-2 rounded-lg text-xs font-medium border transition-colors hover:bg-white/5"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
               >
@@ -258,8 +266,8 @@ export default function IngestPage() {
             </div>
           )}
 
-          {/* Extracted Strategy Review Interface (3 Sections) */}
-          {!completed && (newItems.length > 0 || updates.length > 0 || cleanSummary) && (
+          {/* Extracted Strategy Review Interface */}
+          {!completed && (newItems.length > 0 || updates.length > 0 || errorItems.length > 0 || cleanSummary) && (
             <div className="space-y-8">
               
               {/* SECTION 1: Clean Summary (Read-Only Outline) */}
@@ -395,7 +403,6 @@ export default function IngestPage() {
                       const decision = item.user_decision;
                       const isApply = decision === 'apply_update';
                       const isKeepPrev = decision === 'keep_previous';
-                      const isDiscard = decision === 'discard';
                       const mode = item.apply_mode || 'merge';
 
                       return (
@@ -404,8 +411,7 @@ export default function IngestPage() {
                           className="rounded-2xl p-5 border transition-all space-y-4"
                           style={{
                             background: isApply ? 'var(--bg-elevated)' : 'rgba(255, 255, 255, 0.02)',
-                            borderColor: isApply ? 'var(--accent)' : 'var(--border)',
-                            opacity: isDiscard ? 0.5 : 1
+                            borderColor: isApply ? 'var(--accent)' : 'var(--border)'
                           }}
                         >
                           {/* Card Header */}
@@ -414,7 +420,7 @@ export default function IngestPage() {
                               {item.target_row_name || 'Existing Rule'}
                             </span>
 
-                            {/* 3 Explicit Choice Action Buttons */}
+                            {/* 2 Explicit Choice Action Buttons */}
                             <div className="flex items-center gap-1.5">
                               {/* Option 1: Apply Update */}
                               <button
@@ -440,19 +446,6 @@ export default function IngestPage() {
                                 }}
                               >
                                 <ShieldCheck size={13} /> Keep Previous (Untouched)
-                              </button>
-
-                              {/* Option 3: Discard Suggestion */}
-                              <button
-                                onClick={() => setDecision(item.id, 'discard', false)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                style={{
-                                  background: isDiscard ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-primary)',
-                                  color: isDiscard ? '#f87171' : 'var(--text-muted)',
-                                  border: `1px solid ${isDiscard ? '#ef4444' : 'var(--border)'}`
-                                }}
-                              >
-                                <Ban size={13} /> Discard Suggestion
                               </button>
                             </div>
                           </div>
@@ -528,6 +521,43 @@ export default function IngestPage() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: ⚠️ Couldn't Process — Check Manually */}
+              {errorItems.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 p-3.5 rounded-xl border" style={{ background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
+                    <AlertTriangle size={18} />
+                    <h3 className="font-bold text-sm">
+                      ⚠️ Couldn&apos;t process — check manually ({errorItems.length})
+                    </h3>
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    These items encountered pipeline or embedding errors during processing and could not be automatically evaluated.
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {errorItems.map(item => (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl p-5 border space-y-3"
+                        style={{ background: 'rgba(245, 158, 11, 0.04)', borderColor: 'rgba(245, 158, 11, 0.2)' }}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                            {item.heading}
+                          </span>
+                          <span className="text-[11px] px-2.5 py-1 rounded-md font-mono" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                            {item.reason || 'Pipeline Error'}
+                          </span>
+                        </div>
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          {item.point_text}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
