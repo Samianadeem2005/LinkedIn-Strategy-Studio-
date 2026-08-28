@@ -51,3 +51,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
+
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { sourceDate, targetDate } = body;
+
+    if (!sourceDate || !targetDate || sourceDate === targetDate) {
+      return NextResponse.json({ error: 'Invalid dates for swap' }, { status: 400 });
+    }
+
+    const db = getDb();
+    const tempDate = `TEMP_${Date.now()}`;
+
+    db.transaction(() => {
+      // Swap calendar_entries
+      db.prepare('UPDATE calendar_entries SET date = ? WHERE date = ?').run(tempDate, sourceDate);
+      db.prepare('UPDATE calendar_entries SET date = ? WHERE date = ?').run(sourceDate, targetDate);
+      db.prepare('UPDATE calendar_entries SET date = ? WHERE date = ?').run(targetDate, tempDate);
+
+      // Swap posts (drafts)
+      db.prepare('UPDATE posts SET date = ? WHERE date = ?').run(tempDate, sourceDate);
+      db.prepare('UPDATE posts SET date = ? WHERE date = ?').run(sourceDate, targetDate);
+      db.prepare('UPDATE posts SET date = ? WHERE date = ?').run(targetDate, tempDate);
+    })();
+
+    return NextResponse.json({ success: true, sourceDate, targetDate });
+  } catch (e) {
+    console.error('calendar-events PUT error:', e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}

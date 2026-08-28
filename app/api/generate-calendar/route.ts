@@ -4,6 +4,56 @@ import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { callWithGeminiFallback } from '@/lib/gemini';
 import { v4 as uuidv4 } from 'uuid';
 
+function getValidPostTypeId(db: ReturnType<typeof getDb>, rawIdOrName?: string, typeName?: string): string {
+  const postTypes = db.prepare('SELECT id, name FROM post_types').all() as { id: string; name: string }[];
+  if (postTypes.length === 0) return 'value';
+
+  const defaultId = postTypes[0].id;
+  const lowerMap: Record<string, string> = {};
+
+  postTypes.forEach(pt => {
+    lowerMap[pt.id] = pt.id; // exact ID match
+    lowerMap[pt.name.toLowerCase()] = pt.id; // exact name match
+  });
+
+  if (rawIdOrName && lowerMap[rawIdOrName]) return lowerMap[rawIdOrName];
+  if (rawIdOrName && lowerMap[rawIdOrName.toLowerCase()]) return lowerMap[rawIdOrName.toLowerCase()];
+  if (typeName && lowerMap[typeName.toLowerCase()]) return lowerMap[typeName.toLowerCase()];
+
+  const searchStr = `${rawIdOrName ?? ''} ${typeName ?? ''}`.toLowerCase();
+
+  if (searchStr.includes('value')) {
+    const match = postTypes.find(p => p.name.toLowerCase().includes('value'));
+    if (match) return match.id;
+  }
+  if (searchStr.includes('lead')) {
+    const match = postTypes.find(p => p.name.toLowerCase().includes('lead'));
+    if (match) return match.id;
+  }
+  if (searchStr.includes('showcase') || searchStr.includes('authority')) {
+    const match = postTypes.find(p => p.name.toLowerCase().includes('showcase') || p.name.toLowerCase().includes('authority'));
+    if (match) return match.id;
+  }
+  if (searchStr.includes('personal')) {
+    const match = postTypes.find(p => p.name.toLowerCase().includes('personal'));
+    if (match) return match.id;
+  }
+
+  if (rawIdOrName) {
+    const rule = db.prepare('SELECT pillar_ids FROM custom_pillar_rules WHERE id = ?').get(rawIdOrName) as { pillar_ids?: string } | undefined;
+    if (rule?.pillar_ids) {
+      try {
+        const ids = JSON.parse(rule.pillar_ids);
+        if (Array.isArray(ids) && ids.length > 0 && lowerMap[ids[0]]) {
+          return ids[0];
+        }
+      } catch (_) {}
+    }
+  }
+
+  return defaultId;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -19,9 +69,9 @@ export async function POST(req: NextRequest) {
     const db = getDb();
 
     // Query user settings for dynamic author profile / positioning
-    const settingsRow = db.prepare('SELECT tone_profile FROM settings WHERE id = 1').get() as { tone_profile?: string } | undefined;
-    const authorProfile = settingsRow?.tone_profile?.trim()
-      ? settingsRow.tone_profile.trim()
+    const settingsRow = db.prepare('SELECT about_me FROM settings WHERE id = 1').get() as { about_me?: string } | undefined;
+    const authorProfile = settingsRow?.about_me?.trim()
+      ? settingsRow.about_me.trim()
       : 'I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.';
 
     // Fetch custom pillar rules configured dynamically from Strategy & Pillar Quotas page
@@ -60,56 +110,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Expand rule pool dynamically according to user target counts
-    const expandedPool: { id: string; name: string }[] = [];
-    activeRules.forEach(r => {
-      for (let i = 0; i < r.target_count; i++) {
-        expandedPool.push({ id: r.id, name: r.name });
-      }
-    });
+    const activeQuotasSummary = activeRules.map(r => `"${r.name}": ${r.target_count} post(s)/week`).join(', ');
 
-    if (expandedPool.length === 0) {
-      expandedPool.push({ id: activeRules[0].id, name: activeRules[0].name });
-    }
-
-    // Deterministic shuffle per start date to assign rotated days to pillar types
-    const seed = startDate.split('-').reduce((acc: number, part: string) => acc + parseInt(part), 0);
-    const shuffledPool = [...expandedPool].sort((a, b) => {
-      const hashA = (a.id.charCodeAt(0) + seed) % 17;
-      const hashB = (b.id.charCodeAt(0) + seed) % 17;
-      return hashA - hashB;
-    });
-
-    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const phaseASchedule = daysOfWeek.map((dayName, idx) => {
-      const rule = shuffledPool[idx % shuffledPool.length];
-      return { day_of_week: dayName, post_type_id: rule.id, post_type_name: rule.name };
-    });
-
+    // Compute date mapping for calendar entries
     const startDateObj = new Date(startDate);
-    const isLastDay = (i: number) => i === durationDays - 1;
-    const daysSchedule = Array.from({ length: durationDays }, (_, i) => {
+    const dateMap: { date: string; day_name: string }[] = [];
+    for (let i = 0; i < durationDays; i++) {
       const d = new Date(startDateObj);
       d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
-      const matched = phaseASchedule.find(p => p.day_of_week === dayName) || phaseASchedule[i % phaseASchedule.length];
-
-      return {
-        day_index: i + 1,
-        date: dateStr,
-        day_name: dayName,
-        post_type_id: matched.post_type_id,
-        post_type_name: matched.post_type_name,
-        is_capstone: isLastDay(i)
-      };
-    });
-
-    // ─────────────────────────────────────────────────────────────
-    // PHASE B: TOPIC CLUSTERING & LOGICAL FLOW ARCS
-    // ─────────────────────────────────────────────────────────────
-    const capstoneDayIndex = daysSchedule.find(d => d.is_capstone)?.day_index ?? durationDays;
-    const activeQuotasSummary = activeRules.map(r => `"${r.name}": ${r.target_count} post(s)/week`).join(', ');
+      dateMap.push({
+        date: d.toISOString().split('T')[0],
+        day_name: d.toLocaleDateString('en-US', { weekday: 'long' })
+      });
+    }
 
     const calendarPrompt = `Act as an expert AI Personal Brand Strategist and Developer Growth Coach.
 
@@ -117,38 +130,62 @@ CONTEXT ABOUT ME:
 ${authorProfile}
 
 NON-NEGOTIABLE GROWTH RULES:
-1. ENGLISH ONLY — All titles, topics, bridge logic, and visual suggestions must be in clear English. No Roman Urdu, Hindi, or non-English phrases anywhere.
+
+1. ENGLISH ONLY — All titles, topics, bridge logic, and visual suggestions must be in clear English.
+
 2. Posting Frequency: Once a day, every day, including weekends. Sunday is a high-performing day — never skip it.
-3. **LOCKED PHASE A POST-TYPE SCHEDULE — DO NOT CHANGE ANY TYPE, DATE, OR ORDER:**
-${daysSchedule.map(d => `Day ${d.day_index} (${d.day_name}, ${d.date}): "${d.post_type_name}"${d.is_capstone ? ' [CAPSTONE — final day of batch]' : ''}`).join('\n')}
-4. WEEKLY MIX PER 7-DAY BLOCK — Respect the exact target numbers configured in Strategy & Pillar Quotas (${activeQuotasSummary}).
-5. Visual Requirement: Every post needs an image (code screenshot, architecture diagram, cheat-sheet graphic, comparison table, or a candid personal photo). No text-only posts.
-6. Topic Pacing & Logical Flow Rule: Do NOT drag a single tool/library/topic for more than 2-3 consecutive days. But also do NOT scatter unrelated topics randomly — each new topic should logically bridge from the previous one (e.g., "X's limitation is exactly why Y exists" or "once X is solved, Y becomes the next problem").
-7. Cluster tightly-related sub-topics together (e.g., AI Memory + Persistent Chat History + Mem0 are one conceptual family — don't force them into separate far-apart days if it creates repetition).
 
-PILLAR DEFINITIONS (must never overlap):
-- Value/Educational = explains a concept generically, no project/name attached, teaches "how something works."
-- Lead Magnet = a ready-to-use resource (checklist, cheat sheet, comparison table, framework) — save-worthy, list-format, not narrative.
-- Showcase/Authority = "Problem → Decision → Result" — real code/architecture from MY project, proof of execution.
-- Personal = my raw struggle/confusion/realization — no polish, no teaching, just relatable human moment.
+3. TOPIC EXTRACTION: Extract EVERY major distinct topic/concept from the raw material below. Every extracted topic MUST appear at least once in the final calendar.
 
-MY RAW TOPIC LIST FOR THIS BATCH:
+4. TOPIC ORDER — USE AS GIVEN, DO NOT RE-DERIVE:
+   If the raw material below includes an explicit ordered list of topics, treat that order as FINAL and AUTHORITATIVE. Do not re-sequence, re-rank, or second-guess it — your only job is to group it into families (Rule 5) and assign pillars/days (Rule 6) on top of it. If NO explicit order is given, then derive one logical sequence yourself using genuine prerequisite dependency (foundational concept before what builds on it), and state that derived sequence before the table.
+
+5. CONCEPTUAL FAMILY GROUPING (based on the Rule 4 order):
+   Walking through the topics in their given/derived order, group directly-adjacent topics into a "family" whenever they address the same underlying problem area (e.g., LangChain+LangGraph+Orchestrators = "how agents execute multi-step logic"; AI Memory+Persistent Chat History+Mem0 = "how agents remember things"). Topics with no close adjacent relative are standalone. Output this grouping as a labeled list before the table.
+
+6. MANDATORY SYNTHESIS POST PER FAMILY — THIS IS THE CORE MERGE REQUIREMENT:
+   Every family with 2 or more topics MUST include, as the LAST day of that family's run, ONE post that explicitly merges/synthesizes at least 2 of that family's topics together in the SAME post — showing how they connect or work together (e.g., "how LangGraph replaced my LangChain chains" or "how Persistent Chat History + Mem0 work together in my memory layer"). This synthesis post's "Topic(s) Covered" field must list 2 topics, not 1. Do not just place topics on adjacent days without ever combining any of them — adjacency alone is NOT sufficient; at least one true merge is required per family. Prefer making this synthesis post a Showcase (proof of the pieces working together in your real project), but if pillar quota doesn't allow Showcase that day, any pillar may host the synthesis as long as the 2-topic merge happens.
+
+7. PILLAR QUOTA — assign pillars per day (chosen freely by you) subject to:
+   a) Total count of each pillar across ${durationDays} days must exactly match ${activeQuotasSummary}.
+   b) Each consecutive 7-day block must independently reflect the same proportional pillar mix.
+   c) Final partial block (if any) should approximate the same ratio as closely as possible.
+   d) The final day (Day ${durationDays}) must be a Showcase/Capstone post tying multiple concepts together.
+
+8. Visual Requirement: Every post needs an image. No text-only posts.
+
+9. TOPIC PACING & NO-INTERLEAVING RULE:
+   a) Non-synthesis days cover exactly ONE topic.
+   b) The synthesis day (Rule 6) covers exactly TWO topics from the same family.
+   c) Never list three or more topics in any single day.
+   d) A family must occupy an unbroken run of consecutive days — no interleaving, no leaving and returning later.
+   e) No single topic run (including its family) exceeds what's needed to cover it once each plus one synthesis day — do not artificially stretch a family beyond that.
+   f) Every new topic/family must logically bridge from the immediately preceding one.
+
+10. FEASIBILITY: If topics are fewer than days allow, break broader topics into distinct sub-angles and insert them into the Rule 4 order at their correct position — not randomly.
+
+PILLAR DEFINITIONS:
+- Value/Educational = generic concept explanation, no project attached.
+- Lead Magnet = checklist/cheat sheet/framework — save-worthy, list-format.
+- Showcase/Authority = "Problem → Decision → Result" — real code/architecture from MY project.
+- Personal = raw struggle/confusion/realization — no teaching, no polish.
+
+MY RAW TOPIC LIST / NOTES FOR THIS BATCH:
 ${rawDump}
 
 TASK:
-Build a ${durationDays}-day content calendar using these exact rules and columns:
-| Day | Type | Post (hook + topic) | Topic(s) Covered | Visual |
-- "post_type_name" must match the locked pillar defined in Strategy & Pillar Quotas.
-- "post_title" column should give a specific, compelling headline/angle — not just the topic name.
-- "bridge_logic" column must explain in one short phrase why this topic follows logically from the previous day's topic.
-- Ensure the weekly mix ratio (${activeQuotasSummary}) defined is hit for every 7-day block.
-- Ensure no topic runs more than 2-3 consecutive days.
-- End the batch (Day ${capstoneDayIndex}) with a capstone Showcase post if this is the final block of a topic set, tying multiple concepts into one architecture diagram.
-- "visual_suggestion" column describing exactly what kind of image should accompany each post (e.g., code screenshot, flow diagram, cheat-sheet card, comparison table graphic, candid personal photo) — matched to the post type using this rule of thumb: Value → diagrams/flowcharts, Lead Magnet → checklist/cheat-sheet cards, Showcase → real code/architecture screenshots, Personal → authentic candid photos.
+Step 1: Output "TOPIC ORDER" (as given, or derived per Rule 4).
+Step 2: Output "FAMILY GROUPING" (per Rule 5), clearly marking which day will be each family's synthesis day.
+Step 3: Output the calendar table with EXACT columns:
+| Day | Type | Post | Topic(s) Covered | Bridge Logic | Visual |
 
-Generate exactly ${durationDays} entries.
-Keep the output as a single clean markdown table, no extra commentary before 
-or after unless I ask for strategy notes too.`;
+- "Topic(s) Covered": ONE topic normally; exactly TWO topics on each family's mandatory synthesis day (Rule 6); never three+.
+- "Bridge Logic": REQUIRED every row, referencing the Rule 4/5 dependency.
+- "Visual": Value → diagrams, Lead Magnet → checklist/cheat-sheet cards, Showcase → code/architecture screenshots, Personal → candid photos.
+
+Before finalizing, verify: every family has exactly one 2-topic synthesis day, no family is split/interleaved, every extracted topic appears at least once, and pillar quota (total + per-week) is exact.
+
+Generate exactly ${durationDays} entries.`;
 
     // Strictly enforce SchemaType output for zero prose, zero markdown fences, 100% structured JSON (TS equivalent of Pydantic)
     const jsonText = await callWithGeminiFallback(async (genAI) => {
@@ -166,9 +203,6 @@ or after unless I ask for strategy notes too.`;
                   type: SchemaType.OBJECT,
                   properties: {
                     day_index: { type: SchemaType.NUMBER },
-                    date: { type: SchemaType.STRING },
-                    day_name: { type: SchemaType.STRING },
-                    post_type_id: { type: SchemaType.STRING },
                     post_type_name: { type: SchemaType.STRING },
                     post_title: { type: SchemaType.STRING },
                     topics_covered: {
@@ -178,7 +212,7 @@ or after unless I ask for strategy notes too.`;
                     bridge_logic: { type: SchemaType.STRING },
                     visual_suggestion: { type: SchemaType.STRING }
                   },
-                  required: ['day_index', 'date', 'day_name', 'post_type_id', 'post_type_name', 'post_title', 'topics_covered', 'bridge_logic', 'visual_suggestion']
+                  required: ['day_index', 'post_type_name', 'post_title', 'topics_covered', 'bridge_logic', 'visual_suggestion']
                 }
               },
               validation: {
@@ -200,72 +234,36 @@ or after unless I ask for strategy notes too.`;
     });
 
     const parsed = JSON.parse(jsonText);
-
     const validationWarnings: string[] = [...(parsed.validation?.warnings ?? [])];
+
+    // Backend soft sanity warning check if raw notes are very brief for long duration
+    const wordCount = rawDump.trim().split(/\s+/).length;
+    if (wordCount < 15 && durationDays >= 14) {
+      validationWarnings.push("Aapke notes short hain, 30 din ke liye thoda aur detail add karein for best results.");
+    }
+
     const entries = (parsed.entries as {
-      day_index: number; date: string; day_name: string; post_type_id: string;
-      post_type_name: string; post_title: string; topics_covered: string[];
-      bridge_logic: string; visual_suggestion: string;
+      day_index: number; post_type_name: string; post_title: string;
+      topics_covered: string[]; bridge_logic: string; visual_suggestion: string;
     }[]).map((entry, i) => {
-      const locked = daysSchedule[i] || daysSchedule[0];
+      const idx = typeof entry.day_index === 'number' ? entry.day_index - 1 : i;
+      const dateInfo = dateMap[idx] || dateMap[i % dateMap.length];
+      const matchedTypeId = getValidPostTypeId(db, undefined, entry.post_type_name);
+
       return {
-        ...entry,
-        day_index: locked.day_index,
-        date: locked.date,
-        day_name: locked.day_name,
-        post_type_id: locked.post_type_id,
-        post_type_name: locked.post_type_name
+        day_index: idx + 1,
+        date: dateInfo.date,
+        day_name: dateInfo.day_name,
+        post_type_id: matchedTypeId,
+        post_type_name: entry.post_type_name,
+        post_title: entry.post_title,
+        topics_covered: entry.topics_covered,
+        bridge_logic: entry.bridge_logic,
+        visual_suggestion: entry.visual_suggestion
       };
     });
 
-    // ─────────────────────────────────────────────────────────────
-    // PHASE C: VALIDATOR PASS — Topic Closure & Reappearance Check
-    // ─────────────────────────────────────────────────────────────
-    const topicTracker: Record<string, { firstSeen: number; lastSeen: number }> = {};
-    const closedTopics = new Set<string>();
-
-    const postTypeNameSet = new Set(
-      activeRules.map(r => r.name.toLowerCase())
-    );
-
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      const topics = Array.isArray(entry.topics_covered) ? entry.topics_covered : [entry.topics_covered];
-
-      for (const rawTopic of topics) {
-        if (!rawTopic) continue;
-        const topic = rawTopic.trim().toLowerCase();
-
-        if (postTypeNameSet.has(topic)) continue;
-        if (['personal story', 'reflection', 'personal experience'].includes(topic)) continue;
-
-        if (closedTopics.has(topic)) {
-          validationWarnings.push(
-            `Day ${entry.day_index}: Topic "${rawTopic}" reappears after its cluster had already closed (First seen Day ${topicTracker[topic].firstSeen}, last closed Day ${topicTracker[topic].lastSeen}). Topics must stay in tight 2-3 day clusters without scattering.`
-          );
-        } else if (topicTracker[topic]) {
-          const gap = entry.day_index - topicTracker[topic].lastSeen;
-          if (gap > 2) {
-            closedTopics.add(topic);
-            validationWarnings.push(
-              `Day ${entry.day_index}: Topic "${rawTopic}" resurfaces after a ${gap}-day gap. Topics must resolve in clean consecutive clusters.`
-            );
-          } else {
-            topicTracker[topic].lastSeen = entry.day_index;
-          }
-        } else {
-          topicTracker[topic] = { firstSeen: entry.day_index, lastSeen: entry.day_index };
-        }
-      }
-
-      for (const [t, data] of Object.entries(topicTracker)) {
-        if (!closedTopics.has(t) && entry.day_index - data.lastSeen >= 2) {
-          closedTopics.add(t);
-        }
-      }
-    }
-
-    return NextResponse.json({ entries, phaseASchedule, validationWarnings });
+    return NextResponse.json({ entries, validationWarnings });
   } catch (e) {
     console.error('generate-calendar error:', e);
     return NextResponse.json({ error: String(e) }, { status: 500 });
@@ -288,8 +286,9 @@ export async function PUT(req: NextRequest) {
     `);
     const tx = db.transaction((items: typeof entries) => {
       for (const e of items) {
+        const validPostTypeId = getValidPostTypeId(db, e.post_type_id, e.post_type_name);
         insertEntry.run(
-          uuidv4(), planId, e.day_index, e.date, e.post_type_id,
+          uuidv4(), planId, e.day_index, e.date, validPostTypeId,
           e.post_title, JSON.stringify(e.topics_covered ?? []),
           e.bridge_logic ?? '', e.visual_suggestion ?? ''
         );

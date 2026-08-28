@@ -30,6 +30,7 @@ export interface Settings {
   frequency: string;
   tone_profile: ToneProfile;
   anatomy_scope: 'global' | 'per_post_type';
+  about_me?: string;
 }
 
 export interface WeeklyMapping {

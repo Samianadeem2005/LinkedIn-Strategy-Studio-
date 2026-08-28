@@ -333,13 +333,24 @@ export default function SettingsPage() {
   const { postTypes, anatomy, settings, refreshPostTypes, refreshAnatomy, refreshSettings } = useApp();
   const { show: showToast, ToastEl } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'pillars' | 'anatomy' | 'tone' | 'mechanics'>('pillars');
+  const [activeTab, setActiveTab] = useState<'about' | 'pillars' | 'anatomy' | 'tone' | 'mechanics'>('about');
   const [ptModal, setPtModal] = useState<{ open: boolean; existing?: PostType }>({ open: false });
   const [aModal, setAModal] = useState<{ open: boolean; existing?: AnatomySection }>({ open: false });
   const [wmModal, setWmModal] = useState<{ open: boolean; existing?: WritingMechanic }>({ open: false });
   
   const [writingMechanics, setWritingMechanics] = useState<WritingMechanic[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // About Me context state
+  const [aboutMe, setAboutMe] = useState(settings?.about_me ?? '');
+  const [savingAboutMe, setSavingAboutMe] = useState(false);
+
+  // Sync aboutMe from settings on load
+  useEffect(() => {
+    if (settings?.about_me) {
+      setAboutMe(settings.about_me);
+    }
+  }, [settings?.about_me]);
 
   // Tone form state
   const [formality, setFormality] = useState<'casual' | 'professional' | 'mixed'>(settings?.tone_profile?.formality ?? 'mixed');
@@ -371,6 +382,33 @@ export default function SettingsPage() {
     return () => window.removeEventListener('strategy_updated', handleStrategyUpdated);
   }, [fetchMechanics, refreshAll]);
 
+  const saveAboutMe = async () => {
+    setSavingAboutMe(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          frequency: settings?.frequency ?? 'daily',
+          anatomy_scope: anatomyScope,
+          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix },
+          about_me: aboutMe
+        })
+      });
+      if (res.ok) {
+        await refreshSettings();
+        showToast('About Me / Brand Context saved successfully.', 'success');
+      } else {
+        const d = await res.json();
+        showToast(d.error ?? 'Save failed.', 'error');
+      }
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      setSavingAboutMe(false);
+    }
+  };
+
   const saveTone = async () => {
     setSavingTone(true);
     try {
@@ -380,7 +418,8 @@ export default function SettingsPage() {
         body: JSON.stringify({
           frequency: settings?.frequency ?? 'daily',
           anatomy_scope: anatomyScope,
-          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix }
+          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix },
+          about_me: aboutMe
         })
       });
       if (res.ok) { await refreshSettings(); showToast('Settings saved.', 'success'); }
@@ -474,6 +513,7 @@ export default function SettingsPage() {
   };
 
   const tabs = [
+    { id: 'about' as const, label: 'About Me', icon: 'M' },
     { id: 'pillars' as const, label: 'Post Pillars', icon: 'P' },
     { id: 'anatomy' as const, label: 'Post Anatomy', icon: 'A' },
     { id: 'tone'    as const, label: 'Tone & Voice', icon: 'T' },
@@ -540,6 +580,51 @@ export default function SettingsPage() {
       {/* Tab Content - scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-8">
+
+          {/* TAB 0: About Me / Context */}
+          {activeTab === 'about' && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="font-semibold text-base">About Me / Brand Context</h2>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    This background context is directly injected into Gemini AI prompts under <span className="font-mono text-purple-400 font-semibold">CONTEXT ABOUT ME</span>.
+                    Whenever you update this section, all future calendar generation and post creation will automatically use your latest context.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 mb-6">
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Your Professional Bio &amp; Proof-of-Work Context
+                </label>
+                <textarea
+                  value={aboutMe}
+                  onChange={e => setAboutMe(e.target.value)}
+                  rows={8}
+                  placeholder="e.g. I am an AI Engineer (Software Engineering student, class of 2027) building in public..."
+                  className="w-full px-4 py-3 rounded-xl border text-sm leading-relaxed focus:outline-none resize-y"
+                  style={{
+                    background: 'var(--bg-primary)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={e => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
+                />
+              </div>
+
+              <button
+                onClick={saveAboutMe}
+                disabled={savingAboutMe}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                style={{ background: 'var(--accent)', color: 'white' }}
+              >
+                {savingAboutMe ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save About Me Context</>}
+              </button>
+            </div>
+          )}
 
           {/* TAB 1: Post Pillars */}
           {activeTab === 'pillars' && (

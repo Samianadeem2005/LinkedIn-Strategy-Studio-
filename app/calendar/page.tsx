@@ -11,7 +11,7 @@ interface CalendarItem {
   post_type_id: string;
   post_type_name: string;
   post_title?: string;
-  topics_covered?: string[];
+  topics_covered?: string[] | string;
   bridge_logic?: string;
   visual_suggestion?: string;
   status?: string;
@@ -45,14 +45,12 @@ const formatNames: Record<string, string> = {
   'video_post': 'Video Post (500–800 chars)'
 };
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 export default function CalendarPage() {
   const { show: showToast, ToastEl } = useToast();
 
-  // Current selected month date (defaults to September 2026 or current active month)
   const [currentDate, setCurrentDate] = useState(() => {
-    // If today is before Sep 2026, default to Sep 2026 for demonstration if calendar entries exist, else current month
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
@@ -60,6 +58,10 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [calendarEntries, setCalendarEntries] = useState<CalendarItem[]>([]);
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
+
+  // Drag & drop state
+  const [draggedDate, setDraggedDate] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
   // Selected date pop-up state
   const [selectedDayEvent, setSelectedDayEvent] = useState<{
@@ -99,6 +101,59 @@ export default function CalendarPage() {
   useEffect(() => {
     fetchData();
   }, [monthQueryString]);
+
+  // Handle Drag & Drop Swap Logic
+  const handleSwapDates = async (sourceDate: string, targetDate: string) => {
+    if (!sourceDate || !targetDate || sourceDate === targetDate) return;
+
+    // Optimistic state update in UI
+    setCalendarEntries(prev => prev.map(c => {
+      if (c.date === sourceDate) return { ...c, date: targetDate };
+      if (c.date === targetDate) return { ...c, date: sourceDate };
+      return c;
+    }));
+
+    setDrafts(prev => prev.map(d => {
+      if (d.date === sourceDate) return { ...d, date: targetDate };
+      if (d.date === targetDate) return { ...d, date: sourceDate };
+      return d;
+    }));
+
+    showToast('Swapping dates...', 'info');
+
+    try {
+      const res = await fetch('/api/calendar-events', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceDate, targetDate })
+      });
+
+      if (res.ok) {
+        showToast('Topic date updated successfully!', 'success');
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Failed to update dates in DB', 'error');
+        fetchData(); // Rollback on error
+      }
+    } catch (e) {
+      showToast('Network error while swapping dates', 'error');
+      fetchData(); // Rollback on error
+    }
+  };
+
+  // Helper to format topic(s) covered string
+  const formatTopicsCovered = (topics?: string[] | string): string => {
+    if (!topics) return '';
+    if (Array.isArray(topics)) return topics.join(', ');
+    if (typeof topics === 'string') {
+      try {
+        const parsed = JSON.parse(topics);
+        if (Array.isArray(parsed)) return parsed.join(', ');
+      } catch (_) {}
+      return topics;
+    }
+    return '';
+  };
 
   // Build Grid Days for Month
   const gridDays = useMemo(() => {
@@ -168,75 +223,120 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-6xl mx-auto px-6 py-4 h-[calc(100vh-80px)] flex flex-col justify-between overflow-hidden">
       {ToastEl}
 
       {/* Header & Controls */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               {monthYearString}
             </h1>
             <div className="flex items-center gap-1">
               <button onClick={handlePrevMonth}
-                className="p-1.5 rounded-lg border transition-colors hover:bg-white/5"
+                className="p-1 rounded-lg border transition-colors hover:bg-white/5"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
                 title="Previous month">
-                <ChevronLeft size={16} />
+                <ChevronLeft size={14} />
               </button>
               <button onClick={handleNextMonth}
-                className="p-1.5 rounded-lg border transition-colors hover:bg-white/5"
+                className="p-1 rounded-lg border transition-colors hover:bg-white/5"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
                 title="Next month">
-                <ChevronRight size={16} />
+                <ChevronRight size={14} />
               </button>
             </div>
           </div>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            {totalScheduledCount} {totalScheduledCount === 1 ? 'post scheduled' : 'posts scheduled'}
+          <p className="text-[11px] mt-0.5 flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+            <span>{totalScheduledCount} {totalScheduledCount === 1 ? 'post scheduled' : 'posts scheduled'}</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full border border-purple-500/30 text-purple-400 bg-purple-500/10">
+              Drag cards to swap dates
+            </span>
           </p>
         </div>
 
         <Link href="/strategy"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-          <Sparkles size={14} style={{ color: 'var(--accent)' }} /> Strategy & Quotas
+          <Sparkles size={13} style={{ color: 'var(--accent)' }} /> Strategy & Quotas
         </Link>
       </div>
 
       {/* Weekday Labels Header */}
-      <div className="grid grid-cols-7 gap-3 mb-3 text-center">
+      <div className="grid grid-cols-7 gap-2 mb-2 text-center shrink-0">
         {WEEKDAYS.map((day, idx) => (
-          <div key={day} className="text-xs font-semibold uppercase tracking-wider py-1"
+          <div key={day} className="text-[11px] font-bold uppercase tracking-wider py-0.5"
             style={{ color: idx === 0 || idx === 1 ? 'var(--accent)' : 'var(--text-muted)' }}>
             {day}
           </div>
         ))}
       </div>
 
-      {/* Monthly Grid */}
+      {/* Monthly Grid with viewport fit and auto-rows-fr */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-32 gap-3" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--text-muted)' }}>
           <Loader2 size={28} className="spinner" />
           <p className="text-sm font-medium">Loading calendar schedule...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-7 gap-3">
+        <div className="flex-1 grid grid-cols-7 auto-rows-fr gap-2 min-h-0 overflow-hidden">
           {gridDays.map((cell, idx) => {
             if (!cell) {
               return (
-                <div key={`empty-${idx}`} className="h-28 rounded-2xl" style={{ background: 'transparent' }} />
+                <div key={`empty-${idx}`} className="w-full h-full min-h-0 rounded-xl overflow-hidden" style={{ background: 'transparent' }} />
               );
             }
 
             const events = eventsByDate[cell.dateStr];
             const hasDraft = !!events?.draft;
             const hasPlan = !!events?.plan;
+            const isDraggable = hasDraft || hasPlan;
+            const isBeingDragged = draggedDate === cell.dateStr;
+            const isDragTarget = dragOverDate === cell.dateStr;
+
+            const topicText = hasPlan
+              ? formatTopicsCovered(events.plan?.topics_covered) || events.plan?.post_title
+              : events?.draft?.topic_summary || 'Saved Draft';
 
             return (
               <div
                 key={cell.dateStr}
+                draggable={isDraggable}
+                onDragStart={(e) => {
+                  setDraggedDate(cell.dateStr);
+                  e.dataTransfer.setData('text/plain', cell.dateStr);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragEnd={() => {
+                  setDraggedDate(null);
+                  setDragOverDate(null);
+                }}
+                onDragOver={(e) => {
+                  if (draggedDate && draggedDate !== cell.dateStr) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }
+                }}
+                onDragEnter={(e) => {
+                  if (draggedDate && draggedDate !== cell.dateStr) {
+                    e.preventDefault();
+                    setDragOverDate(cell.dateStr);
+                  }
+                }}
+                onDragLeave={(e) => {
+                  if (dragOverDate === cell.dateStr) {
+                    setDragOverDate(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverDate(null);
+                  const sourceDate = e.dataTransfer.getData('text/plain') || draggedDate;
+                  if (sourceDate && sourceDate !== cell.dateStr) {
+                    handleSwapDates(sourceDate, cell.dateStr);
+                  }
+                }}
                 onClick={() => {
                   if (hasDraft || hasPlan) {
                     setSelectedDayEvent({
@@ -246,45 +346,55 @@ export default function CalendarPage() {
                     });
                   }
                 }}
-                className={`h-28 rounded-2xl p-3 flex flex-col justify-between border transition-all ${
-                  hasDraft || hasPlan ? 'cursor-pointer hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/10' : ''
+                className={`w-full h-full min-h-0 rounded-xl p-2 flex flex-col justify-between border overflow-hidden transition-all duration-200 select-none box-border ${
+                  isDraggable ? 'cursor-grab active:cursor-grabbing hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/10' : ''
+                } ${
+                  isBeingDragged ? 'opacity-40 scale-95 border-dashed border-purple-500' : ''
+                } ${
+                  isDragTarget ? 'ring-2 ring-purple-500 border-purple-500 bg-purple-500/20 scale-[1.02] shadow-xl shadow-purple-500/20' : ''
                 }`}
                 style={{
-                  background: 'var(--bg-surface)',
-                  borderColor: hasDraft ? 'var(--accent)' : hasPlan ? 'rgba(108,99,255,0.3)' : 'rgba(255,255,255,0.06)',
+                  background: isDragTarget ? 'rgba(124, 58, 237, 0.15)' : 'var(--bg-surface)',
+                  borderColor: isDragTarget
+                    ? '#7c3aed'
+                    : hasDraft
+                    ? 'var(--accent)'
+                    : hasPlan
+                    ? 'rgba(108,99,255,0.3)'
+                    : 'rgba(255,255,255,0.07)',
                 }}
               >
-                {/* Top Row: Day Number */}
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                {/* Top Row: Day Number (text-xs / ~12px, font-medium) */}
+                <div className="flex items-center justify-between pointer-events-none w-full">
+                  <span className="font-medium text-xs leading-none" style={{ color: 'var(--text-primary)' }}>
                     {cell.dayNum}
                   </span>
                   {hasDraft && (
-                    <span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} title="Saved Draft" />
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--accent)' }} title="Saved Draft" />
                   )}
                 </div>
 
                 {/* Event Content Inside Day Box */}
                 {hasDraft && (
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block mb-1 truncate max-w-full"
+                  <div className="min-w-0 pointer-events-none overflow-hidden flex flex-col justify-end gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block truncate max-w-full opacity-90 self-start"
                       style={{ background: 'rgba(124, 58, 237, 0.2)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
                       {events.draft?.post_type_name || 'Draft'}
-                    </div>
-                    <p className="text-xs font-medium line-clamp-2 leading-tight" style={{ color: 'var(--text-primary)' }}>
+                    </span>
+                    <p className="text-[8px] font-normal truncate max-w-full leading-tight" style={{ color: 'var(--text-primary)' }}>
                       {events.draft?.topic_summary || 'Saved Draft'}
                     </p>
                   </div>
                 )}
 
                 {!hasDraft && hasPlan && (
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block mb-1 truncate max-w-full"
+                  <div className="min-w-0 pointer-events-none overflow-hidden flex flex-col justify-end gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block truncate max-w-full opacity-90 self-start"
                       style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid #3b82f6' }}>
                       {events.plan?.post_type_name || 'Planned'}
-                    </div>
-                    <p className="text-xs font-medium line-clamp-2 leading-tight" style={{ color: 'var(--text-primary)' }}>
-                      {events.plan?.post_title}
+                    </span>
+                    <p className="text-[8px] font-normal truncate max-w-full leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {topicText}
                     </p>
                   </div>
                 )}
@@ -324,7 +434,7 @@ export default function CalendarPage() {
                     {selectedDayEvent.dateStr}
                   </span>
                 </div>
-                <h2 className="text-lg font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                <h2 className="text-lg font-bold mt-1 leading-snug" style={{ color: 'var(--text-primary)' }}>
                   {selectedDayEvent.draft?.topic_summary || selectedDayEvent.plan?.post_title}
                 </h2>
               </div>
@@ -372,11 +482,23 @@ export default function CalendarPage() {
               </div>
             ) : selectedDayEvent.plan ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-xs flex-wrap">
                   <span className="px-2.5 py-1 rounded-full font-bold" style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                     Pillar: {selectedDayEvent.plan.post_type_name || 'Standard'}
                   </span>
+                  {formatTopicsCovered(selectedDayEvent.plan.topics_covered) && (
+                    <span className="px-2.5 py-1 rounded-full font-medium" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                      Topic(s): {formatTopicsCovered(selectedDayEvent.plan.topics_covered)}
+                    </span>
+                  )}
                 </div>
+
+                {selectedDayEvent.plan.post_title && (
+                  <div className="p-3.5 rounded-xl border text-xs" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)' }}>
+                    <strong className="block font-semibold mb-1" style={{ color: 'var(--accent)' }}>Planned Headline / Angle:</strong>
+                    <p style={{ color: 'var(--text-primary)' }} className="text-sm font-medium">{selectedDayEvent.plan.post_title}</p>
+                  </div>
+                )}
 
                 {selectedDayEvent.plan.bridge_logic && (
                   <div className="p-3.5 rounded-xl border text-xs" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)' }}>
