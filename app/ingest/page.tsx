@@ -8,7 +8,7 @@ interface ReviewItem {
   id: string;
   heading: string;
   point_text: string;
-  target_table: 'post_types' | 'post_anatomy' | 'writing_mechanics' | 'hook_bank';
+  target_table: 'post_types' | 'post_anatomy' | 'writing_mechanics' | 'hook_types';
   is_new_category: number;
   target_row_id: string | null;
   target_row_name?: string | null;
@@ -161,7 +161,7 @@ export default function IngestPage() {
       case 'post_types': return { bg: 'rgba(167, 139, 250, 0.15)', color: '#a78bfa', label: 'Post Pillar' };
       case 'post_anatomy': return { bg: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', label: 'Post Anatomy' };
       case 'writing_mechanics': return { bg: 'rgba(52, 211, 153, 0.15)', color: '#34d399', label: 'Writing Mechanic' };
-      case 'hook_bank': return { bg: 'rgba(251, 146, 60, 0.15)', color: '#fb923c', label: 'Hook Bank' };
+      case 'hook_types': return { bg: 'rgba(251, 146, 60, 0.15)', color: '#fb923c', label: 'Hook Types' };
       default: return { bg: 'var(--bg-hover)', color: 'var(--text-muted)', label: table };
     }
   };

@@ -71,14 +71,22 @@ export async function POST(req: NextRequest) {
     // Load anatomy - respect scope
     const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Record<string, unknown> | undefined;
     const scope = (settings?.anatomy_scope as string) ?? 'global';
-    let anatomySections;
+    let anatomySections: Record<string, unknown>[] = [];
     if (scope === 'per_post_type') {
-      anatomySections = db.prepare(
-        'SELECT * FROM post_anatomy WHERE applies_to_post_type_id = ? OR applies_to_post_type_id IS NULL ORDER BY order_index'
+      const typeSpecific = db.prepare(
+        'SELECT * FROM post_anatomy WHERE applies_to_post_type_id = ? ORDER BY order_index ASC'
       ).all(postTypeId) as Record<string, unknown>[];
+
+      if (typeSpecific.length > 0) {
+        anatomySections = typeSpecific;
+      } else {
+        anatomySections = db.prepare(
+          'SELECT * FROM post_anatomy WHERE applies_to_post_type_id IS NULL ORDER BY order_index ASC'
+        ).all() as Record<string, unknown>[];
+      }
     } else {
       anatomySections = db.prepare(
-        'SELECT * FROM post_anatomy WHERE applies_to_post_type_id IS NULL ORDER BY order_index'
+        'SELECT * FROM post_anatomy WHERE applies_to_post_type_id IS NULL ORDER BY order_index ASC'
       ).all() as Record<string, unknown>[];
     }
 
@@ -142,15 +150,13 @@ export async function POST(req: NextRequest) {
       'SELECT prompt_directive FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
     ).all() as { prompt_directive: string }[];
 
-    // Handle selected hooks if provided
-    const selectedHooks = (body.selectedHooks as string[] | undefined) ?? [];
-    const selectedHookIds = (body.selectedHookIds as string[] | undefined) ?? [];
-    if (selectedHookIds.length > 0) {
-      const updateHookStmt = db.prepare('UPDATE hook_bank SET used_count = used_count + 1 WHERE id = ?');
-      for (const hid of selectedHookIds) {
-        updateHookStmt.run(hid);
-      }
-    }
+    // Load active hook types live from DB
+    const dbHookTypes = db.prepare('SELECT name, description, angles FROM hook_types ORDER BY rowid ASC').all() as { name: string; description: string; angles: string }[];
+    const hookBankList = dbHookTypes.map(ht => {
+      const parsedAngles: string[] = ht.angles ? JSON.parse(ht.angles) : [];
+      const angleStr = parsedAngles.join(' / ');
+      return `${ht.name} — ${ht.description} (angles: ${angleStr})`;
+    }).join('\n');
 
     const anatomyPrompt = anatomySections.map((s, i) =>
       `${i + 1}. **${s.section_name}**: ${s.rule_description}`
@@ -158,10 +164,27 @@ export async function POST(req: NextRequest) {
 
     const userAboutMe = (settings?.about_me as string)?.trim() || "I am an AI Engineer building in public on LinkedIn.";
 
-    // ── Shared context block ───────────────────────────────────────
-    const sharedContext = `
-ACTIVE MODE: ${mode === 'A' ? 'A — Generate from Notes' : 'B — Research & Generate via Web Search'}
+    // ── Mode-specific instruction block ───────────────────────────
+    const modeInstructions = mode === 'A'
+      ? `## MODE A — Generate from Notes
+RAW NOTES / INPUT: ${rawNotes}
+- **Detailed Input**: Use code, specs & real project details directly as backbone.
+- **Thin / Keyword Input** (e.g. "RAG", "pgvector"): Break down the complete end-to-end architecture & all subcomponents (e.g. chunking → embeddings → vector indexing → similarity search → context synthesis). Never write superficial generic text.`
+      : `## MODE B — Research & Generate via Web Search & Official Docs
+TOPIC: ${rawNotes}
+SEARCH RESULTS:
+${webResults}
+- **Extract Technical Specs**: Pull official framework docs, API specs, architecture patterns, subcomponents (e.g. chunking, vector indexing, retrieval pipelines, state graphs), benchmarks & best practices.
+- **Synthesize**: Re-explain the full concept end-to-end in your own engineering voice with practical workflow steps & trade-offs.`;
+
+    // ── Full assembled prompt ──────────────────────────────────────
+    const prompt = `You are an expert LinkedIn content strategist writing on behalf of:
+${userAboutMe}
+
+ACTIVE MODE: ${mode === 'A' ? 'Mode A — Generate from Notes' : 'Mode B — Research & Generate via Web Search & Official Docs'}
+
 TODAY'S PILLAR: ${postType.name}
+
 TARGET POST FORMAT: ${activeFormat.name} (Mandatory Length: STRICTLY between ${activeFormat.min} and ${activeFormat.max} characters across all sections combined)
 
 ACTIVE PILLAR'S CORE FOCUS:
@@ -179,41 +202,19 @@ ${anatomyPrompt}
 WRITING MECHANICS DIRECTIVES (mandatory formatting & structural constraints):
 ${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive}`).join('\n') : '• Keep lines short and scannable. Avoid wall of text blocks.'}
 
-${selectedHooks.length > 0 ? `SELECTED HOOK EXAMPLES FOR INSPIRATION:\n${selectedHooks.map(h => `• "${h}"`).join('\n')}` : ''}
+AVAILABLE HOOK TYPES (structural moves, not literal text):
+${hookBankList || 'No hook types configured.'}
+
+From the hook types above, pick ONE that best fits today's pillar and topic. 
+Write an original sentence per version following one of its angles — never 
+copy the angle text directly. All 3 versions use the SAME hook type, each 
+with a different angle/wording.
 
 TONE & VOICE PROFILE:
 - Formality: ${tone.formality}
 - Sentence length: ${tone.sentenceLength}
 - Language mix: ${tone.languageMix || 'Not specified'}
 - NEVER use these phrases: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
-`.trim();
-
-    // ── Mode-specific instruction block ───────────────────────────
-    const modeInstructions = mode === 'A'
-      ? `
-## MODE A — Generate from Notes
-
-RAW NOTES / INPUT: ${rawNotes}
-
-• **Detailed Input**: Use code, specs & real project details directly as backbone.
-• **Thin / Keyword Input** (e.g. "RAG", "pgvector"): Break down the complete end-to-end architecture & all subcomponents (e.g. chunking → embeddings → vector indexing → similarity search → context synthesis). Never write superficial generic text.
-`.trim()
-      : `
-## MODE B — Research & Generate via Web Search & Official Docs
-
-TOPIC: ${rawNotes}
-SEARCH RESULTS:
-${webResults}
-
-• **Extract Technical Specs**: Pull official framework docs, API specs, architecture patterns, subcomponents (e.g. chunking, vector indexing, retrieval pipelines, state graphs), benchmarks & best practices.
-• **Synthesize**: Re-explain the full concept end-to-end in your own engineering voice with practical workflow steps & trade-offs.
-`.trim();
-
-    // ── Full assembled prompt ──────────────────────────────────────
-    const prompt = `You are an expert LinkedIn content strategist writing on behalf of:
-${userAboutMe}
-
-${sharedContext}
 
 ---
 
@@ -222,9 +223,7 @@ ${modeInstructions}
 ---
 
 ## Output Format
-
 Return exactly 3 versions. For each version, output every section defined in the active Post Anatomy above (in order), plus a Visual suggestion.
-
 Respond with ONLY valid JSON — no markdown fences, no commentary before or after:
 {
   "versions": [
@@ -242,6 +241,7 @@ Respond with ONLY valid JSON — no markdown fences, no commentary before or aft
 
 CRITICAL RULES:
 - Each version must be genuinely distinct (different angle, opening hook, or framing — not just rephrased).
+- All 3 versions apply the SAME hook type but different angles/wording — never repeat the exact same hook sentence across versions.
 - Never include placeholder text or meta-commentary unless the Showcase/Authority pillar exception applies (thin input with no real project detail).
 - Every section listed in the anatomy must appear in every version.
 - The post must be ready to copy-paste to LinkedIn as-is.`;

@@ -114,12 +114,15 @@ function initSchema(db: Database.Database) {
       order_index INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS hook_bank (
+    DROP TABLE IF EXISTS hook_bank;
+
+    CREATE TABLE IF NOT EXISTS hook_types (
       id TEXT PRIMARY KEY,
-      hook_text TEXT NOT NULL,
-      category TEXT,
-      source TEXT,
-      used_count INTEGER DEFAULT 0
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      angles TEXT NOT NULL,
+      best_fit_pillars TEXT NOT NULL,
+      created_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS voice_examples (
@@ -321,19 +324,75 @@ function seedIfEmpty(db: Database.Database) {
     }
   }
 
-  // Seed hook bank if empty
-  const hookCount = (db.prepare('SELECT COUNT(*) as c FROM hook_bank').get() as { c: number }).c;
-  if (hookCount === 0) {
-    const defaultHooks = [
-      { hook_text: 'Most developers spend weeks building X. Here is how we solved it in 48 hours.', category: 'contrarian', source: 'Default Playbook' },
-      { hook_text: '90% of RAG pipelines break in production because of this single mistake:', category: 'stat', source: 'Default Playbook' },
-      { hook_text: 'What if you could automate your entire content workflow without sacrificing quality?', category: 'question', source: 'Default Playbook' },
-      { hook_text: 'We refactored our entire agent architecture last week. Here is what broke (and what worked):', category: 'story', source: 'Default Playbook' },
-      { hook_text: 'Stop using generic prompts for complex reasoning. Do this instead:', category: 'contrarian', source: 'Default Playbook' }
+  // Seed hook types if empty
+  const hookTypesCount = (db.prepare('SELECT COUNT(*) as c FROM hook_types').get() as { c: number }).c;
+  if (hookTypesCount === 0) {
+    const defaultHookTypes = [
+      {
+        name: 'Misconception',
+        description: 'Challenge a false belief the reader holds',
+        angles: JSON.stringify(['Call out a false belief your ideal client has', 'State the false assumption they have', 'Challenge what they thought was true']),
+        best_fit_pillars: JSON.stringify(['Value', 'Authority'])
+      },
+      {
+        name: 'Transformation',
+        description: 'Show contrast between past struggle and present success',
+        angles: JSON.stringify(['Show where you were vs where you are now', 'Highlight the gap between before and after', 'Help readers see themselves in your journey']),
+        best_fit_pillars: JSON.stringify(['Personal'])
+      },
+      {
+        name: 'Objection',
+        description: 'Directly confront target audience doubts',
+        angles: JSON.stringify(['Quote the exact objection prospects have', 'Share the conversation you had with them', 'Address the doubt to show you understand']),
+        best_fit_pillars: JSON.stringify(['Value', 'Authority'])
+      },
+      {
+        name: 'Process',
+        description: 'Outline a clear step-by-step method to solve a pain point',
+        angles: JSON.stringify(['Lead with the pain point you\'re solving', 'Offer a clear step-by-step solution', 'Number your steps to make it actionable']),
+        best_fit_pillars: JSON.stringify(['Lead Magnet'])
+      },
+      {
+        name: 'Client story',
+        description: 'Narrate real client results and transformation',
+        angles: JSON.stringify(['Start with the challenge your client faced', 'Then show the desired outcome they achieved', 'Make similar prospects picture their success']),
+        best_fit_pillars: JSON.stringify(['Showcase'])
+      },
+      {
+        name: 'Industry take',
+        description: 'Share a bold perspective on industry shifts',
+        angles: JSON.stringify(['State how your industry/niche has changed', 'Add that it\'s actually a good thing', 'Make them want to know why you think so']),
+        best_fit_pillars: JSON.stringify(['Value', 'Authority'])
+      },
+      {
+        name: 'Framework',
+        description: 'Introduce a high-value structured solution or cheat sheet',
+        angles: JSON.stringify(['Position it as the only solution they need', 'Add a save trigger to signal its value', 'Make it feel like a quick win for them']),
+        best_fit_pillars: JSON.stringify(['Lead Magnet'])
+      },
+      {
+        name: 'Contrast',
+        description: 'Highlight common mistakes vs the right strategy',
+        angles: JSON.stringify(['Point out what everyone seems to do', 'Show what they should be doing instead', 'Highlight the disconnect between them']),
+        best_fit_pillars: JSON.stringify(['Value', 'Authority'])
+      },
+      {
+        name: 'Lesson',
+        description: 'Reflect on a setback and key takeaways',
+        angles: JSON.stringify(['Open with the struggle or setback you faced', 'Share the specific lesson you learned from it', 'Make it relatable so readers feel inspired']),
+        best_fit_pillars: JSON.stringify(['Personal'])
+      },
+      {
+        name: 'Case study',
+        description: 'Detail proof of performance with metrics and timeline',
+        angles: JSON.stringify(['State how you helped a client achieve results', 'Include a specific metric and a timeframe', 'Connect with prospects wanting that result']),
+        best_fit_pillars: JSON.stringify(['Showcase'])
+      }
     ];
-    const insertHook = db.prepare('INSERT INTO hook_bank (id, hook_text, category, source, used_count) VALUES (?, ?, ?, ?, 0)');
-    for (const h of defaultHooks) {
-      insertHook.run(uuidv4(), h.hook_text, h.category, h.source);
+    const insertHookType = db.prepare('INSERT INTO hook_types (id, name, description, angles, best_fit_pillars, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+    const now = new Date().toISOString();
+    for (const ht of defaultHookTypes) {
+      insertHookType.run(uuidv4(), ht.name, ht.description, ht.angles, ht.best_fit_pillars, now);
     }
   }
 }

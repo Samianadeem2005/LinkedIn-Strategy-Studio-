@@ -12,7 +12,7 @@ const navItems = [
   { href: '/calendar-maker', icon: Sparkles, label: 'Calendar Maker', desc: 'AI content schedule generator' },
   { href: '/drafts', icon: FileText, label: 'Drafts', desc: 'Saved draft posts' },
   { href: '/ingest', icon: Layers, label: 'Ingest', desc: 'Extract raw strategy' },
-  { href: '/hooks', icon: Bookmark, label: 'Hook Bank', desc: 'Scroll-stopping hooks library' },
+  { href: '/hook-types', icon: Bookmark, label: 'Hook Types', desc: 'Structured hook bank & angles' },
   { href: '/settings', icon: Settings, label: 'Settings', desc: 'Post types & anatomy' },
   { href: '/strategy', icon: LayoutGrid, label: 'Strategy', desc: 'Weekly template & rules' },
 ];

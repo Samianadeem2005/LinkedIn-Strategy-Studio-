@@ -20,7 +20,7 @@ export interface CategoryContext {
 export interface ExtractedPoint {
   heading: string;
   point_text: string;
-  target_table: 'post_types' | 'post_anatomy' | 'writing_mechanics' | 'hook_bank';
+  target_table: 'post_types' | 'post_anatomy' | 'writing_mechanics' | 'hook_types';
   is_new_category: boolean;
   target_row_id: string | null;
   suggested_order_index?: number | null;

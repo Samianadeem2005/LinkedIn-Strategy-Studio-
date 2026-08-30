@@ -140,9 +140,10 @@ function PostTypeModal({ existing, onClose, onSaved }: {
 }
 
 // ── Anatomy Section Modal ──────────────────────────────────────────────────
-function AnatomyModal({ existing, maxOrder, onClose, onSaved }: {
+function AnatomyModal({ existing, maxOrder, targetPostTypeId, onClose, onSaved }: {
   existing?: AnatomySection;
   maxOrder: number;
+  targetPostTypeId?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -165,7 +166,12 @@ function AnatomyModal({ existing, maxOrder, onClose, onSaved }: {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_name: sectionName, rule_description: ruleDescription, order_index: existing?.order_index ?? maxOrder + 1 })
+        body: JSON.stringify({
+          section_name: sectionName,
+          rule_description: ruleDescription,
+          order_index: existing?.order_index ?? maxOrder + 1,
+          applies_to_post_type_id: existing ? existing.applies_to_post_type_id : (targetPostTypeId ?? null)
+        })
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.error ?? 'Save failed.', 'error'); return; }
@@ -335,11 +341,14 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<'about' | 'pillars' | 'anatomy' | 'tone' | 'mechanics'>('about');
   const [ptModal, setPtModal] = useState<{ open: boolean; existing?: PostType }>({ open: false });
-  const [aModal, setAModal] = useState<{ open: boolean; existing?: AnatomySection }>({ open: false });
+  const [aModal, setAModal] = useState<{ open: boolean; existing?: AnatomySection; targetPostTypeId?: string | null }>({ open: false });
   const [wmModal, setWmModal] = useState<{ open: boolean; existing?: WritingMechanic }>({ open: false });
   
   const [writingMechanics, setWritingMechanics] = useState<WritingMechanic[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selectedAnatomyTab, setSelectedAnatomyTab] = useState<string>('default');
+  const [customizing, setCustomizing] = useState(false);
+  const [reverting, setReverting] = useState(false);
 
   // About Me context state
   const [aboutMe, setAboutMe] = useState(settings?.about_me ?? '');
@@ -350,7 +359,10 @@ export default function SettingsPage() {
     if (settings?.about_me) {
       setAboutMe(settings.about_me);
     }
-  }, [settings?.about_me]);
+    if (settings?.anatomy_scope) {
+      setAnatomyScope(settings.anatomy_scope);
+    }
+  }, [settings?.about_me, settings?.anatomy_scope]);
 
   // Tone form state
   const [formality, setFormality] = useState<'casual' | 'professional' | 'mixed'>(settings?.tone_profile?.formality ?? 'mixed');
@@ -359,6 +371,76 @@ export default function SettingsPage() {
   const [languageMix, setLanguageMix] = useState(settings?.tone_profile?.languageMix ?? '');
   const [savingTone, setSavingTone] = useState(false);
   const [anatomyScope, setAnatomyScope] = useState<'global' | 'per_post_type'>(settings?.anatomy_scope ?? 'global');
+
+  const changeAnatomyScope = async (newScope: 'global' | 'per_post_type') => {
+    setAnatomyScope(newScope);
+    if (newScope === 'per_post_type') {
+      setSelectedAnatomyTab('default');
+    }
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          frequency: settings?.frequency ?? 'daily',
+          anatomy_scope: newScope,
+          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix },
+          about_me: aboutMe
+        })
+      });
+      if (res.ok) {
+        await refreshSettings();
+        showToast(`Anatomy scope updated to ${newScope === 'global' ? 'Global (all types)' : 'Per Post Type'}.`, 'success');
+      }
+    } catch (e) {
+      showToast(String(e), 'error');
+    }
+  };
+
+  const customizePostType = async (postTypeId: string) => {
+    setCustomizing(true);
+    try {
+      const res = await fetch('/api/anatomy/customize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_type_id: postTypeId })
+      });
+      if (res.ok) {
+        await refreshAnatomy();
+        showToast('Custom anatomy created for this post type.', 'success');
+      } else {
+        const d = await res.json();
+        showToast(d.error ?? 'Failed to customize anatomy.', 'error');
+      }
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      setCustomizing(false);
+    }
+  };
+
+  const revertPostType = async (postTypeId: string) => {
+    if (!confirm('Revert to Default? All custom sections for this post type will be deleted.')) return;
+    setReverting(true);
+    try {
+      const res = await fetch('/api/anatomy/revert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_type_id: postTypeId })
+      });
+      if (res.ok) {
+        await refreshAnatomy();
+        showToast('Reverted to Default anatomy.', 'success');
+      } else {
+        const d = await res.json();
+        showToast(d.error ?? 'Failed to revert anatomy.', 'error');
+      }
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      setReverting(false);
+    }
+  };
 
   const fetchMechanics = useCallback(async () => {
     try {
@@ -473,11 +555,16 @@ export default function SettingsPage() {
 
   const onDragEndAnatomy = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
-    const items = Array.from(anatomy);
+    const isPerType = anatomyScope === 'per_post_type';
+    const targetTypeId = isPerType && selectedAnatomyTab !== 'default' ? selectedAnatomyTab : null;
+    const currentList = anatomy.filter(a =>
+      targetTypeId ? a.applies_to_post_type_id === targetTypeId : !a.applies_to_post_type_id
+    );
+
+    const items = Array.from(currentList);
     const [moved] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, moved);
 
-    // 1-based sequential order index (1, 2, 3, 4...)
     const reordered = items.map((item, i) => ({ id: item.id, order_index: i + 1 }));
 
     await fetch('/api/anatomy', {
@@ -486,7 +573,7 @@ export default function SettingsPage() {
       body: JSON.stringify(reordered)
     });
     await refreshAnatomy();
-  }, [anatomy, refreshAnatomy]);
+  }, [anatomy, anatomyScope, selectedAnatomyTab, refreshAnatomy]);
 
   const onDragEndMechanics = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
@@ -533,7 +620,12 @@ export default function SettingsPage() {
       {aModal.open && (
         <AnatomyModal
           existing={aModal.existing}
-          maxOrder={anatomy.length}
+          targetPostTypeId={aModal.targetPostTypeId}
+          maxOrder={
+            (anatomyScope === 'per_post_type' && selectedAnatomyTab !== 'default')
+              ? anatomy.filter(a => a.applies_to_post_type_id === selectedAnatomyTab).length
+              : anatomy.filter(a => !a.applies_to_post_type_id).length
+          }
           onClose={() => setAModal({ open: false })}
           onSaved={refreshAnatomy}
         />
@@ -690,74 +782,320 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="font-semibold text-base">Post Anatomy Builder</h2>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Drag to reorder. Changes apply to the next generation immediately.</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Configure section structure and instructions for Gemini AI generation.
+                  </p>
                 </div>
-                <button onClick={() => setAModal({ open: true })}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                  style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent)', color: 'var(--accent)' }}>
-                  <Plus size={14} /> Add Section
-                </button>
+                {(anatomyScope === 'global' || selectedAnatomyTab === 'default' || anatomy.some(a => a.applies_to_post_type_id === selectedAnatomyTab)) && (
+                  <button
+                    onClick={() => setAModal({
+                      open: true,
+                      targetPostTypeId: (anatomyScope === 'per_post_type' && selectedAnatomyTab !== 'default') ? selectedAnatomyTab : null
+                    })}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                    style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent)', color: 'var(--accent)' }}
+                  >
+                    <Plus size={14} /> Add Section
+                  </button>
+                )}
               </div>
 
+              {/* Scope Dropdown */}
               <div className="flex items-center gap-3 mb-5 p-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
                 <div className="flex-1">
                   <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Anatomy Scope</span>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Global = same sections for all post types. Per-type = sections linked to a specific post type.</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Global = same sections for all post types. Per Post Type = custom anatomy rules per post type with default fallback.
+                  </p>
                 </div>
-                <select value={anatomyScope} onChange={e => setAnatomyScope(e.target.value as 'global' | 'per_post_type')} style={selectStyle}>
+                <select
+                  value={anatomyScope}
+                  onChange={e => changeAnatomyScope(e.target.value as 'global' | 'per_post_type')}
+                  style={selectStyle}
+                >
                   <option value="global">Global (all types)</option>
                   <option value="per_post_type">Per Post Type</option>
                 </select>
               </div>
 
-              <DragDropContext onDragEnd={onDragEndAnatomy}>
-                <Droppable droppableId="anatomy">
-                  {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
-                      {anatomy.length === 0 && (
-                        <p className="text-sm text-center py-12" style={{ color: 'var(--text-muted)' }}>No sections yet. Add one above.</p>
-                      )}
-                      {anatomy.map((section, index) => (
-                        <Draggable key={section.id} draggableId={section.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div ref={provided.innerRef} {...provided.draggableProps}
-                              className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors"
-                              style={{
-                                background: snapshot.isDragging ? 'var(--bg-hover)' : 'var(--bg-elevated)',
-                                border: `1px solid ${snapshot.isDragging ? 'var(--accent)' : 'var(--border)'}`,
-                                boxShadow: snapshot.isDragging ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
-                                ...provided.draggableProps.style,
-                              }}>
-                              <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing" style={{ color: 'var(--text-muted)' }}>
-                                <GripVertical size={14} />
-                              </div>
+              {/* Per Post Type Secondary Pills Row */}
+              {anatomyScope === 'per_post_type' && (
+                <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 border-b" style={{ borderColor: 'var(--border)' }}>
+                  {/* Default Tab Pill */}
+                  <button
+                    onClick={() => setSelectedAnatomyTab('default')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={{
+                      background: selectedAnatomyTab === 'default' ? 'var(--accent)' : 'var(--bg-elevated)',
+                      color: selectedAnatomyTab === 'default' ? 'white' : 'var(--text-secondary)',
+                      border: `1px solid ${selectedAnatomyTab === 'default' ? 'var(--accent)' : 'var(--border)'}`
+                    }}
+                  >
+                    <span>Default</span>
+                    <span className="text-[10px] opacity-75 font-mono">({anatomy.filter(a => !a.applies_to_post_type_id).length})</span>
+                  </button>
+
+                  {/* Post Type Tab Pills */}
+                  {postTypes.map(pt => {
+                    const isCustom = anatomy.some(a => a.applies_to_post_type_id === pt.id);
+                    const isActive = selectedAnatomyTab === pt.id;
+                    const customCount = anatomy.filter(a => a.applies_to_post_type_id === pt.id).length;
+
+                    return (
+                      <button
+                        key={pt.id}
+                        onClick={() => setSelectedAnatomyTab(pt.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
+                        style={{
+                          background: isActive ? 'var(--accent)' : 'var(--bg-elevated)',
+                          color: isActive ? 'white' : 'var(--text-secondary)',
+                          border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`
+                        }}
+                      >
+                        <span>{pt.name}</span>
+                        {isCustom ? (
+                          <span
+                            className="px-1.5 py-0.2 text-[9px] font-bold rounded uppercase tracking-wider"
+                            style={{
+                              background: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(168, 85, 247, 0.2)',
+                              color: isActive ? 'white' : '#c084fc',
+                              border: isActive ? 'none' : '1px solid rgba(168, 85, 247, 0.4)'
+                            }}
+                          >
+                            Custom ({customCount})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] opacity-60">(Default)</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* SECTION LIST DISPLAY */}
+              {(() => {
+                const isPerType = anatomyScope === 'per_post_type';
+                const activeTabId = isPerType ? selectedAnatomyTab : 'default';
+                const isDefaultTab = activeTabId === 'default';
+
+                if (isPerType && !isDefaultTab) {
+                  const targetPt = postTypes.find(p => p.id === activeTabId);
+                  const customSections = anatomy.filter(a => a.applies_to_post_type_id === activeTabId);
+                  const isCustomized = customSections.length > 0;
+                  const defaultSections = anatomy.filter(a => !a.applies_to_post_type_id);
+
+                  if (!isCustomized) {
+                    return (
+                      <div className="space-y-4">
+                        <div
+                          className="p-4 rounded-xl border flex items-center justify-between gap-4"
+                          style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
+                        >
+                          <div>
+                            <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              Using Default Anatomy for {targetPt?.name ?? 'this post type'}
+                            </p>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                              Currently using Default anatomy. Click Customize to override for this type only.
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => customizePostType(activeTabId)}
+                            disabled={customizing}
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 flex-shrink-0"
+                            style={{ background: 'linear-gradient(135deg, var(--accent), #a78bfa)', color: 'white' }}
+                          >
+                            {customizing ? (
+                              <><Loader2 size={13} className="spinner" /> Customizing...</>
+                            ) : (
+                              <><Sparkles size={13} /> Customize This Type</>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 opacity-60">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider px-1" style={{ color: 'var(--text-muted)' }}>
+                            Default Anatomy Preview (Read-Only)
+                          </p>
+                          {defaultSections.length === 0 && (
+                            <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>No default anatomy sections defined.</p>
+                          )}
+                          {defaultSections.map((section, index) => (
+                            <div
+                              key={section.id}
+                              className="flex items-center gap-3 px-4 py-3 rounded-xl border"
+                              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
+                            >
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                                {index + 1}
+                              </span>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-semibold px-2 py-0.5 rounded"
-                                    style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)44' }}>
-                                    {index + 1}
-                                  </span>
-                                  <span className="font-medium text-sm">{section.section_name}</span>
-                                </div>
+                                <span className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>{section.section_name}</span>
                                 <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{section.rule_description}</p>
                               </div>
-                              <button onClick={() => setAModal({ open: true, existing: section })}
-                                className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>
-                                <Pencil size={14} />
-                              </button>
-                              <button onClick={() => deleteAnatomy(section.id)}
-                                className="p-2 rounded-lg transition-colors hover:bg-red-900/20" style={{ color: '#ef4444' }}>
-                                <Trash2 size={14} />
-                              </button>
+                              <span className="text-[10px] italic px-2 py-1 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                                Following Default
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <div
+                        className="p-4 rounded-xl border flex items-center justify-between gap-4"
+                        style={{ background: 'rgba(168, 85, 247, 0.08)', borderColor: 'rgba(168, 85, 247, 0.3)' }}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="px-2 py-0.5 text-xs font-bold rounded flex-shrink-0"
+                            style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' }}
+                          >
+                            Customized
+                          </span>
+                          <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                            Independent anatomy override active for <strong>{targetPt?.name}</strong>.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => revertPostType(activeTabId)}
+                          disabled={reverting}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-red-900/20 disabled:opacity-50 flex-shrink-0"
+                          style={{ border: '1px solid rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                        >
+                          {reverting ? <Loader2 size={13} className="spinner" /> : <Trash2 size={13} />}
+                          Revert to Default
+                        </button>
+                      </div>
+
+                      <DragDropContext onDragEnd={onDragEndAnatomy}>
+                        <Droppable droppableId={`anatomy_${activeTabId}`}>
+                          {(provided) => (
+                            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                              {customSections.map((section, index) => (
+                                <Draggable key={section.id} draggableId={section.id} index={index}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors"
+                                      style={{
+                                        background: snapshot.isDragging ? 'var(--bg-hover)' : 'var(--bg-elevated)',
+                                        border: `1px solid ${snapshot.isDragging ? 'var(--accent)' : 'var(--border)'}`,
+                                        boxShadow: snapshot.isDragging ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
+                                        ...provided.draggableProps.style,
+                                      }}
+                                    >
+                                      <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing" style={{ color: 'var(--text-muted)' }}>
+                                        <GripVertical size={14} />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span
+                                            className="text-xs font-semibold px-2 py-0.5 rounded"
+                                            style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)44' }}
+                                          >
+                                            {index + 1}
+                                          </span>
+                                          <span className="font-medium text-sm">{section.section_name}</span>
+                                        </div>
+                                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{section.rule_description}</p>
+                                      </div>
+                                      <button
+                                        onClick={() => setAModal({ open: true, existing: section, targetPostTypeId: activeTabId })}
+                                        className="p-2 rounded-lg transition-colors hover:bg-white/5"
+                                        style={{ color: 'var(--text-muted)' }}
+                                      >
+                                        <Pencil size={14} />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteAnatomy(section.id)}
+                                        className="p-2 rounded-lg transition-colors hover:bg-red-900/20"
+                                        style={{ color: '#ef4444' }}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
                             </div>
                           )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+                        </Droppable>
+                      </DragDropContext>
                     </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
+                  );
+                }
+
+                const defaultList = anatomy.filter(a => !a.applies_to_post_type_id);
+
+                return (
+                  <DragDropContext onDragEnd={onDragEndAnatomy}>
+                    <Droppable droppableId="anatomy_default">
+                      {(provided) => (
+                        <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                          {defaultList.length === 0 && (
+                            <p className="text-sm text-center py-12" style={{ color: 'var(--text-muted)' }}>No sections yet. Add one above.</p>
+                          )}
+                          {defaultList.map((section, index) => (
+                            <Draggable key={section.id} draggableId={section.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors"
+                                  style={{
+                                    background: snapshot.isDragging ? 'var(--bg-hover)' : 'var(--bg-elevated)',
+                                    border: `1px solid ${snapshot.isDragging ? 'var(--accent)' : 'var(--border)'}`,
+                                    boxShadow: snapshot.isDragging ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
+                                    ...provided.draggableProps.style,
+                                  }}
+                                >
+                                  <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing" style={{ color: 'var(--text-muted)' }}>
+                                    <GripVertical size={14} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="text-xs font-semibold px-2 py-0.5 rounded"
+                                        style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)44' }}
+                                      >
+                                        {index + 1}
+                                      </span>
+                                      <span className="font-medium text-sm">{section.section_name}</span>
+                                    </div>
+                                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{section.rule_description}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => setAModal({ open: true, existing: section, targetPostTypeId: null })}
+                                    className="p-2 rounded-lg transition-colors hover:bg-white/5"
+                                    style={{ color: 'var(--text-muted)' }}
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteAnatomy(section.id)}
+                                    className="p-2 rounded-lg transition-colors hover:bg-red-900/20"
+                                    style={{ color: '#ef4444' }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </DragDropContext>
+                );
+              })()}
             </div>
           )}
 

@@ -20,7 +20,7 @@ export async function GET(
     const postTypes = db.prepare('SELECT id, name, core_focus, dos FROM post_types').all() as { id: string; name: string; core_focus: string; dos: string }[];
     const anatomy = db.prepare('SELECT id, section_name, rule_description FROM post_anatomy').all() as { id: string; section_name: string; rule_description: string }[];
     const mechanics = db.prepare('SELECT id, rule_name, prompt_directive, description FROM writing_mechanics').all() as { id: string; rule_name: string; prompt_directive: string; description: string }[];
-    const hooks = db.prepare('SELECT id, hook_text, category FROM hook_bank').all() as { id: string; hook_text: string; category: string }[];
+    const hooks = db.prepare('SELECT id, name, description FROM hook_types').all() as { id: string; name: string; description: string }[];
 
     const nameMap: Record<string, string> = {};
     const currentTextMap: Record<string, string> = {};
@@ -46,8 +46,8 @@ export async function GET(
     });
 
     hooks.forEach(h => {
-      nameMap[h.id] = `Hook Bank → ${h.category || 'General'}`;
-      currentTextMap[h.id] = h.hook_text || 'No current hook text set.';
+      nameMap[h.id] = `Hook Types → ${h.name}`;
+      currentTextMap[h.id] = h.description || 'No current hook description set.';
     });
 
     const enrichedRows = reviewRows.map(row => {

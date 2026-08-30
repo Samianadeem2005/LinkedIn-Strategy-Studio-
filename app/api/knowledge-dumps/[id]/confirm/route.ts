@@ -93,22 +93,24 @@ export async function POST(
           `).run(finalText, finalText, targetRowId);
         }
         mechanicsCount++;
-      } else if (targetTable === 'hook_bank') {
+      } else if (targetTable === 'hook_types') {
         if (isNew || !targetRowId) {
+          const defaultAngles = JSON.stringify(['Angle 1 focus', 'Angle 2 focus', 'Angle 3 focus']);
+          const defaultPillars = JSON.stringify(['Value', 'Authority']);
           db.prepare(`
-            INSERT INTO hook_bank (id, hook_text, category, source, used_count)
-            VALUES (?, ?, ?, ?, 0)
-          `).run(uuidv4(), pointText, heading || 'general', `Ingested Dump ${id.slice(0, 8)}`);
+            INSERT INTO hook_types (id, name, description, angles, best_fit_pillars, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(uuidv4(), heading || 'Custom Hook Type', pointText, defaultAngles, defaultPillars, new Date().toISOString());
         } else {
-          const existingRow = db.prepare('SELECT hook_text FROM hook_bank WHERE id = ?').get(targetRowId) as { hook_text: string } | undefined;
-          const beforeText = existingRow?.hook_text || '';
+          const existingRow = db.prepare('SELECT description FROM hook_types WHERE id = ?').get(targetRowId) as { description: string } | undefined;
+          const beforeText = existingRow?.description || '';
 
           let finalText = pointText;
           if (applyMode === 'merge') {
             finalText = await mergeRulesWithAI(beforeText, pointText);
           }
 
-          db.prepare('UPDATE hook_bank SET hook_text = ? WHERE id = ?').run(finalText, targetRowId);
+          db.prepare('UPDATE hook_types SET description = ? WHERE id = ?').run(finalText, targetRowId);
         }
         hooksCount++;
       } else if (targetTable === 'post_anatomy') {

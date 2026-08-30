@@ -8,11 +8,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!body.section_name?.trim()) return NextResponse.json({ error: 'Section name is required.' }, { status: 400 });
     if (!body.rule_description?.trim()) return NextResponse.json({ error: 'Rule description is required.' }, { status: 400 });
     const db = getDb();
+    const existing = db.prepare('SELECT applies_to_post_type_id FROM post_anatomy WHERE id = ?').get(id) as { applies_to_post_type_id: string | null } | undefined;
+    const targetType = body.applies_to_post_type_id !== undefined ? body.applies_to_post_type_id : (existing?.applies_to_post_type_id ?? null);
     db.prepare('UPDATE post_anatomy SET section_name = ?, rule_description = ?, order_index = ?, applies_to_post_type_id = ? WHERE id = ?').run(
       body.section_name.trim(),
       body.rule_description.trim(),
       body.order_index,
-      body.applies_to_post_type_id ?? null,
+      targetType,
       id
     );
     return NextResponse.json(db.prepare('SELECT * FROM post_anatomy WHERE id = ?').get(id));
