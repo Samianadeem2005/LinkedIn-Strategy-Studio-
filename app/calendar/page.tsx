@@ -102,11 +102,11 @@ export default function CalendarPage() {
     fetchData();
   }, [monthQueryString]);
 
-  // Handle Drag & Drop Swap Logic
+  // Handle Drag & Drop Swap Logic (Immediate UI update & silent DB persistence)
   const handleSwapDates = async (sourceDate: string, targetDate: string) => {
     if (!sourceDate || !targetDate || sourceDate === targetDate) return;
 
-    // Optimistic state update in UI
+    // Optimistic state update in UI - immediate visual feedback
     setCalendarEntries(prev => prev.map(c => {
       if (c.date === sourceDate) return { ...c, date: targetDate };
       if (c.date === targetDate) return { ...c, date: sourceDate };
@@ -119,8 +119,7 @@ export default function CalendarPage() {
       return d;
     }));
 
-    showToast('Swapping dates...', 'info');
-
+    // Silent backend sync without popups or alerts
     try {
       const res = await fetch('/api/calendar-events', {
         method: 'PUT',
@@ -128,16 +127,11 @@ export default function CalendarPage() {
         body: JSON.stringify({ sourceDate, targetDate })
       });
 
-      if (res.ok) {
-        showToast('Topic date updated successfully!', 'success');
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to update dates in DB', 'error');
-        fetchData(); // Rollback on error
+      if (!res.ok) {
+        fetchData(); // Quiet rollback on server error
       }
     } catch (e) {
-      showToast('Network error while swapping dates', 'error');
-      fetchData(); // Rollback on error
+      fetchData(); // Quiet rollback on network error
     }
   };
 
@@ -223,7 +217,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-4 h-[calc(100vh-80px)] flex flex-col justify-between overflow-hidden">
+    <div className="max-w-6xl mx-auto px-6 py-6 pb-12">
       {ToastEl}
 
       {/* Header & Controls */}
@@ -273,18 +267,18 @@ export default function CalendarPage() {
         ))}
       </div>
 
-      {/* Monthly Grid with viewport fit and auto-rows-fr */}
+      {/* Monthly Grid driven by aspect-square per cell */}
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--text-muted)' }}>
+        <div className="py-20 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--text-muted)' }}>
           <Loader2 size={28} className="spinner" />
           <p className="text-sm font-medium">Loading calendar schedule...</p>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-7 auto-rows-fr gap-2 min-h-0 overflow-hidden">
+        <div className="grid grid-cols-7 gap-2 w-full">
           {gridDays.map((cell, idx) => {
             if (!cell) {
               return (
-                <div key={`empty-${idx}`} className="w-full h-full min-h-0 rounded-xl overflow-hidden" style={{ background: 'transparent' }} />
+                <div key={`empty-${idx}`} className="w-full rounded-xl" style={{ aspectRatio: '1 / 1', padding: '8px', boxSizing: 'border-box', background: 'transparent' }} />
               );
             }
 
@@ -346,7 +340,7 @@ export default function CalendarPage() {
                     });
                   }
                 }}
-                className={`w-full h-full min-h-0 rounded-xl p-2 flex flex-col justify-between border overflow-hidden transition-all duration-200 select-none box-border ${
+                className={`w-full rounded-xl flex flex-col justify-between border overflow-hidden transition-all duration-200 select-none box-border ${
                   isDraggable ? 'cursor-grab active:cursor-grabbing hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/10' : ''
                 } ${
                   isBeingDragged ? 'opacity-40 scale-95 border-dashed border-purple-500' : ''
@@ -354,6 +348,9 @@ export default function CalendarPage() {
                   isDragTarget ? 'ring-2 ring-purple-500 border-purple-500 bg-purple-500/20 scale-[1.02] shadow-xl shadow-purple-500/20' : ''
                 }`}
                 style={{
+                  aspectRatio: '1 / 1',
+                  padding: '8px',
+                  boxSizing: 'border-box',
                   background: isDragTarget ? 'rgba(124, 58, 237, 0.15)' : 'var(--bg-surface)',
                   borderColor: isDragTarget
                     ? '#7c3aed'
@@ -364,9 +361,9 @@ export default function CalendarPage() {
                     : 'rgba(255,255,255,0.07)',
                 }}
               >
-                {/* Top Row: Day Number (text-xs / ~12px, font-medium) */}
-                <div className="flex items-center justify-between pointer-events-none w-full">
-                  <span className="font-medium text-xs leading-none" style={{ color: 'var(--text-primary)' }}>
+                {/* Top Row: Day Number */}
+                <div className="flex items-center justify-between pointer-events-none w-full shrink-0">
+                  <span className="font-semibold text-[12px] leading-none" style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
                     {cell.dayNum}
                   </span>
                   {hasDraft && (
@@ -374,26 +371,64 @@ export default function CalendarPage() {
                   )}
                 </div>
 
-                {/* Event Content Inside Day Box */}
+                {/* Event Content Inside Day Box - Vertically Centered */}
                 {hasDraft && (
-                  <div className="min-w-0 pointer-events-none overflow-hidden flex flex-col justify-end gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block truncate max-w-full opacity-90 self-start"
-                      style={{ background: 'rgba(124, 58, 237, 0.2)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
+                  <div className="w-full min-w-0 pointer-events-none overflow-hidden flex flex-col justify-center gap-1 flex-1 my-auto">
+                    <span className="font-bold uppercase tracking-wider rounded-full block opacity-90 self-start"
+                      style={{
+                        fontSize: '9px',
+                        padding: '1.5px 6px',
+                        maxWidth: '100%',
+                        display: 'block',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        background: 'rgba(124, 58, 237, 0.2)',
+                        color: 'var(--accent)',
+                        border: '1px solid var(--accent)'
+                      }}>
                       {events.draft?.post_type_name || 'Draft'}
                     </span>
-                    <p className="text-[8px] font-normal truncate max-w-full leading-tight" style={{ color: 'var(--text-primary)' }}>
+                    <p className="font-medium leading-tight opacity-90"
+                      style={{
+                        fontSize: '10px',
+                        color: 'var(--text-primary)',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                       {events.draft?.topic_summary || 'Saved Draft'}
                     </p>
                   </div>
                 )}
 
                 {!hasDraft && hasPlan && (
-                  <div className="min-w-0 pointer-events-none overflow-hidden flex flex-col justify-end gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block truncate max-w-full opacity-90 self-start"
-                      style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid #3b82f6' }}>
+                  <div className="w-full min-w-0 pointer-events-none overflow-hidden flex flex-col justify-center gap-1 flex-1 my-auto">
+                    <span className="font-bold uppercase tracking-wider rounded-full block opacity-90 self-start"
+                      style={{
+                        fontSize: '9px',
+                        padding: '1.5px 6px',
+                        maxWidth: '100%',
+                        display: 'block',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#60a5fa',
+                        border: '1px solid #3b82f6'
+                      }}>
                       {events.plan?.post_type_name || 'Planned'}
                     </span>
-                    <p className="text-[8px] font-normal truncate max-w-full leading-tight" style={{ color: 'var(--text-primary)' }}>
+                    <p className="font-medium leading-tight opacity-90"
+                      style={{
+                        fontSize: '10px',
+                        color: 'var(--text-primary)',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                       {topicText}
                     </p>
                   </div>

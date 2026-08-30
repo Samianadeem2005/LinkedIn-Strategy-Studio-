@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         api_key: apiKey,
-        query: query.trim(),
+        query: `${query.trim()} official documentation technical architecture guide best practices`,
         search_depth: 'advanced',
         include_answer: true,
         include_raw_content: false,

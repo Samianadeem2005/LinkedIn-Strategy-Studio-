@@ -21,7 +21,17 @@ interface CalendarEntry {
 }
 
 export default function StudioPage() {
-  const { postTypes, anatomy, settings } = useApp();
+  const {
+    postTypes,
+    anatomy,
+    settings,
+    generating,
+    webSearchStatus,
+    generationResult,
+    generationError,
+    startWebSearchGenerate,
+    startNotesGenerate
+  } = useApp();
   const { show: showToast, ToastEl } = useToast();
 
   const [selectedPostTypeId, setSelectedPostTypeId] = useState('');
@@ -52,8 +62,6 @@ export default function StudioPage() {
     fetchQuotas();
   }, []);
 
-  const [generating, setGenerating] = useState(false);
-  const [webSearchStatus, setWebSearchStatus] = useState<string | null>(null); // null = idle, string = current step label
   const [versions, setVersions] = useState<PostVersion[]>([]);
   const [activeVersion, setActiveVersion] = useState(0);
   const [editedSections, setEditedSections] = useState<Record<string, string>>({});
@@ -61,6 +69,39 @@ export default function StudioPage() {
   const [postId, setPostId] = useState<string | null>(null);
   const [postStatus, setPostStatus] = useState<'draft' | 'approved' | 'published'>('draft');
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
+
+  // Sync completed generation result from AppContext
+  useEffect(() => {
+    if (generationResult && generationResult.versions?.length > 0) {
+      setVersions(generationResult.versions);
+      setActiveVersion(0);
+      setEditedSections(generationResult.versions[0].sections);
+      setPostId(generationResult.postId);
+      setPostStatus('draft');
+      if (generationResult.repeatWarning) setRepeatWarning(generationResult.repeatWarning);
+      fetchQuotas();
+    }
+  }, [generationResult]);
+
+  useEffect(() => {
+    if (generationError) {
+      showToast(generationError, 'error');
+    }
+  }, [generationError, showToast]);
+
+  // Auto-resize all section textareas to 100% of their scrollHeight to guarantee zero clipping
+  useEffect(() => {
+    if (versions.length === 0) return;
+    requestAnimationFrame(() => {
+      const textareas = document.querySelectorAll<HTMLTextAreaElement>('.section-textarea');
+      textareas.forEach(ta => {
+        ta.style.height = 'auto';
+        const newH = Math.max(60, ta.scrollHeight);
+        ta.style.height = `${newH}px`;
+        console.log(`[Section Audit] ${ta.name || 'section'}: scrollHeight=${ta.scrollHeight}px, clientHeight=${ta.clientHeight}px`);
+      });
+    });
+  }, [editedSections, activeVersion, versions]);
 
   // ── Topic Classifier state ─────────────────────────────────────
   const [classifying, setClassifying] = useState(false);
@@ -74,6 +115,43 @@ export default function StudioPage() {
     alternative_reasoning: string | null;
   } | null>(null);
   const [recentUsedTypes, setRecentUsedTypes] = useState<string[]>([]);
+  // Restore Studio state on mount if navigating back from another page
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('studio_page_state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.versions && parsed.versions.length > 0) {
+          setVersions(parsed.versions);
+          if (parsed.activeVersion !== undefined) setActiveVersion(parsed.activeVersion);
+          if (parsed.editedSections) setEditedSections(parsed.editedSections);
+          if (parsed.rawNotes) setRawNotes(parsed.rawNotes);
+          if (parsed.selectedPostTypeId) setSelectedPostTypeId(parsed.selectedPostTypeId);
+          if (parsed.postId) setPostId(parsed.postId);
+          if (parsed.postFormat) setPostFormat(parsed.postFormat);
+          if (parsed.postDate) setPostDate(parsed.postDate);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Save Studio state to sessionStorage on state change
+  useEffect(() => {
+    if (versions.length > 0 || rawNotes.trim().length > 0) {
+      try {
+        sessionStorage.setItem('studio_page_state', JSON.stringify({
+          versions,
+          activeVersion,
+          editedSections,
+          rawNotes,
+          selectedPostTypeId,
+          postId,
+          postFormat,
+          postDate
+        }));
+      } catch {}
+    }
+  }, [versions, activeVersion, editedSections, rawNotes, selectedPostTypeId, postId, postFormat, postDate]);
   const [weeklySchedule, setWeeklySchedule] = useState<{
     dayName: string;
     isToday: boolean;
@@ -192,134 +270,36 @@ export default function StudioPage() {
   const handleGenerate = async () => {
     if (!selectedPostTypeId) { showToast('Select a post type first.', 'error'); return; }
     if (!rawNotes.trim()) { showToast('Add raw notes before generating.', 'error'); return; }
-    setGenerating(true);
     setVersions([]);
     setRepeatWarning(null);
     setPostId(null);
-    try {
-      const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
-      const res = await fetch('/api/generate-post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawNotes,
-          postTypeId: selectedPostTypeId,
-          postFormat,
-          date: postDate,
-          selectedHooks: activeSelectedHookTexts,
-          selectedHookIds
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) { showToast(data.error ?? 'Generation failed.', 'error'); return; }
-      setVersions(data.versions);
-      setActiveVersion(0);
-      setEditedSections(data.versions[0].sections);
-      setPostId(data.postId);
-      setPostStatus('draft');
-      fetchQuotas();
-      if (data.repeatWarning) setRepeatWarning(data.repeatWarning);
-    } catch (e) {
-      showToast(String(e), 'error');
-    } finally {
-      setGenerating(false);
-    }
+    const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
+    await startNotesGenerate({
+      rawNotes,
+      selectedPostTypeId,
+      postFormat,
+      postDate,
+      selectedHooks: activeSelectedHookTexts,
+      selectedHookIds
+    });
   };
 
   // ── Mode B: web search → then generate ─────────────────────
-  // localStorage cache: same query within 30 min reuses saved results (skips Tavily call)
-  const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-  const CACHE_KEY_PREFIX = 'ws_cache_';
-
-  const getCachedResults = (query: string) => {
-    try {
-      const key = CACHE_KEY_PREFIX + query.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 80);
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      const entry = JSON.parse(raw) as { resultsText: string; resultCount: number; savedAt: number };
-      if (Date.now() - entry.savedAt > CACHE_TTL_MS) { localStorage.removeItem(key); return null; }
-      return entry;
-    } catch { return null; }
-  };
-
-  const saveCachedResults = (query: string, resultsText: string, resultCount: number) => {
-    try {
-      const key = CACHE_KEY_PREFIX + query.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 80);
-      localStorage.setItem(key, JSON.stringify({ resultsText, resultCount, savedAt: Date.now() }));
-    } catch { /* ignore quota errors */ }
-  };
-
   const handleWebSearchGenerate = async () => {
     if (!selectedPostTypeId) { showToast('Select a pillar first.', 'error'); return; }
     if (!rawNotes.trim()) { showToast('Enter a topic in Raw Notes to search for.', 'error'); return; }
-
-    setGenerating(true);
     setVersions([]);
     setRepeatWarning(null);
     setPostId(null);
-
-    try {
-      // ── Step 1: check localStorage cache first ──────────────
-      let resultsText: string;
-      let resultCount: number;
-
-      const cached = getCachedResults(rawNotes);
-      if (cached) {
-        // Reuse saved results — skip Tavily call entirely
-        resultsText = cached.resultsText;
-        resultCount = cached.resultCount;
-        setWebSearchStatus(`⚡ Using cached results (${resultCount} sources) — generating post…`);
-        showToast(`Using saved search results — no API call needed.`, 'success');
-      } else {
-        // Fresh Tavily search
-        setWebSearchStatus('🔍 Searching the web…');
-        const searchRes = await fetch('/api/web-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: rawNotes.trim() }),
-        });
-        const searchData = await searchRes.json();
-        if (!searchRes.ok) { showToast(searchData.error ?? 'Web search failed.', 'error'); return; }
-
-        resultsText = searchData.resultsText;
-        resultCount = searchData.resultCount;
-
-        // Save to localStorage for 30 minutes
-        saveCachedResults(rawNotes, resultsText, resultCount);
-        setWebSearchStatus(`✅ Found ${resultCount} sources — generating post…`);
-      }
-
-      // ── Step 2: generate post with web results ──────────────
-      const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
-      const genRes = await fetch('/api/generate-post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawNotes,
-          postTypeId: selectedPostTypeId,
-          postFormat,
-          date: today,
-          webResults: resultsText,
-          selectedHooks: activeSelectedHookTexts,
-          selectedHookIds
-        }),
-      });
-      const data = await genRes.json();
-      if (!genRes.ok) { showToast(data.error ?? 'Generation failed.', 'error'); return; }
-
-      setVersions(data.versions);
-      setActiveVersion(0);
-      setEditedSections(data.versions[0].sections);
-      setPostId(data.postId);
-      setPostStatus('draft');
-      fetchQuotas();
-      if (data.repeatWarning) setRepeatWarning(data.repeatWarning);
-    } catch (e) {
-      showToast(String(e), 'error');
-    } finally {
-      setGenerating(false);
-      setWebSearchStatus(null);
-    }
+    const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
+    await startWebSearchGenerate({
+      rawNotes,
+      selectedPostTypeId,
+      postFormat,
+      postDate,
+      selectedHooks: activeSelectedHookTexts,
+      selectedHookIds
+    });
   };
 
   const classifyTopic = async () => {
@@ -381,15 +361,40 @@ export default function StudioPage() {
   };
 
   const handleSaveEdits = async () => {
-    if (!postId) return;
     const updatedVersions = versions.map((v, i) =>
       i === activeVersion ? { ...v, sections: editedSections } : v
     );
-    await fetch(`/api/posts/${postId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ versions: updatedVersions, selected_version: activeVersion, status: 'draft' })
-    });
+
+    if (postId) {
+      await fetch(`/api/posts/${postId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ versions: updatedVersions, selected_version: activeVersion, status: 'draft' })
+      });
+    } else {
+      const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim();
+      const firstVer = updatedVersions[0]?.sections || {};
+      const totalCharCount = Object.values(firstVer).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: postDate,
+          post_type_id: selectedPostTypeId,
+          raw_notes_used: rawNotes,
+          topic_summary: topicSummary,
+          versions: updatedVersions,
+          selected_version: activeVersion,
+          status: 'draft',
+          post_format: postFormat,
+          character_count: totalCharCount
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPostId(data.id);
+      }
+    }
     setVersions(updatedVersions);
     setPostStatus('draft');
     fetchQuotas();
@@ -429,20 +434,9 @@ export default function StudioPage() {
       <div className="flex-shrink-0 border-b px-6 py-4 sticky top-0 z-10"
         style={{ background: 'rgba(10,10,15,0.9)', borderColor: 'var(--border)', backdropFilter: 'blur(8px)' }}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Zap size={18} style={{ color: 'var(--accent)' }} />
-              <h1 className="font-semibold text-base">Studio</h1>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
-              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>
-                {resolvedSource === 'calendar' && '📅'}
-                {resolvedSource === 'weekly' && '📆'}
-                {resolvedSource === 'manual' && '✏️'}
-              </span>
-              <span style={{ color: 'var(--text-secondary)' }}>{resolvedLabel || 'Resolving…'}</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Zap size={18} style={{ color: 'var(--accent)' }} />
+            <h1 className="font-semibold text-base">Studio</h1>
           </div>
           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -837,19 +831,15 @@ export default function StudioPage() {
                 {activeAnatomy.map(section => {
                   const content = editedSections[section.section_name] ?? '';
                   const isRegen = regeneratingSection === section.section_name;
+
                   return (
-                    <div key={section.id} className="rounded-xl border overflow-hidden animate-fade-in"
+                    <div key={section.id} className="rounded-xl border animate-fade-in"
                       style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
-                      <div className="flex items-center justify-between px-4 py-2 border-b"
+                      <div className="flex items-center justify-between px-4 py-2 border-b rounded-t-xl"
                         style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-                        <div>
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
-                            {section.section_name}
-                          </span>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)', maxWidth: 300 }}>
-                            {section.rule_description}
-                          </p>
-                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
+                          {section.section_name}
+                        </span>
                         <button
                           onClick={() => handleRegenerateSection(section.id, section.section_name)}
                           disabled={isRegen}
@@ -860,11 +850,15 @@ export default function StudioPage() {
                         </button>
                       </div>
                       <textarea
+                        name={section.section_name}
                         value={content}
-                        onChange={e => handleSectionEdit(section.section_name, e.target.value)}
-                        rows={section.section_name === 'Breakdown' ? 6 : 3}
-                        className="w-full px-4 py-3 bg-transparent text-sm resize-none focus:outline-none leading-relaxed"
-                        style={{ color: 'var(--text-primary)' }}
+                        onChange={e => {
+                          handleSectionEdit(section.section_name, e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = `${Math.max(60, e.target.scrollHeight)}px`;
+                        }}
+                        className="section-textarea w-full px-4 py-3 bg-transparent text-sm resize-none focus:outline-none leading-relaxed block rounded-b-xl"
+                        style={{ color: 'var(--text-primary)', height: 'auto', minHeight: '60px' }}
                       />
                     </div>
                   );

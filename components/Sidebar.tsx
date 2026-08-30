@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Zap, Settings, LayoutGrid, Calendar, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark, FileText } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 const navItems = [
   { href: '/', icon: Zap, label: 'Studio', desc: 'Daily post generation' },
@@ -19,6 +20,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { generating, webSearchStatus } = useApp();
 
   return (
     <aside
@@ -104,7 +106,15 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t flex items-center justify-center text-center" style={{ borderColor: 'var(--border)' }}>
+      <div className="p-4 border-t flex flex-col items-center justify-center text-center gap-2" style={{ borderColor: 'var(--border)' }}>
+        {generating && (
+          <div className="w-full flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold animate-pulse"
+            style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
+            <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+            {!collapsed ? (webSearchStatus || 'Generating post...') : '...'}
+          </div>
+        )}
+
         {!collapsed ? (
           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Powered by Gemini · Local SQLite

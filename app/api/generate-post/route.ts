@@ -156,17 +156,13 @@ export async function POST(req: NextRequest) {
       `${i + 1}. **${s.section_name}**: ${s.rule_description}`
     ).join('\n');
 
+    const userAboutMe = (settings?.about_me as string)?.trim() || "I am an AI Engineer building in public on LinkedIn.";
+
     // ── Shared context block ───────────────────────────────────────
     const sharedContext = `
 ACTIVE MODE: ${mode === 'A' ? 'A — Generate from Notes' : 'B — Research & Generate via Web Search'}
 TODAY'S PILLAR: ${postType.name}
 TARGET POST FORMAT: ${activeFormat.name} (Mandatory Length: STRICTLY between ${activeFormat.min} and ${activeFormat.max} characters across all sections combined)
-
-PILLAR DEFINITIONS (internalize these before writing):
-- Value/Educational = explains a concept generically, no specific project name attached, teaches "how something works."
-- Lead Magnet = a ready-to-use resource (checklist, cheat sheet, comparison table, framework) — save-worthy, list-format, not narrative.
-- Showcase/Authority = "Problem → Decision → Result" — real code/architecture from MY project, proof of execution.
-- Personal = my raw struggle/confusion/realization — no polish, no teaching, just a relatable human moment.
 
 ACTIVE PILLAR'S CORE FOCUS:
 ${coreFocus || "No core focus defined — rely entirely on DOs/DON'Ts below as your primary guide."}
@@ -188,10 +184,8 @@ ${selectedHooks.length > 0 ? `SELECTED HOOK EXAMPLES FOR INSPIRATION:\n${selecte
 TONE & VOICE PROFILE:
 - Formality: ${tone.formality}
 - Sentence length: ${tone.sentenceLength}
-- Language mix: ${tone.languageMix || 'Professional English'}
+- Language mix: ${tone.languageMix || 'Not specified'}
 - NEVER use these phrases: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
-
-LANGUAGE RULE: Write in clear English. Roman Urdu/Hindi mixing is only acceptable for Personal-pillar posts, or as very short quoted colloquial hook fragments elsewhere — never the majority of any section or title.
 `.trim();
 
     // ── Mode-specific instruction block ───────────────────────────
@@ -199,59 +193,25 @@ LANGUAGE RULE: Write in clear English. Roman Urdu/Hindi mixing is only acceptabl
       ? `
 ## MODE A — Generate from Notes
 
-RAW NOTES / TODAY'S INPUT:
-${rawNotes}
+RAW NOTES / INPUT: ${rawNotes}
 
-### Step 1 — Intent Analysis (run this mentally before writing)
-
-Classify the input above as one of two types:
-
-**Detailed input** — the notes contain specific technical detail, a narrative, a real event, code, or a described problem/solution.
-→ Use this content directly as the backbone of the post; your job is mainly structuring it into the active anatomy, not inventing new substance.
-
-**Thin/keyword input** — the notes are just a topic name or a short phrase (e.g. "pgvector indexing", "LangGraph multi-agent orchestration", a couple of words with no real detail).
-→ Do NOT shallow-match — do not simply drop the keyword into a generic template sentence. Instead:
-  1. Ask: what would a substantive post in this pillar actually need to say about this topic?
-  2. Draw on foundational knowledge of the topic (how it works, what problem it solves, common patterns) to write real substance — not vague filler.
-  3. Match depth to the pillar:
-     - Value → explain the core mechanism properly
-     - Lead Magnet → produce an actual usable checklist/framework about this topic
-     - Personal → reflect honestly on the experience of learning or using it
-  4. EXCEPTION — Showcase/Authority pillar: this pillar requires real proof from the user's own project. If the input is too thin to contain real project detail, do NOT fabricate specifics. Instead, generate the post with clearly marked placeholders (e.g. [describe what broke / what you built]) and leave a note asking the user to fill in the real detail before publishing.
-
-### Step 2 — Write the post
-
-Using the anatomy sections above, tone profile, pillar DOs/DON'Ts, and your Step 1 analysis, write all 3 versions. Every section must reflect what the intent analysis established — never let a thin input result in generic, could-apply-to-anyone content.
+• **Detailed Input**: Use code, specs & real project details directly as backbone.
+• **Thin / Keyword Input** (e.g. "RAG", "pgvector"): Break down the complete end-to-end architecture & all subcomponents (e.g. chunking → embeddings → vector indexing → similarity search → context synthesis). Never write superficial generic text.
 `.trim()
       : `
-## MODE B — Research & Generate via Web Search
+## MODE B — Research & Generate via Web Search & Official Docs
 
 TOPIC: ${rawNotes}
-
-WEB SEARCH RESULTS (provided via Tavily):
+SEARCH RESULTS:
 ${webResults}
 
-### Step 1 — Read and evaluate the sources
-
-Review all provided search results. Identify:
-- 2-4 concrete, specific facts, best practices, or recent developments actually relevant to the topic and pillar (not generic background everyone already knows).
-- Whether the sources agree or conflict. If they conflict, note the disagreement briefly, or default to the most recent/authoritative-looking source.
-- Whether the sources are thin or off-topic. If the search results don't contain enough substance to write a grounded post, say so explicitly instead of inventing facts to compensate.
-
-### Step 2 — Synthesize, never copy
-
-- NEVER reproduce sentences from the source material verbatim or near-verbatim. Paraphrase every fact fully in your own words.
-- Do not string together lightly-reworded source sentences — genuinely re-explain ideas as if teaching them from understanding, not summarizing text.
-- Add the user's own angle: tie the researched fact back to their actual work/project where natural (e.g. "this is exactly the tradeoff I hit when building X"), since the goal is authentic building-in-public content, not a news recap.
-- If a specific source is unusually important to a claim (e.g. official docs change, benchmark number), you may reference it narratively (e.g. "the official docs now recommend...") without directly quoting it.
-
-### Step 3 — Write the post
-
-Use the active anatomy, tone profile, and pillar DOs/DON'Ts. The substance now comes from verified, current web research — the post should read as informed and current.
+• **Extract Technical Specs**: Pull official framework docs, API specs, architecture patterns, subcomponents (e.g. chunking, vector indexing, retrieval pipelines, state graphs), benchmarks & best practices.
+• **Synthesize**: Re-explain the full concept end-to-end in your own engineering voice with practical workflow steps & trade-offs.
 `.trim();
 
     // ── Full assembled prompt ──────────────────────────────────────
-    const prompt = `You are an expert LinkedIn content strategist writing on behalf of an AI Engineer (Software Engineering student, class of 2027) who builds LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. They share their authentic learning and building journey on LinkedIn.
+    const prompt = `You are an expert LinkedIn content strategist writing on behalf of:
+${userAboutMe}
 
 ${sharedContext}
 
@@ -303,15 +263,8 @@ CRITICAL RULES:
     const firstVersionSections = parsed.versions[0]?.sections || {};
     const totalCharCount = Object.values(firstVersionSections).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
 
-    // Persist post to DB
-    const postId = uuidv4();
-    const today = date ?? new Date().toISOString().split('T')[0];
-    db.prepare(`
-      INSERT INTO posts (id, date, post_type_id, raw_notes_used, topic_summary, versions, selected_version, status, post_format, character_count, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?, ?)
-    `).run(postId, today, postTypeId, rawNotes, topicSummary, JSON.stringify(parsed.versions), format, totalCharCount, new Date().toISOString());
-
-    return NextResponse.json({ postId, versions: parsed.versions, repeatWarning, postFormat: format, characterCount: totalCharCount });
+    // Do NOT automatically persist to posts DB — only persist when user clicks "Save to Drafts"
+    return NextResponse.json({ postId: null, versions: parsed.versions, repeatWarning, postFormat: format, characterCount: totalCharCount, topicSummary });
   } catch (e) {
     console.error('generate-post error:', e);
     return NextResponse.json({ error: String(e) }, { status: 500 });
