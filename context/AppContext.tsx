@@ -19,7 +19,7 @@ export interface AnatomySection {
 }
 
 export interface ToneProfile {
-  formality: 'casual' | 'professional' | 'mixed';
+  formality: string;
   sentenceLength: 'short' | 'medium' | 'long';
   bannedPhrases: string[];
   languageMix: string;

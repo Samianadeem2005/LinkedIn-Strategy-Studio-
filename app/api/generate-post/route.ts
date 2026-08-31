@@ -147,15 +147,56 @@ export async function POST(req: NextRequest) {
 
     // Load enabled writing mechanics directives
     const writingMechanics = db.prepare(
-      'SELECT prompt_directive FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
-    ).all() as { prompt_directive: string }[];
+      'SELECT prompt_directive, description FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
+    ).all() as { prompt_directive?: string; description?: string }[];
 
-    // Load active hook types live from DB
-    const dbHookTypes = db.prepare('SELECT name, description, angles FROM hook_types ORDER BY rowid ASC').all() as { name: string; description: string; angles: string }[];
-    const hookBankList = dbHookTypes.map(ht => {
-      const parsedAngles: string[] = ht.angles ? JSON.parse(ht.angles) : [];
+    // Load active hook types live from DB - filtered by today's pillar & prioritized by least recently used (max 5)
+    const allHookTypes = db.prepare(
+      'SELECT id, name, description, angles, best_fit_pillars, last_used_at FROM hook_types'
+    ).all() as { id: string; name: string; description?: string; angles: string; best_fit_pillars: string; last_used_at?: string | null }[];
+
+    const activePillarNames = postTypesList.map(pt => pt.name as string);
+    let matchingHookTypes = allHookTypes.filter(ht => {
+      try {
+        const pillars: string[] = JSON.parse(ht.best_fit_pillars);
+        return pillars.some(p => activePillarNames.includes(p) || p === postType.name);
+      } catch {
+        return false;
+      }
+    });
+
+    // Fall back to all hook types if zero match current pillar
+    if (matchingHookTypes.length === 0) {
+      matchingHookTypes = allHookTypes;
+    }
+
+    // Sort by least recently used (nulls first, then oldest timestamp)
+    matchingHookTypes.sort((a, b) => {
+      if (!a.last_used_at && !b.last_used_at) return 0;
+      if (!a.last_used_at) return -1;
+      if (!b.last_used_at) return 1;
+      return new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime();
+    });
+
+    // Take top 5
+    const selectedHookTypes = matchingHookTypes.slice(0, 5);
+
+    // Update last_used_at for selected hook types
+    if (selectedHookTypes.length > 0) {
+      const nowIso = new Date().toISOString();
+      const updateStmt = db.prepare('UPDATE hook_types SET last_used_at = ? WHERE id = ?');
+      for (const ht of selectedHookTypes) {
+        updateStmt.run(nowIso, ht.id);
+      }
+    }
+
+    const hookBankList = selectedHookTypes.map(ht => {
+      let parsedAngles: string[] = [];
+      try { parsedAngles = JSON.parse(ht.angles); } catch {}
       const angleStr = parsedAngles.join(' / ');
-      return `${ht.name} — ${ht.description} (angles: ${angleStr})`;
+      return ht.description?.trim()
+        ? `${ht.name} — ${ht.description} (angles: ${angleStr})`
+        : `${ht.name} (angles: ${angleStr})`;
     }).join('\n');
 
     const anatomyPrompt = anatomySections.map((s, i) =>
@@ -200,7 +241,7 @@ ACTIVE POST ANATOMY (output every section in this exact order for EVERY version)
 ${anatomyPrompt}
 
 WRITING MECHANICS DIRECTIVES (mandatory formatting & structural constraints):
-${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive}`).join('\n') : '• Keep lines short and scannable. Avoid wall of text blocks.'}
+${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive || m.description}`).join('\n') : '• Keep lines short and scannable. Avoid wall of text blocks.'}
 
 AVAILABLE HOOK TYPES (structural moves, not literal text):
 ${hookBankList || 'No hook types configured.'}
@@ -223,7 +264,7 @@ ${modeInstructions}
 ---
 
 ## Output Format
-Return exactly 3 versions. For each version, output every section defined in the active Post Anatomy above (in order), plus a Visual suggestion.
+Return exactly 3 versions. For each version, output every section defined in the active Post Anatomy above (in order), plus a Visual suggestion and a Resources array.
 Respond with ONLY valid JSON — no markdown fences, no commentary before or after:
 {
   "versions": [
@@ -232,10 +273,13 @@ Respond with ONLY valid JSON — no markdown fences, no commentary before or aft
       "sections": {
         "${anatomySections.map(s => s.section_name).join('": "...",\n        "')}: "..."
       },
-      "visualSuggestion": "Specific, concrete one-line description of the image/graphic to pair with this version"
+      "visualSuggestion": "Specific, concrete one-line description of the image/graphic to pair with this version",
+      "resources": [
+        "Official Documentation / Resource Title (https://example.com/url)"
+      ]
     },
-    { "version": 2, "sections": { ... }, "visualSuggestion": "..." },
-    { "version": 3, "sections": { ... }, "visualSuggestion": "..." }
+    { "version": 2, "sections": { ... }, "visualSuggestion": "...", "resources": [ "..." ] },
+    { "version": 3, "sections": { ... }, "visualSuggestion": "...", "resources": [ "..." ] }
   ]
 }
 
@@ -244,6 +288,7 @@ CRITICAL RULES:
 - All 3 versions apply the SAME hook type but different angles/wording — never repeat the exact same hook sentence across versions.
 - Never include placeholder text or meta-commentary unless the Showcase/Authority pillar exception applies (thin input with no real project detail).
 - Every section listed in the anatomy must appear in every version.
+- **RESOURCES ARRAY**: In every version, include 1-4 specific URLs or official doc references in the "resources" array. In Mode B (Web Search), extract the exact source URLs/titles from the provided search results. In Mode A, list official framework doc URLs, GitHub repos, or technical specs relevant to the topic (e.g. LangChain Docs (https://python.langchain.com), PostgreSQL pgvector (https://github.com/pgvector/pgvector)).
 - The post must be ready to copy-paste to LinkedIn as-is.`;
 
     const jsonText = await callWithGeminiFallback(async (genAI) => {
@@ -255,16 +300,20 @@ CRITICAL RULES:
     });
 
     const parsed = JSON.parse(jsonText);
+    const sanitizedVersions = (parsed.versions || []).map((v: Record<string, unknown>) => ({
+      ...v,
+      resources: Array.isArray(v.resources) ? v.resources.map((r: unknown) => String(r)) : []
+    }));
 
     // Auto-extract topic summary from raw notes (first 200 chars)
     const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim();
 
     // Calculate total character count for first version
-    const firstVersionSections = parsed.versions[0]?.sections || {};
+    const firstVersionSections = sanitizedVersions[0]?.sections || {};
     const totalCharCount = Object.values(firstVersionSections).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
 
     // Do NOT automatically persist to posts DB — only persist when user clicks "Save to Drafts"
-    return NextResponse.json({ postId: null, versions: parsed.versions, repeatWarning, postFormat: format, characterCount: totalCharCount, topicSummary });
+    return NextResponse.json({ postId: null, versions: sanitizedVersions, repeatWarning, postFormat: format, characterCount: totalCharCount, topicSummary });
   } catch (e) {
     console.error('generate-post error:', e);
     return NextResponse.json({ error: String(e) }, { status: 500 });

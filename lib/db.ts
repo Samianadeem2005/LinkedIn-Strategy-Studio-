@@ -171,6 +171,12 @@ function initSchema(db: Database.Database) {
   if (!settingsColumns.includes('about_me')) {
     db.exec("ALTER TABLE settings ADD COLUMN about_me TEXT DEFAULT NULL");
   }
+
+  // Runtime migration — add last_used_at column to hook_types table
+  const hookColumns = (db.prepare("PRAGMA table_info(hook_types)").all() as { name: string }[]).map(c => c.name);
+  if (!hookColumns.includes('last_used_at')) {
+    db.exec("ALTER TABLE hook_types ADD COLUMN last_used_at TEXT DEFAULT NULL");
+  }
   const defaultAboutMe = "I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.";
   db.exec(`UPDATE settings SET about_me = '${defaultAboutMe.replace(/'/g, "''")}' WHERE id = 1 AND (about_me IS NULL OR about_me = '')`);
 

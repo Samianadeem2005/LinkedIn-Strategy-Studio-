@@ -21,6 +21,7 @@ interface PostVersion {
   version: number;
   sections: Record<string, string>;
   visualSuggestion?: string;
+  resources?: string[];
 }
 
 interface DraftItem {
@@ -510,9 +511,19 @@ export default function CalendarPage() {
 
                 {/* Visual Suggestion */}
                 {selectedDayEvent.draft.versions?.[selectedDayEvent.draft.selected_version || 0]?.visualSuggestion && (
-                  <p className="text-xs italic p-3 rounded-lg border" style={{ background: '#0d1a0d', borderColor: '#166534', color: '#86efac' }}>
+                  <p className="text-xs italic p-3 rounded-lg border mb-2" style={{ background: '#0d1a0d', borderColor: '#166534', color: '#86efac' }}>
                     🎨 Visual Suggestion: {selectedDayEvent.draft.versions[selectedDayEvent.draft.selected_version || 0].visualSuggestion}
                   </p>
+                )}
+
+                {/* Resources */}
+                {selectedDayEvent.draft.versions?.[selectedDayEvent.draft.selected_version || 0]?.resources && selectedDayEvent.draft.versions[selectedDayEvent.draft.selected_version || 0].resources!.length > 0 && (
+                  <div className="p-3 rounded-lg border text-xs" style={{ background: '#0d1f2e', borderColor: '#1a4a7a', color: '#93c5fd' }}>
+                    <strong className="block mb-1 text-blue-400">📚 Resources / References:</strong>
+                    {selectedDayEvent.draft.versions[selectedDayEvent.draft.selected_version || 0].resources!.map((r, i) => (
+                      <p key={i} className="truncate">• {r}</p>
+                    ))}
+                  </div>
                 )}
               </div>
             ) : selectedDayEvent.plan ? (

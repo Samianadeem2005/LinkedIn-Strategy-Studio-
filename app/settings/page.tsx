@@ -227,14 +227,13 @@ function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
 }) {
   const { show: showToast, ToastEl } = useToast();
   const [ruleName, setRuleName] = useState(existing?.rule_name ?? '');
-  const [description, setDescription] = useState(existing?.description ?? '');
-  const [promptDirective, setPromptDirective] = useState(existing?.prompt_directive ?? '');
+  const [description, setDescription] = useState(existing?.description ?? existing?.prompt_directive ?? '');
   const [enabled, setEnabled] = useState<boolean>(existing ? existing.enabled === 1 : true);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    if (!ruleName.trim() || !description.trim() || !promptDirective.trim()) {
-      showToast('All fields are required.', 'error');
+    if (!ruleName.trim() || !description.trim()) {
+      showToast('Rule name and description are required.', 'error');
       return;
     }
     setSaving(true);
@@ -247,7 +246,7 @@ function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
         body: JSON.stringify({
           rule_name: ruleName,
           description,
-          prompt_directive: promptDirective,
+          prompt_directive: description,
           enabled: enabled ? 1 : 0,
           order_index: existing?.order_index ?? maxOrder + 1
         })
@@ -279,30 +278,13 @@ function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
         </div>
 
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Human Description (UI Reference)</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Rule Instruction (Sent to Gemini AI)</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            placeholder="Detailed explanation of what this writing rule achieves..."
-            rows={2}
-            className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none resize-none"
-            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
-            Prompt Directive (Sent to Gemini AI)
-          </label>
-          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-            Compact, imperative instruction injected into post generation prompt.
-          </p>
-          <textarea
-            value={promptDirective}
-            onChange={e => setPromptDirective(e.target.value)}
-            placeholder="e.g. Format content with 1-2 sentence short paragraphs and single line breaks."
+            placeholder="e.g. Stagger line lengths unevenly down the screen to create a visual 'wave' that dynamically guides the reader's eye down the post."
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none resize-none font-mono text-xs"
+            className="w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none resize-none"
             style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
           />
         </div>
@@ -354,21 +336,23 @@ export default function SettingsPage() {
   const [aboutMe, setAboutMe] = useState(settings?.about_me ?? '');
   const [savingAboutMe, setSavingAboutMe] = useState(false);
 
-  // Sync aboutMe from settings on load
+  // Sync settings on load
   useEffect(() => {
-    if (settings?.about_me) {
-      setAboutMe(settings.about_me);
+    if (settings?.about_me) setAboutMe(settings.about_me);
+    if (settings?.anatomy_scope) setAnatomyScope(settings.anatomy_scope);
+    if (settings?.tone_profile) {
+      setFormality(settings.tone_profile.formality ?? '');
+      setSentenceLength(settings.tone_profile.sentenceLength ?? 'short');
+      setBannedPhrases(settings.tone_profile.bannedPhrases ?? []);
+      setLanguageMix(settings.tone_profile.languageMix ?? 'English');
     }
-    if (settings?.anatomy_scope) {
-      setAnatomyScope(settings.anatomy_scope);
-    }
-  }, [settings?.about_me, settings?.anatomy_scope]);
+  }, [settings?.about_me, settings?.anatomy_scope, settings?.tone_profile]);
 
   // Tone form state
-  const [formality, setFormality] = useState<'casual' | 'professional' | 'mixed'>(settings?.tone_profile?.formality ?? 'mixed');
+  const [formality, setFormality] = useState<string>(settings?.tone_profile?.formality ?? '');
   const [sentenceLength, setSentenceLength] = useState<'short' | 'medium' | 'long'>(settings?.tone_profile?.sentenceLength ?? 'short');
   const [bannedPhrases, setBannedPhrases] = useState<string[]>(settings?.tone_profile?.bannedPhrases ?? []);
-  const [languageMix, setLanguageMix] = useState(settings?.tone_profile?.languageMix ?? '');
+  const [languageMix, setLanguageMix] = useState<string>(settings?.tone_profile?.languageMix ?? 'English');
   const [savingTone, setSavingTone] = useState(false);
   const [anatomyScope, setAnatomyScope] = useState<'global' | 'per_post_type'>(settings?.anatomy_scope ?? 'global');
 
@@ -1103,21 +1087,26 @@ export default function SettingsPage() {
           {activeTab === 'tone' && (
             <div>
               <h2 className="font-semibold text-base mb-1">Tone &amp; Voice Profile</h2>
-              <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Applied to every generation call regardless of pillar.</p>
+              <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Applied to every generation call regardless of post type.</p>
 
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Formality</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Language Mix</label>
                   <div className="relative">
-                    <select value={formality} onChange={e => setFormality(e.target.value as typeof formality)}
-                      className="w-full appearance-none pr-8" style={{ ...selectStyle, width: '100%' }}>
-                      <option value="casual">Casual</option>
-                      <option value="professional">Professional</option>
-                      <option value="mixed">Mixed</option>
+                    <select
+                      value={languageMix}
+                      onChange={e => setLanguageMix(e.target.value)}
+                      className="w-full appearance-none pr-8"
+                      style={{ ...selectStyle, width: '100%' }}
+                    >
+                      <option value="English">English</option>
+                      <option value="Roman Urdu">Roman Urdu</option>
+                      <option value="Mix (English + Roman Urdu)">Mix (English + Roman Urdu)</option>
                     </select>
                     <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                   </div>
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Sentence Length</label>
                   <div className="relative">
@@ -1133,12 +1122,20 @@ export default function SettingsPage() {
               </div>
 
               <div className="mb-5">
-                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Language Mix</label>
-                <textarea value={languageMix} onChange={e => setLanguageMix(e.target.value)}
-                  placeholder="e.g. Roman Urdu/English casual for hooks and personal posts, English for technical explanations"
-                  rows={2}
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Formality &amp; Tone Directives
+                </label>
+                <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Describe your desired tone and formality style (e.g. conversational yet authoritative, professional without stiff jargon).
+                </p>
+                <textarea
+                  value={formality}
+                  onChange={e => setFormality(e.target.value)}
+                  placeholder="e.g. Conversational, direct, authentic. High energy with zero fluff or corporate jargon."
+                  rows={3}
                   className="w-full px-3 py-2.5 rounded-lg border text-sm resize-none focus:outline-none"
-                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                />
               </div>
 
               <div className="mb-6">
@@ -1154,7 +1151,7 @@ export default function SettingsPage() {
               <button onClick={saveTone} disabled={savingTone}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 style={{ background: 'var(--accent)', color: 'white' }}>
-                {savingTone ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Tone Profile &amp; Scope</>}
+                {savingTone ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Tone Profile</>}
               </button>
             </div>
           )}
@@ -1210,13 +1207,9 @@ export default function SettingsPage() {
                                       {mech.rule_name}
                                     </span>
                                   </div>
-                                  <p className="text-xs mb-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                                    {mech.description}
+                                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                    {mech.description || mech.prompt_directive}
                                   </p>
-                                  <div className="p-2 rounded-lg text-xs font-mono" style={{ background: 'var(--bg-primary)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
-                                    <span className="font-bold text-[10px] uppercase tracking-wider block mb-0.5" style={{ color: 'var(--accent)' }}>Directive:</span>
-                                    {mech.prompt_directive}
-                                  </div>
                                 </div>
 
                                 <div className="flex items-center gap-1.5 flex-shrink-0">

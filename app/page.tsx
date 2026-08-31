@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, Rocket, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Lightbulb, Search } from 'lucide-react';
+import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, Rocket, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Lightbulb, Search, Trash2, ExternalLink, Link2 } from 'lucide-react';
 
 interface PostVersion {
   version: number;
   sections: Record<string, string>;
   visualSuggestion: string;
+  resources?: string[];
 }
 
 interface CalendarEntry {
@@ -160,48 +161,25 @@ export default function StudioPage() {
     pillarName: string;
   }[]>([]);
 
-  // ── Hook Bank state ───────────────────────────────────────────
-  const [hooks, setHooks] = useState<{ id: string; hook_text: string; category: string }[]>([]);
-  const [selectedHookIds, setSelectedHookIds] = useState<string[]>([]);
-  const [loadingHooks, setLoadingHooks] = useState(false);
 
-  const fetchHooks = async (categoryName?: string) => {
-    setLoadingHooks(true);
-    try {
-      const query = categoryName ? `?category=${encodeURIComponent(categoryName)}` : '';
-      const res = await fetch(`/api/hooks${query}`);
-      if (res.ok) {
-        const data = await res.json();
-        setHooks(data);
-      }
-    } catch { /* fall through */ }
-    finally { setLoadingHooks(false); }
-  };
-
-  useEffect(() => {
-    const selectedType = postTypes.find(pt => pt.id === selectedPostTypeId);
-    fetchHooks(selectedType?.name);
-
-    const handleStrategyUpdated = () => {
-      fetchHooks(selectedType?.name);
-    };
-
-    window.addEventListener('strategy_updated', handleStrategyUpdated);
-    return () => window.removeEventListener('strategy_updated', handleStrategyUpdated);
-  }, [selectedPostTypeId, postTypes]);
-
-  const toggleHookSelection = (id: string) => {
-    setSelectedHookIds(prev =>
-      prev.includes(id) ? prev.filter(hId => hId !== id) : [...prev, id]
-    );
-  };
 
   // Load weekly schedule for vertical ovals & resolution order
   useEffect(() => {
     async function resolveToday() {
       const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-      const todayIdx = daysOfWeek.indexOf(todayDayName);
+      
+      // Calculate day name based on selected postDate
+      let selectedDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      if (postDate) {
+        const parts = postDate.split('-');
+        if (parts.length === 3) {
+          const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          if (!isNaN(dObj.getTime())) {
+            selectedDayName = dObj.toLocaleDateString('en-US', { weekday: 'long' });
+          }
+        }
+      }
+      const selectedDayIdx = daysOfWeek.indexOf(selectedDayName);
 
       const defaultMix: Record<string, string> = {
         'Monday': 'Value',
@@ -225,36 +203,39 @@ export default function StudioPage() {
       } catch { /* fall through */ }
 
       const list = daysOfWeek.map((dayName, idx) => {
-        const isToday = idx === todayIdx;
-        const isPast = idx < todayIdx;
-        const isFuture = idx > todayIdx;
+        const isToday = dayName === selectedDayName;
+        const isPast = idx < selectedDayIdx;
+        const isFuture = idx > selectedDayIdx;
         const pillarName = mappingMap[dayName] || defaultMix[dayName] || 'Value';
         return { dayName, isToday, isPast, isFuture, pillarName };
       });
       setWeeklySchedule(list);
 
-      // 1. Check calendar_entries for today
+      // 1. Check calendar_entries for postDate
       try {
-        const calRes = await fetch(`/api/calendar-today?date=${today}`);
+        const calRes = await fetch(`/api/calendar-today?date=${postDate}`);
         if (calRes.ok) {
           const entry: CalendarEntry = await calRes.json();
-          if (entry?.id) {
+          if (entry?.id && entry.date === postDate) {
             setCalendarEntry(entry);
             setSelectedPostTypeId(entry.post_type_id);
             setResolvedSource('calendar');
-            setResolvedLabel(`Today's plan: ${entry.post_title}`);
+            setResolvedLabel(`Plan for ${postDate}: ${entry.post_title}`);
             return;
           }
         }
       } catch { /* fall through */ }
 
-      // 2. Fall back to weekly mapping
-      if (mappingMap[todayDayName]) {
-        const matched = postTypes.find(pt => pt.name.toLowerCase() === mappingMap[todayDayName].toLowerCase());
+      // Clear stale calendar entry if no matching plan exists for selected date
+      setCalendarEntry(null);
+
+      // 2. Fall back to weekly mapping for selectedDayName
+      if (mappingMap[selectedDayName]) {
+        const matched = postTypes.find(pt => pt.name.toLowerCase() === mappingMap[selectedDayName].toLowerCase());
         if (matched) {
           setSelectedPostTypeId(matched.id);
           setResolvedSource('weekly');
-          setResolvedLabel(`${todayDayName} — ${matched.name}`);
+          setResolvedLabel(`${selectedDayName} — ${matched.name}`);
           return;
         }
       }
@@ -264,7 +245,7 @@ export default function StudioPage() {
       setResolvedLabel('Select a pillar manually');
     }
     resolveToday();
-  }, [today, settings, postTypes]);
+  }, [postDate, settings, postTypes]);
 
   // ── Mode A: generate from raw notes ──────────────────────────
   const handleGenerate = async () => {
@@ -273,14 +254,13 @@ export default function StudioPage() {
     setVersions([]);
     setRepeatWarning(null);
     setPostId(null);
-    const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
     await startNotesGenerate({
       rawNotes,
       selectedPostTypeId,
       postFormat,
       postDate,
-      selectedHooks: activeSelectedHookTexts,
-      selectedHookIds
+      selectedHooks: [],
+      selectedHookIds: []
     });
   };
 
@@ -291,14 +271,13 @@ export default function StudioPage() {
     setVersions([]);
     setRepeatWarning(null);
     setPostId(null);
-    const activeSelectedHookTexts = hooks.filter(h => selectedHookIds.includes(h.id)).map(h => h.hook_text);
     await startWebSearchGenerate({
       rawNotes,
       selectedPostTypeId,
       postFormat,
       postDate,
-      selectedHooks: activeSelectedHookTexts,
-      selectedHookIds
+      selectedHooks: [],
+      selectedHookIds: []
     });
   };
 
@@ -424,7 +403,26 @@ export default function StudioPage() {
     ? anatomy.filter(s => !s.applies_to_post_type_id || s.applies_to_post_type_id === selectedPostTypeId)
     : anatomy.filter(s => !s.applies_to_post_type_id);
   const currentVisualSuggestion = versions[activeVersion]?.visualSuggestion ?? '';
+  const currentResources = versions[activeVersion]?.resources ?? [];
   const hasOutput = versions.length > 0;
+
+  useEffect(() => {
+    if (hasOutput) {
+      setTimeout(() => {
+        const textareas = document.querySelectorAll<HTMLTextAreaElement>('.section-textarea');
+        textareas.forEach(ta => {
+          ta.style.height = 'auto';
+          ta.style.height = `${Math.max(60, ta.scrollHeight)}px`;
+          console.log(`[Section Debug] ${ta.name}: scrollHeight=${ta.scrollHeight}px, clientHeight=${ta.clientHeight}px (Clipped: ${ta.scrollHeight > ta.clientHeight})`);
+        });
+
+        const container = document.getElementById('output-panel-container');
+        if (container) {
+          console.log(`[Panel Debug] Output container: scrollHeight=${container.scrollHeight}px, clientHeight=${container.clientHeight}px (Scrollable: ${container.scrollHeight > container.clientHeight})`);
+        }
+      }, 0);
+    }
+  }, [hasOutput, versions, activeVersion, editedSections]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -451,7 +449,7 @@ export default function StudioPage() {
         <div className="flex flex-col gap-4 overflow-y-auto p-6 border-r" style={{ borderColor: 'var(--border)' }}>
           
           {/* Calendar context banner */}
-          {calendarEntry && (
+          {calendarEntry && calendarEntry.date === postDate && (
             <div className="p-4 rounded-xl border animate-fade-in"
               style={{ background: '#0d1f2e', borderColor: '#1a4a7a' }}>
               <div className="flex items-center gap-2 mb-2">
@@ -687,58 +685,7 @@ export default function StudioPage() {
             </div>
           )}
 
-          {/* Hook Bank Selector */}
-          {hooks.length > 0 && (
-            <div
-              className="p-3.5 rounded-xl border space-y-2"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={14} style={{ color: 'var(--accent)' }} />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Hook Suggestions (Click to select for generation)
-                  </span>
-                </div>
-                <button
-                  onClick={() => fetchHooks(selectedType?.name)}
-                  disabled={loadingHooks}
-                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--accent)' }}
-                >
-                  <RefreshCw size={11} className={loadingHooks ? 'spinner' : ''} />
-                  Shuffle
-                </button>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {hooks.map(h => {
-                  const isSelected = selectedHookIds.includes(h.id);
-                  return (
-                    <button
-                      key={h.id}
-                      type="button"
-                      onClick={() => toggleHookSelection(h.id)}
-                      className="p-2.5 rounded-lg text-left text-xs transition-all border flex items-start gap-2"
-                      style={{
-                        background: isSelected ? 'rgba(124, 58, 237, 0.15)' : 'var(--bg-primary)',
-                        borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
-                        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => {}}
-                        className="mt-0.5 accent-purple-600 rounded"
-                      />
-                      <span className="line-clamp-2 leading-relaxed flex-1">{h.hook_text}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Generate buttons — two explicit modes */}
           <div className="grid grid-cols-2 gap-3">
@@ -783,8 +730,8 @@ export default function StudioPage() {
           </div>
         </div>
 
-        {/* Right: Output panel — scrollable */}
-        <div className="flex flex-col gap-4 overflow-y-auto p-6">
+        {/* Right: Output panel — fully scrollable */}
+        <div id="output-panel-container" className="flex flex-col gap-4 overflow-y-auto p-6 relative">
           {!hasOutput && !generating && (
             <div className="flex-1 flex flex-col items-center justify-center rounded-xl border border-dashed py-20"
               style={{ borderColor: 'var(--border)' }}>
@@ -810,7 +757,7 @@ export default function StudioPage() {
           {hasOutput && !generating && (
             <>
               {/* Version tabs */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 sticky top-0 z-10 py-1" style={{ background: 'var(--bg-primary)' }}>
                 {versions.map((v, i) => (
                   <button
                     key={i}
@@ -827,14 +774,14 @@ export default function StudioPage() {
               </div>
 
               {/* Sections */}
-              <div className="flex flex-col gap-3" style={{ minHeight: 0 }}>
+              <div className="flex flex-col gap-4">
                 {activeAnatomy.map(section => {
                   const content = editedSections[section.section_name] ?? '';
                   const isRegen = regeneratingSection === section.section_name;
 
                   return (
                     <div key={section.id} className="rounded-xl border animate-fade-in"
-                      style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+                      style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', height: 'auto', overflow: 'visible' }}>
                       <div className="flex items-center justify-between px-4 py-2 border-b rounded-t-xl"
                         style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
                         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
@@ -858,7 +805,7 @@ export default function StudioPage() {
                           e.target.style.height = `${Math.max(60, e.target.scrollHeight)}px`;
                         }}
                         className="section-textarea w-full px-4 py-3 bg-transparent text-sm resize-none focus:outline-none leading-relaxed block rounded-b-xl"
-                        style={{ color: 'var(--text-primary)', height: 'auto', minHeight: '60px' }}
+                        style={{ color: 'var(--text-primary)', height: 'auto', minHeight: '60px', overflow: 'hidden' }}
                       />
                     </div>
                   );
@@ -867,33 +814,78 @@ export default function StudioPage() {
                 {/* Visual suggestion */}
                 {currentVisualSuggestion && (
                   <div className="px-4 py-3 rounded-xl border animate-fade-in"
-                    style={{ background: '#0d1a0d', borderColor: '#166534' }}>
+                    style={{ background: '#0d1a0d', borderColor: '#166534', height: 'auto', overflow: 'visible' }}>
                     <div className="flex items-center gap-2 mb-1">
                       <Image size={14} style={{ color: '#22c55e' }} />
                       <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>Visual Suggestion</span>
                     </div>
-                    <p className="text-xs" style={{ color: '#86efac' }}>{currentVisualSuggestion}</p>
+                    <p className="text-xs leading-relaxed" style={{ color: '#86efac' }}>{currentVisualSuggestion}</p>
+                  </div>
+                )}
+
+                {/* Resources / Sources section */}
+                {currentResources && currentResources.length > 0 && (
+                  <div className="px-4 py-3 rounded-xl border animate-fade-in"
+                    style={{ background: '#0d1f2e', borderColor: '#1a4a7a', height: 'auto', overflow: 'visible' }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <BookOpen size={14} style={{ color: '#60a5fa' }} />
+                      <span className="text-xs font-semibold" style={{ color: '#60a5fa' }}>Resources / References</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {currentResources.map((resItem, idx) => {
+                        const urlMatch = resItem.match(/https?:\/\/[^\s\)]+/);
+                        const targetUrl = urlMatch ? urlMatch[0] : (resItem.startsWith('http') ? resItem : null);
+                        return (
+                          <div key={idx} className="flex items-start gap-2 text-xs" style={{ color: '#93c5fd' }}>
+                            <span className="text-[10px] mt-0.5">•</span>
+                            {targetUrl ? (
+                              <a
+                                href={targetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-white transition-colors flex items-center gap-1 break-all"
+                              >
+                                {resItem}
+                                <ExternalLink size={10} className="inline flex-shrink-0" />
+                              </a>
+                            ) : (
+                              <span className="leading-relaxed break-all">{resItem}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Footer actions */}
-              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                  style={{
-                    background: 'var(--bg-elevated)',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border)',
-                  }}>
-                  <Eye size={12} />
-                  Draft
-                </div>
-
-                <button onClick={handleSaveEdits}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
-                  style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 2px 10px rgba(108,99,255,0.3)' }}>
-                  <Save size={14} /> Save to Drafts
+              <div className="flex items-center justify-between pt-4 border-t sticky bottom-0 z-10 py-3 mt-2"
+                style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)' }}>
+                <button
+                  onClick={() => { setVersions([]); showToast('Discarded generated post.', 'info'); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors hover:bg-red-950/20"
+                  style={{ borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}>
+                  <Trash2 size={13} /> Discard
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border)',
+                    }}>
+                    <Eye size={12} />
+                    {postStatus === 'draft' ? 'Saved Draft' : 'Draft'}
+                  </div>
+
+                  <button onClick={handleSaveEdits}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                    style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 2px 10px rgba(108,99,255,0.3)' }}>
+                    <Save size={14} /> Save to Drafts
+                  </button>
+                </div>
               </div>
             </>
           )}

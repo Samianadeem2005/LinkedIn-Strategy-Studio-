@@ -18,8 +18,10 @@ export async function POST(req: NextRequest) {
     const { rule_name, description, prompt_directive, enabled, order_index } = body;
 
     if (!rule_name?.trim()) return NextResponse.json({ error: 'Rule name is required.' }, { status: 400 });
-    if (!description?.trim()) return NextResponse.json({ error: 'Description is required.' }, { status: 400 });
-    if (!prompt_directive?.trim()) return NextResponse.json({ error: 'Prompt directive is required.' }, { status: 400 });
+    if (!description?.trim() && !prompt_directive?.trim()) return NextResponse.json({ error: 'Description is required.' }, { status: 400 });
+
+    const finalDescription = (description ?? prompt_directive ?? '').trim();
+    const finalDirective = (prompt_directive ?? description ?? '').trim();
 
     const db = getDb();
     const id = uuidv4();
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
     db.prepare(`
       INSERT INTO writing_mechanics (id, rule_name, description, prompt_directive, enabled, order_index)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, rule_name, description, prompt_directive, enabled ?? 1, targetOrder);
+    `).run(id, rule_name.trim(), finalDescription, finalDirective, enabled ?? 1, targetOrder);
 
     const inserted = db.prepare('SELECT * FROM writing_mechanics WHERE id = ?').get(id);
     return NextResponse.json(inserted, { status: 201 });

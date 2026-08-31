@@ -9,6 +9,7 @@ interface PostVersion {
   version: number;
   sections: Record<string, string>;
   visualSuggestion?: string;
+  resources?: string[];
 }
 
 interface PostItem {
@@ -198,9 +199,19 @@ export default function DraftsPage() {
 
                   {/* Visual Suggestion badge */}
                   {activeVer?.visualSuggestion && (
-                    <p className="text-[11px] italic mb-4" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[11px] italic mb-2" style={{ color: 'var(--text-muted)' }}>
                       🎨 Visual: {activeVer.visualSuggestion}
                     </p>
+                  )}
+
+                  {/* Resources preview */}
+                  {activeVer?.resources && activeVer.resources.length > 0 && (
+                    <div className="mb-4 text-[11px]" style={{ color: '#60a5fa' }}>
+                      <strong className="block mb-0.5">📚 Resources ({activeVer.resources.length}):</strong>
+                      {activeVer.resources.slice(0, 2).map((res, i) => (
+                        <p key={i} className="truncate">• {res}</p>
+                      ))}
+                    </div>
                   )}
                 </div>
 
