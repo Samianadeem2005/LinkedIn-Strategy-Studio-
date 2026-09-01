@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Zap, Settings, LayoutGrid, Calendar, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark, FileText } from 'lucide-react';
+import { Zap, Settings, LayoutGrid, Calendar, Layers, ChevronLeft, ChevronRight, Sparkles, Bookmark, FileText, Type } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 const navItems = [
   { href: '/', icon: Zap, label: 'Studio', desc: 'Daily post generation' },
+  { href: '/formatter', icon: Type, label: 'Formatter', desc: 'Text formatter & LinkedIn preview' },
   { href: '/calendar', icon: Calendar, label: 'Calendar', desc: 'Monthly schedule & plan' },
   { href: '/calendar-maker', icon: Sparkles, label: 'Calendar Maker', desc: 'AI content schedule generator' },
   { href: '/drafts', icon: FileText, label: 'Drafts', desc: 'Saved draft posts' },

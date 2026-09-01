@@ -54,6 +54,7 @@ export default function DraftsPage() {
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({});
   const [savingIds, setSavingIds] = useState<Record<string, boolean>>({});
   const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -158,7 +159,6 @@ export default function DraftsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this draft?')) return;
     setActionLoadingId(id);
     try {
       const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
@@ -172,6 +172,7 @@ export default function DraftsPage() {
       showToast(String(e), 'error');
     } finally {
       setActionLoadingId(null);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -376,14 +377,31 @@ export default function DraftsPage() {
                     )}
                   </div>
 
-                  <button onClick={() => handleDelete(post.id)}
-                    disabled={actionLoadingId === post.id}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-red-500/10 text-red-400 border"
-                    style={{ borderColor: 'var(--border)' }}
-                    title="Delete draft">
-                    {actionLoadingId === post.id ? <Loader2 size={13} className="spinner" /> : <Trash2 size={13} />}
-                    <span>Delete</span>
-                  </button>
+                  {deleteConfirmId === post.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => handleDelete(post.id)}
+                        disabled={actionLoadingId === post.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-all shadow-sm"
+                        title="Click to confirm deletion">
+                        {actionLoadingId === post.id ? <Loader2 size={13} className="spinner" /> : <Trash2 size={13} />}
+                        <span>Confirm Delete?</span>
+                      </button>
+                      <button onClick={() => setDeleteConfirmId(null)}
+                        className="px-2 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-white/10"
+                        title="Cancel deletion">
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirmId(post.id)}
+                      disabled={actionLoadingId === post.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-red-500/10 text-red-400 border"
+                      style={{ borderColor: 'var(--border)' }}
+                      title="Delete draft">
+                      <Trash2 size={13} />
+                      <span>Delete</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
