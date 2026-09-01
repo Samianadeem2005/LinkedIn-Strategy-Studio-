@@ -290,9 +290,11 @@ export default function CalendarPage() {
             const isBeingDragged = draggedDate === cell.dateStr;
             const isDragTarget = dragOverDate === cell.dateStr;
 
-            const topicText = hasPlan
-              ? formatTopicsCovered(events.plan?.topics_covered) || events.plan?.post_title
-              : events?.draft?.topic_summary || 'Saved Draft';
+            const topicsCoveredText = hasPlan ? formatTopicsCovered(events.plan?.topics_covered) : '';
+            const topicText = topicsCoveredText 
+              || (hasPlan ? events.plan?.post_title : '') 
+              || events?.draft?.topic_summary 
+              || 'Saved Post';
 
             return (
               <div
@@ -399,7 +401,7 @@ export default function CalendarPage() {
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
                       }}>
-                      {events.draft?.topic_summary || 'Saved Draft'}
+                      {topicText}
                     </p>
                   </div>
                 )}
@@ -492,9 +494,17 @@ export default function CalendarPage() {
                   </span>
                 </div>
 
+                {/* Prompt Question / Raw Notes Used */}
+                {selectedDayEvent.draft.raw_notes_used && (
+                  <div className="p-3 rounded-xl border text-xs" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)' }}>
+                    <strong className="block font-semibold mb-1" style={{ color: 'var(--accent)' }}>💡 Prompt Question / Raw Notes:</strong>
+                    <p style={{ color: 'var(--text-secondary)' }} className="leading-relaxed whitespace-pre-wrap">{selectedDayEvent.draft.raw_notes_used}</p>
+                  </div>
+                )}
+
                 {/* Section Content Preview */}
                 {selectedDayEvent.draft.versions?.[selectedDayEvent.draft.selected_version || 0]?.sections && (
-                  <div className="max-h-80 overflow-y-auto space-y-3 p-4 rounded-xl border text-xs leading-relaxed"
+                  <div className="max-h-72 overflow-y-auto space-y-3 p-4 rounded-xl border text-xs leading-relaxed"
                     style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)' }}>
                     {Object.entries(selectedDayEvent.draft.versions[selectedDayEvent.draft.selected_version || 0].sections).map(([secName, secText]) => (
                       <div key={secName} className="space-y-1">

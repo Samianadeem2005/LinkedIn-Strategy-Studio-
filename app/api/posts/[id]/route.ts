@@ -22,6 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.selected_version !== undefined) { updates.push('selected_version = ?'); vals.push(body.selected_version); }
     if (body.versions !== undefined) { updates.push('versions = ?'); vals.push(JSON.stringify(body.versions)); }
     if (body.topic_summary !== undefined) { updates.push('topic_summary = ?'); vals.push(body.topic_summary); }
+    if (body.date !== undefined) { updates.push('date = ?'); vals.push(body.date); }
     if (updates.length === 0) return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
 
     vals.push(id);

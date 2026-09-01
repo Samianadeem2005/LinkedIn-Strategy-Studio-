@@ -35,11 +35,13 @@ export async function POST(req: NextRequest) {
     const db = getDb();
     const { v4: uuidv4 } = await import('uuid');
     const id = uuidv4();
+    const postTypeId = body.post_type_id && String(body.post_type_id).trim() !== '' ? body.post_type_id : null;
+
     db.prepare(`
       INSERT INTO posts (id, calendar_entry_id, date, post_type_id, series_part, raw_notes_used, topic_summary, versions, selected_version, status, post_format, character_count, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, body.calendar_entry_id ?? null, body.date, body.post_type_id,
+      id, body.calendar_entry_id ?? null, body.date || new Date().toISOString().split('T')[0], postTypeId,
       body.series_part ?? null, body.raw_notes_used ?? null, body.topic_summary ?? null,
       JSON.stringify(body.versions ?? []), body.selected_version ?? 0,
       body.status ?? 'draft', body.post_format ?? 'text_post', body.character_count ?? 0, new Date().toISOString()

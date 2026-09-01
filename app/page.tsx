@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, Rocket, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Lightbulb, Search, Trash2, ExternalLink, Link2 } from 'lucide-react';
+import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, Rocket, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Lightbulb, Search, Trash2, ExternalLink, Link2, Copy } from 'lucide-react';
 
 interface PostVersion {
   version: number;
@@ -344,14 +344,25 @@ export default function StudioPage() {
       i === activeVersion ? { ...v, sections: editedSections } : v
     );
 
+    const postTypeIdToUse = selectedPostTypeId || (postTypes.length > 0 ? postTypes[0].id : null);
+
     if (postId) {
-      await fetch(`/api/posts/${postId}`, {
+      const res = await fetch(`/api/posts/${postId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ versions: updatedVersions, selected_version: activeVersion, status: 'draft' })
       });
+      if (res.ok) {
+        setVersions(updatedVersions);
+        setPostStatus('draft');
+        fetchQuotas();
+        showToast('Saved to Drafts!', 'success');
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to update draft.', 'error');
+      }
     } else {
-      const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim();
+      const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim() || 'Untitled Draft';
       const firstVer = updatedVersions[0]?.sections || {};
       const totalCharCount = Object.values(firstVer).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
       const res = await fetch('/api/posts', {
@@ -359,7 +370,7 @@ export default function StudioPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: postDate,
-          post_type_id: selectedPostTypeId,
+          post_type_id: postTypeIdToUse,
           raw_notes_used: rawNotes,
           topic_summary: topicSummary,
           versions: updatedVersions,
@@ -372,12 +383,15 @@ export default function StudioPage() {
       if (res.ok) {
         const data = await res.json();
         setPostId(data.id);
+        setVersions(updatedVersions);
+        setPostStatus('draft');
+        fetchQuotas();
+        showToast('Saved to Drafts!', 'success');
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to save draft.', 'error');
       }
     }
-    setVersions(updatedVersions);
-    setPostStatus('draft');
-    fetchQuotas();
-    showToast('Saved to Drafts!', 'success');
   };
 
   const handleStatusChange = async (status: 'draft' | 'approved' | 'published') => {
@@ -393,6 +407,26 @@ export default function StudioPage() {
     } else {
       showToast('Failed to update status.', 'error');
     }
+  };
+
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyFullPost = () => {
+    const rawText = activeAnatomy
+      .map(s => (editedSections[s.section_name] ?? '').trim())
+      .filter(Boolean)
+      .join('\n\n');
+
+    if (!rawText.trim()) {
+      showToast('No post content to copy.', 'error');
+      return;
+    }
+
+    const textToCopy = rawText.replace(/\r\n/g, '\n');
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    showToast('Full post copied to clipboard!', 'success');
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const selectedType = postTypes.find(pt => pt.id === selectedPostTypeId);
@@ -756,21 +790,37 @@ export default function StudioPage() {
 
           {hasOutput && !generating && (
             <>
-              {/* Version tabs */}
-              <div className="flex gap-2 sticky top-0 z-10 py-1" style={{ background: 'var(--bg-primary)' }}>
-                {versions.map((v, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleVersionSwitch(i)}
-                    className="flex-1 py-2 rounded-lg text-xs font-medium transition-all duration-150"
-                    style={{
-                      background: activeVersion === i ? 'var(--accent)' : 'var(--bg-elevated)',
-                      color: activeVersion === i ? 'white' : 'var(--text-secondary)',
-                      border: `1px solid ${activeVersion === i ? 'var(--accent)' : 'var(--border)'}`,
-                    }}>
-                    Version {v.version}
-                  </button>
-                ))}
+              {/* Version tabs & Copy button */}
+              <div className="flex items-center justify-between gap-2 sticky top-0 z-10 py-1" style={{ background: 'var(--bg-primary)' }}>
+                <div className="flex gap-2 flex-1">
+                  {versions.map((v, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleVersionSwitch(i)}
+                      className="flex-1 py-2 rounded-lg text-xs font-medium transition-all duration-150"
+                      style={{
+                        background: activeVersion === i ? 'var(--accent)' : 'var(--bg-elevated)',
+                        color: activeVersion === i ? 'white' : 'var(--text-secondary)',
+                        border: `1px solid ${activeVersion === i ? 'var(--accent)' : 'var(--border)'}`,
+                      }}>
+                      Version {v.version}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleCopyFullPost}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 shrink-0 hover:bg-white/5"
+                  style={{
+                    background: copied ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-elevated)',
+                    borderColor: copied ? '#22c55e' : 'var(--accent)',
+                    color: copied ? '#22c55e' : 'var(--accent)',
+                  }}
+                  title="Copy full post to clipboard"
+                >
+                  <Copy size={13} />
+                  {copied ? 'Copied!' : 'Copy Full Post'}
+                </button>
               </div>
 
               {/* Sections */}
@@ -879,6 +929,15 @@ export default function StudioPage() {
                     <Eye size={12} />
                     {postStatus === 'draft' ? 'Saved Draft' : 'Draft'}
                   </div>
+
+                  <button onClick={handleCopyFullPost}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all hover:bg-white/5"
+                    style={{
+                      borderColor: copied ? '#22c55e' : 'var(--accent)',
+                      color: copied ? '#22c55e' : 'var(--accent)'
+                    }}>
+                    <Copy size={13} /> {copied ? 'Copied!' : 'Copy Post'}
+                  </button>
 
                   <button onClick={handleSaveEdits}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"

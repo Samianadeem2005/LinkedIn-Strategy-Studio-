@@ -69,7 +69,22 @@ function PostTypeModal({ existing, onClose, onSaved }: {
   };
 
   return (
-    <Modal title={existing ? `Edit: ${existing.name}` : 'New Post Type'} onClose={onClose} width="max-w-xl">
+    <Modal
+      title={existing ? `Edit: ${existing.name}` : 'New Post Type'}
+      onClose={onClose}
+      width="max-w-xl"
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
+            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+            style={{ background: 'var(--accent)', color: 'white' }}>
+            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Post Type</>}
+          </button>
+        </>
+      }
+    >
       {ToastEl}
       <div className="space-y-4">
         <div>
@@ -124,16 +139,6 @@ function PostTypeModal({ existing, onClose, onSaved }: {
           accentColor="#ef4444"
           error={dontsError}
         />
-
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
-            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
-          <button onClick={save} disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: 'white' }}>
-            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Post Type</>}
-          </button>
-        </div>
       </div>
     </Modal>
   );
@@ -185,7 +190,21 @@ function AnatomyModal({ existing, maxOrder, targetPostTypeId, onClose, onSaved }
   };
 
   return (
-    <Modal title={existing ? `Edit: ${existing.section_name}` : 'New Anatomy Section'} onClose={onClose}>
+    <Modal
+      title={existing ? `Edit: ${existing.section_name}` : 'New Anatomy Section'}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
+            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            style={{ background: 'var(--accent)', color: 'white' }}>
+            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Section</>}
+          </button>
+        </>
+      }
+    >
       {ToastEl}
       <div className="space-y-4">
         <div>
@@ -203,15 +222,6 @@ function AnatomyModal({ existing, maxOrder, targetPostTypeId, onClose, onSaved }
             className="w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none resize-none"
             style={{ background: 'var(--bg-primary)', borderColor: ruleError ? 'var(--danger)' : 'var(--border)', color: 'var(--text-primary)' }} />
           {ruleError && <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>{ruleError}</p>}
-        </div>
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
-            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
-          <button onClick={save} disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: 'white' }}>
-            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Section</>}
-          </button>
         </div>
       </div>
     </Modal>
@@ -263,7 +273,21 @@ function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
   };
 
   return (
-    <Modal title={existing ? `Edit Mechanic: ${existing.rule_name}` : 'New Writing Mechanic'} onClose={onClose}>
+    <Modal
+      title={existing ? `Edit Mechanic: ${existing.rule_name}` : 'New Writing Mechanic'}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
+            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            style={{ background: 'var(--accent)', color: 'white' }}>
+            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Mechanic</>}
+          </button>
+        </>
+      }
+    >
       {ToastEl}
       <div className="space-y-4">
         <div>
@@ -300,16 +324,6 @@ function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
           <label htmlFor="mech-enabled" className="text-xs font-medium cursor-pointer" style={{ color: 'var(--text-primary)' }}>
             Enable this rule in generation prompts
           </label>
-        </div>
-
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-white/5 border"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>Cancel</button>
-          <button onClick={save} disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: 'white' }}>
-            {saving ? <><Loader2 size={14} className="spinner" /> Saving...</> : <><Save size={14} /> Save Mechanic</>}
-          </button>
         </div>
       </div>
     </Modal>
