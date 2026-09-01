@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, RefreshCw, Eye, Image, Loader2, BookOpen, Sparkles, Search, Trash2, ExternalLink, Copy } from 'lucide-react';
+import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, RefreshCw, Image, Loader2, BookOpen, Sparkles, Search, Trash2, ExternalLink, Copy, Type } from 'lucide-react';
 
 interface PostVersion {
   version: number;
@@ -22,6 +23,7 @@ interface CalendarEntry {
 }
 
 export default function StudioPage() {
+  const router = useRouter();
   const {
     postTypes,
     anatomy,
@@ -41,6 +43,17 @@ export default function StudioPage() {
   const [postDate, setPostDate] = useState(() => new Date().toISOString().split('T')[0]);
   const today = postDate;
   const [calendarEntry, setCalendarEntry] = useState<CalendarEntry | null>(null);
+
+  // Entrance animation mount state
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
+  const getEntranceStyle = (delayMs: number) => ({
+    animationDelay: `${delayMs}ms`,
+    opacity: isLoaded ? undefined : 0,
+  });
 
   // Quota & Weekly Saved Tracking
   const [ruleList, setRuleList] = useState<{ id: string; name: string; target_count: number; used_this_week: number; is_hybrid: boolean }[]>([]);
@@ -417,6 +430,34 @@ export default function StudioPage() {
     showToast(`Version ${vIdx + 1} copied to clipboard!`, 'success');
   };
 
+  const handleFormatPost = (vIdx: number) => {
+    const currentSections = editedSectionsMap[vIdx] || versions[vIdx]?.sections || {};
+    const activeAnatomy = settings?.anatomy_scope === 'per_post_type'
+      ? anatomy.filter(s => !s.applies_to_post_type_id || s.applies_to_post_type_id === selectedPostTypeId)
+      : anatomy.filter(s => !s.applies_to_post_type_id);
+
+    let fullText = activeAnatomy
+      .map(s => (currentSections[s.section_name] || '').trim())
+      .filter(Boolean)
+      .join('\n\n');
+
+    if (!fullText.trim()) {
+      fullText = Object.values(currentSections)
+        .filter(val => typeof val === 'string' && val.trim())
+        .map(val => (val as string).trim())
+        .join('\n\n');
+    }
+
+    if (!fullText.trim()) {
+      showToast('No post content to format.', 'error');
+      return;
+    }
+
+    sessionStorage.setItem('format_input_text', fullText);
+    showToast(`Redirecting to Formatter with Version ${vIdx + 1}...`, 'info');
+    router.push('/formatter');
+  };
+
   const selectedQuota = ruleList.find(r => r.id === selectedPostTypeId);
 
   const activeAnatomy = settings?.anatomy_scope === 'per_post_type'
@@ -429,17 +470,20 @@ export default function StudioPage() {
       {ToastEl}
 
       {/* Top Section: Input Card (Full Width) */}
-      <div className="rounded-2xl border p-6 space-y-5" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      <div
+        className={`rounded-2xl border p-6 space-y-5 shadow-xl shadow-black/20 ${isLoaded ? 'animate-studio-settle' : ''}`}
+        style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', ...getEntranceStyle(0) }}>
         
         {/* Calendar context banner if available */}
         {calendarEntry && calendarEntry.date === postDate && (
-          <div className="p-4 rounded-xl border animate-fade-in"
-            style={{ background: '#0d1f2e', borderColor: '#1a4a7a' }}>
+          <div
+            className={`p-4 rounded-xl border transition-all duration-200 ${isLoaded ? 'animate-studio-settle' : ''}`}
+            style={{ background: 'rgba(13, 31, 46, 0.8)', borderColor: '#1a4a7a', ...getEntranceStyle(60) }}>
             <div className="flex items-center gap-2 mb-1.5">
               <BookOpen size={14} style={{ color: '#60a5fa' }} />
               <span className="text-xs font-semibold" style={{ color: '#60a5fa' }}>From your Calendar Plan</span>
             </div>
-            <p className="text-sm font-bold">{calendarEntry.post_title}</p>
+            <p className="text-sm font-bold text-white">{calendarEntry.post_title}</p>
             {calendarEntry.bridge_logic && (
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Bridge: {calendarEntry.bridge_logic}</p>
             )}
@@ -450,8 +494,8 @@ export default function StudioPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           
           {/* Side Column: 7 Weekly Days in Vertical Ovals */}
-          <div className="lg:col-span-1 flex flex-col gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          <div className="lg:col-span-1 flex flex-col gap-2.5">
+            <div className="text-[11px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
               <span>Weekly Schedule</span>
             </div>
             
@@ -460,8 +504,8 @@ export default function StudioPage() {
               return (
                 <div
                   key={item.dayName}
-                  className={`px-3.5 py-2.5 rounded-full border text-xs flex items-center justify-between transition-all ${
-                    item.isToday ? 'shadow-lg shadow-indigo-500/20' : ''
+                  className={`h-10 px-3.5 rounded-xl border text-xs flex items-center justify-between transition-all duration-200 ease-out cursor-pointer hover:border-[var(--accent)]/40 hover:bg-white/[0.02] ${
+                    item.isToday ? 'shadow-md shadow-indigo-500/20' : ''
                   }`}
                   style={{
                     background: item.isToday
@@ -473,7 +517,7 @@ export default function StudioPage() {
                     color: item.isToday ? 'var(--text-primary)' : 'var(--text-secondary)',
                     fontWeight: item.isToday ? 600 : 500
                   }}>
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 font-medium">
                     {item.isToday && (
                       <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: 'var(--accent)' }} />
                     )}
@@ -481,7 +525,7 @@ export default function StudioPage() {
                   </div>
 
                   {savedForDay && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 leading-none h-5 flex items-center"
                       style={{ background: 'var(--accent)', color: '#fff' }}>
                       {savedForDay.pillar_name}
                     </span>
@@ -495,20 +539,20 @@ export default function StudioPage() {
           <div className="lg:col-span-3 flex flex-col gap-4">
             
             {/* Controls Bar */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 rounded-xl border"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+            <div
+              className={`flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 rounded-xl border ${isLoaded ? 'animate-studio-settle' : ''}`}
+              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', ...getEntranceStyle(120) }}>
               
               {/* Pillar Dropdown */}
               <div className="flex-1 flex items-center gap-2">
-                <label className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                <label className="w-12 text-xs font-semibold shrink-0" style={{ color: 'var(--text-secondary)' }}>
                   Pillar:
                 </label>
                 <div className="relative flex-1">
                   <select
                     value={selectedPostTypeId}
                     onChange={e => setSelectedPostTypeId(e.target.value)}
-                    className="w-full px-3 py-2 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-colors"
-                    style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                    className="h-9 w-full px-3 py-1.5 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-all duration-200 ease-out bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]">
                     <option value="">— Select Pillar Option —</option>
                     {ruleList.map(r => (
                       <option key={r.id} value={r.id}>
@@ -522,15 +566,14 @@ export default function StudioPage() {
 
               {/* Post Format Selector */}
               <div className="flex-1 flex items-center gap-2">
-                <label className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                <label className="w-14 text-xs font-semibold shrink-0" style={{ color: 'var(--text-secondary)' }}>
                   Format:
                 </label>
                 <div className="relative flex-1">
                   <select
                     value={postFormat}
                     onChange={e => setPostFormat(e.target.value as any)}
-                    className="w-full px-3 py-2 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-colors"
-                    style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                    className="h-9 w-full px-3 py-1.5 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-all duration-200 ease-out bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]">
                     <option value="text_post">Text Post (600–1,200 chars)</option>
                     <option value="image_post">Image Post (900–1,500 chars)</option>
                     <option value="carousel">Carousel (1,200–1,500 chars)</option>
@@ -542,22 +585,21 @@ export default function StudioPage() {
 
               {/* Scheduled Date Picker */}
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                <label className="text-xs font-semibold shrink-0" style={{ color: 'var(--text-secondary)' }}>
                   Target Date:
                 </label>
                 <input
                   type="date"
                   value={postDate}
                   onChange={e => setPostDate(e.target.value)}
-                  className="px-3 py-2 rounded-lg border text-xs font-mono font-medium cursor-pointer transition-colors"
-                  style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                  className="h-9 px-3 rounded-lg border text-xs font-mono font-medium cursor-pointer transition-all duration-200 ease-out bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
                 />
               </div>
             </div>
 
             {/* Inline Quota Exceeded Confirmation Banner */}
             {inlineQuotaConfirm?.open && selectedQuota && (
-              <div className="p-3.5 rounded-xl border flex flex-col gap-2.5 text-xs animate-fade-in"
+              <div className="p-4 rounded-xl border flex flex-col gap-3 text-xs animate-fade-in"
                 style={{ background: 'rgba(239, 68, 68, 0.12)', borderColor: '#ef4444', color: '#f87171' }}>
                 <div className="flex items-start gap-3">
                   <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
@@ -571,7 +613,7 @@ export default function StudioPage() {
                 <div className="flex items-center justify-end gap-2.5 pt-1 border-t" style={{ borderColor: 'rgba(239, 68, 68, 0.25)' }}>
                   <button
                     onClick={() => setInlineQuotaConfirm(null)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:bg-white/5"
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-200 hover:bg-white/5 cursor-pointer"
                     style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}>
                     Cancel
                   </button>
@@ -585,7 +627,7 @@ export default function StudioPage() {
                         handleWebSearchGenerate(true);
                       }
                     }}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow"
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 shadow-md cursor-pointer hover:bg-red-600 active:scale-[0.98]"
                     style={{ background: '#ef4444', color: '#fff', boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)' }}>
                     Yes, Generate Anyway
                   </button>
@@ -595,7 +637,7 @@ export default function StudioPage() {
 
             {/* Raw notes input box */}
             <div className="flex flex-col">
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Raw Notes / Today&apos;s Content
               </label>
               <textarea
@@ -603,33 +645,28 @@ export default function StudioPage() {
                 onChange={e => setRawNotes(e.target.value)}
                 placeholder="Type or paste everything you built, learned, or studied today here. Articles, code snippets, bug stories, or frameworks — all in this one box."
                 rows={8}
-                className="w-full px-4 py-3 rounded-xl border resize-none text-sm leading-relaxed transition-colors focus:outline-none"
+                className="w-full px-4 py-3.5 rounded-xl border resize-none text-sm leading-relaxed transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)] bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-primary)]"
                 style={{
-                  background: 'var(--bg-elevated)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text-primary)',
                   fontFamily: 'var(--font-inter)',
                 }}
-                onFocus={e => { e.target.style.borderColor = 'var(--accent)'; }}
-                onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
               />
-              <div className="flex justify-between mt-1">
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{rawNotes.length} chars</span>
+              <div className="flex items-center justify-between px-1 mt-1.5 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                <span>{rawNotes.length} chars</span>
                 {anatomy.length > 0 && (
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {activeAnatomy.length} sections active
-                  </span>
+                  <span>{activeAnatomy.length} sections active</span>
                 )}
               </div>
             </div>
 
             {/* Generate Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div
+              className={`grid grid-cols-2 gap-3 pt-1 ${isLoaded ? 'animate-studio-settle' : ''}`}
+              style={getEntranceStyle(240)}>
               <button
                 id="btn-generate-notes"
                 onClick={() => handleGenerate()}
                 disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="h-11 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ease-out flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:shadow-indigo-500/25 active:scale-[0.99]"
                 style={{
                   background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
                   color: 'white',
@@ -646,7 +683,7 @@ export default function StudioPage() {
                 id="btn-generate-websearch"
                 onClick={() => handleWebSearchGenerate()}
                 disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="h-11 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ease-out flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:shadow-teal-500/25 active:scale-[0.99]"
                 style={{
                   background: generating && webSearchStatus
                     ? 'rgba(20,184,166,0.2)'
@@ -668,7 +705,7 @@ export default function StudioPage() {
 
       {/* Repeat warning */}
       {repeatWarning && (
-        <div className="flex items-start gap-3 p-4 rounded-xl animate-fade-in border"
+        <div className="flex items-start gap-3 p-4 rounded-xl border transition-all duration-200"
           style={{ background: '#2e1f0d', borderColor: '#f59e0b55' }}>
           <AlertTriangle size={18} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
           <div>
@@ -681,7 +718,9 @@ export default function StudioPage() {
 
       {/* Bottom Section: 3-Column Generated Output Preview Grid (Below Viewport, Full Width) */}
       {(hasOutput || generating) && (
-        <div className="rounded-2xl border p-6 space-y-6 animate-fade-in" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+        <div
+          className={`rounded-2xl border p-6 space-y-6 shadow-xl shadow-black/20 ${isLoaded ? 'animate-studio-settle' : ''}`}
+          style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', ...getEntranceStyle(300) }}>
           
           <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--border)' }}>
             <div>
@@ -697,7 +736,7 @@ export default function StudioPage() {
             {versions.length > 0 && (
               <button
                 onClick={() => { setVersions([]); setEditedSectionsMap({}); showToast('Discarded generated posts.', 'info'); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors hover:bg-red-950/20"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 hover:bg-red-950/20 active:scale-[0.98] cursor-pointer"
                 style={{ borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}>
                 <Trash2 size={13} /> Discard All
               </button>
@@ -724,13 +763,12 @@ export default function StudioPage() {
                 const isSaved = savedVersionIdx === vIdx;
 
                 return (
-                  <div key={vIdx} className="flex flex-col rounded-2xl border p-4 space-y-4"
-                    style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+                  <div key={vIdx} className="flex flex-col rounded-xl border p-4.5 space-y-4 transition-all duration-200 bg-[var(--bg-elevated)] border-[var(--border)] shadow-md hover:border-[var(--accent)]/30">
                     
                     {/* Version Column Header */}
                     <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-white"
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-sm"
                           style={{ background: 'var(--accent)' }}>
                           Version {ver.version}
                         </span>
@@ -741,7 +779,7 @@ export default function StudioPage() {
 
                       <button
                         onClick={() => handleCopyFullPost(vIdx)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all hover:bg-white/5"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all duration-200 hover:bg-white/5 active:scale-[0.98] cursor-pointer"
                         style={{
                           borderColor: isCopied ? '#22c55e' : 'var(--accent)',
                           color: isCopied ? '#22c55e' : 'var(--accent)',
@@ -759,9 +797,8 @@ export default function StudioPage() {
                         const isRegen = regeneratingSection === isRegenKey;
 
                         return (
-                          <div key={section.id} className="rounded-xl border"
-                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-                            <div className="flex items-center justify-between px-3 py-1.5 border-b rounded-t-xl"
+                          <div key={section.id} className="rounded-lg border bg-[var(--bg-surface)] border-[var(--border)]">
+                            <div className="flex items-center justify-between px-3 py-1.5 border-b rounded-t-lg"
                               style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'var(--border)' }}>
                               <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
                                 {section.section_name}
@@ -770,7 +807,7 @@ export default function StudioPage() {
                                 onClick={() => handleRegenerateSection(section.id, section.section_name, vIdx)}
                                 disabled={isRegen}
                                 title="Regenerate this section only"
-                                className="p-1 rounded transition-colors hover:bg-white/5 disabled:opacity-40"
+                                className="p-1 rounded transition-colors duration-200 hover:bg-white/5 disabled:opacity-40 cursor-pointer"
                                 style={{ color: 'var(--text-muted)' }}>
                                 {isRegen ? <Loader2 size={12} className="spinner" /> : <RefreshCw size={12} />}
                               </button>
@@ -783,7 +820,7 @@ export default function StudioPage() {
                                 e.target.style.height = 'auto';
                                 e.target.style.height = `${Math.max(60, e.target.scrollHeight)}px`;
                               }}
-                              className="section-textarea w-full px-3 py-2.5 bg-transparent text-xs resize-none focus:outline-none leading-relaxed block rounded-b-xl"
+                              className="section-textarea w-full px-3 py-2.5 bg-transparent text-xs resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40 leading-relaxed block rounded-b-lg transition-colors"
                               style={{ color: 'var(--text-primary)', height: 'auto', minHeight: '60px', overflow: 'hidden' }}
                             />
                           </div>
@@ -792,7 +829,7 @@ export default function StudioPage() {
 
                       {/* Visual suggestion */}
                       {ver.visualSuggestion && (
-                        <div className="px-3 py-2.5 rounded-xl border"
+                        <div className="px-3 py-2.5 rounded-lg border"
                           style={{ background: '#0d1a0d', borderColor: '#166534' }}>
                           <div className="flex items-center gap-1.5 mb-1">
                             <Image size={13} style={{ color: '#22c55e' }} />
@@ -804,7 +841,7 @@ export default function StudioPage() {
 
                       {/* Resources */}
                       {ver.resources && ver.resources.length > 0 && (
-                        <div className="px-3 py-2.5 rounded-xl border"
+                        <div className="px-3 py-2.5 rounded-lg border"
                           style={{ background: '#0d1f2e', borderColor: '#1a4a7a' }}>
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <BookOpen size={13} style={{ color: '#60a5fa' }} />
@@ -834,21 +871,32 @@ export default function StudioPage() {
                       )}
                     </div>
 
-                    {/* Version Save Button */}
-                    <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                    {/* Version Save & Format Buttons */}
+                    <div className="pt-2.5 border-t flex items-center gap-2.5" style={{ borderColor: 'var(--border)' }}>
                       <button
                         onClick={() => handleSaveEdits(vIdx)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                        className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                         style={{
                           background: isSaved ? '#22c55e' : 'var(--accent)',
                           color: '#fff',
                           boxShadow: '0 2px 10px rgba(108,99,255,0.3)'
                         }}>
                         {isSaved ? (
-                          <><CheckCircle size={14} /> Version {vIdx + 1} Saved!</>
+                          <><CheckCircle size={14} /> Saved!</>
                         ) : (
-                          <><Save size={14} /> Save Version {vIdx + 1} to Drafts</>
+                          <><Save size={14} /> Save to Drafts</>
                         )}
+                      </button>
+
+                      <button
+                        onClick={() => handleFormatPost(vIdx)}
+                        className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                        style={{
+                          background: 'linear-gradient(135deg, #0284c7, #06b6d4)',
+                          color: '#fff',
+                          boxShadow: '0 2px 10px rgba(2,132,199,0.3)'
+                        }}>
+                        <Type size={14} /> Format Post
                       </button>
                     </div>
                   </div>

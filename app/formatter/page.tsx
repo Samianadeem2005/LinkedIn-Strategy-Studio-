@@ -3,27 +3,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
 import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Strikethrough as StrikeIcon,
-  List,
-  ListOrdered,
-  Eraser,
-  Copy,
-  Calendar as ScheduleIcon,
-  Send,
-  Smartphone,
-  Monitor,
   Smile,
   Globe,
   ThumbsUp,
   MessageSquare,
   Repeat,
   ImageIcon,
-  Undo2,
-  Redo2,
-  ArrowUpDown
+  Eraser,
+  Copy,
+  Calendar as ScheduleIcon,
+  Send,
+  Smartphone,
+  Monitor,
+  List,
+  ListOrdered,
+  ArrowUpDown,
+  Type,
+  ChevronDown
 } from 'lucide-react';
 
 import {
@@ -34,12 +30,9 @@ import {
   toBoldItalicSerif,
   toBoldItalicSans,
   toSans,
-  toUnderline,
-  toStrikethrough,
-  toBoldUnderline,
-  toBoldStrikethrough,
   toScript,
   toDoubleStruck,
+  toMonospace,
   toFullwidth,
   toUppercase,
   toLowercase,
@@ -48,7 +41,12 @@ import {
   toChecklist,
   toAscendingList,
   toDescendingList,
-  unformatText
+  unformatText,
+  toggleBold,
+  toggleItalic,
+  toggleUnderline,
+  toggleStrikethrough,
+  applyFontToText
 } from '@/lib/unicodeFormatter';
 
 const EMOJI_LIST = [
@@ -65,19 +63,16 @@ interface StyleCardDef {
 
 const ALL_STYLE_CARDS: StyleCardDef[] = [
   { id: 'normal', label: 'Normal', fn: (t) => t },
-  { id: 'bold', label: 'Bold', fn: toBoldSerif },
+  { id: 'bold', label: 'Bold Serif', fn: toBoldSerif },
   { id: 'bold_sans', label: 'Bold Sans', fn: toBoldSans },
-  { id: 'italic', label: 'Italic', fn: toItalicSerif },
+  { id: 'italic', label: 'Italic Serif', fn: toItalicSerif },
   { id: 'italic_sans', label: 'Italic Sans', fn: toItalicSans },
-  { id: 'bold_italic', label: 'Bold Italic', fn: toBoldItalicSerif },
+  { id: 'bold_italic', label: 'Bold Italic Serif', fn: toBoldItalicSerif },
   { id: 'bold_italic_sans', label: 'Bold Italic Sans', fn: toBoldItalicSans },
-  { id: 'sans', label: 'Sans', fn: toSans },
-  { id: 'underline', label: 'Underline', fn: toUnderline },
-  { id: 'strikethrough', label: 'Strikethrough', fn: toStrikethrough },
-  { id: 'bold_underline', label: 'Bold Underline', fn: toBoldUnderline },
-  { id: 'bold_strikethrough', label: 'Bold Strikethrough', fn: toBoldStrikethrough },
+  { id: 'sans', label: 'Sans Regular', fn: toSans },
   { id: 'script', label: 'Script', fn: toScript },
-  { id: 'doublestruck', label: 'Doublestruck', fn: toDoubleStruck },
+  { id: 'doublestruck', label: 'Double Struck', fn: toDoubleStruck },
+  { id: 'monospace', label: 'Monospace', fn: toMonospace },
   { id: 'fullwidth', label: 'Fullwidth', fn: toFullwidth },
   { id: 'uppercase', label: 'Uppercase', fn: toUppercase },
   { id: 'lowercase', label: 'Lowercase', fn: toLowercase },
@@ -88,13 +83,34 @@ const ALL_STYLE_CARDS: StyleCardDef[] = [
   { id: 'descending_list', label: 'Descending List', fn: toDescendingList },
 ];
 
+interface FontOptionDef {
+  id: string;
+  label: string;
+  sample: string;
+}
+
+const FONT_OPTIONS: FontOptionDef[] = [
+  { id: 'normal', label: 'Normal', sample: 'Aa' },
+  { id: 'bold', label: 'Bold Serif', sample: '𝗔a' },
+  { id: 'bold_sans', label: 'Bold Sans', sample: '𝘼a' },
+  { id: 'italic', label: 'Italic Serif', sample: '𝐴a' },
+  { id: 'italic_sans', label: 'Italic Sans', sample: '𝘈a' },
+  { id: 'bold_italic', label: 'Bold Italic Serif', sample: '𝐴a' },
+  { id: 'bold_italic_sans', label: 'Bold Italic Sans', sample: '𝘼a' },
+  { id: 'sans', label: 'Sans Regular', sample: '𝖠a' },
+  { id: 'script', label: 'Script', sample: '𝒜a' },
+  { id: 'doublestruck', label: 'Double Struck', sample: '𝔸a' },
+  { id: 'monospace', label: 'Monospace', sample: '𝙰a' },
+  { id: 'fullwidth', label: 'Fullwidth', sample: 'Ａa' },
+];
+
 export default function FormatterPage() {
   const { show: showToast, ToastEl } = useToast();
 
-  const [text, setText] = useState<string>('jargon');
+  const [text, setText] = useState<string>('');
 
   // History stack for Undo/Redo
-  const [history, setHistory] = useState<string[]>(['jargon']);
+  const [history, setHistory] = useState<string[]>(['']);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
 
   // Device preview mode
@@ -102,6 +118,13 @@ export default function FormatterPage() {
 
   // Emoji popover
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Custom Font Dropdown State & Hover Preview Refs
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+  const [hoveredFontId, setHoveredFontId] = useState<string | null>(null);
+  const fontDropdownRef = useRef<HTMLDivElement>(null);
+  const savedSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  const originalTextBeforeHoverRef = useRef<string | null>(null);
 
   // User profile details for preview
   const [userProfile] = useState({
@@ -111,6 +134,24 @@ export default function FormatterPage() {
 
   const [savingDraft, setSavingDraft] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isInitializedRef = useRef(false);
+
+  // Check for text transferred from Content Studio on mount
+  useEffect(() => {
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
+
+    try {
+      const transferredText = sessionStorage.getItem('format_input_text');
+      if (transferredText && transferredText.trim()) {
+        setText(transferredText);
+        setHistory([transferredText]);
+        setHistoryIndex(0);
+        sessionStorage.removeItem('format_input_text');
+        showToast('Loaded post text from Content Studio!', 'success');
+      }
+    } catch {}
+  }, [showToast]);
 
   const updateTextWithHistory = (newVal: string) => {
     setHistory(prev => [...prev.slice(0, historyIndex + 1), newVal]);
@@ -118,47 +159,141 @@ export default function FormatterPage() {
     setText(newVal);
   };
 
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
-      setText(history[historyIndex - 1]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
-      setText(history[historyIndex - 1]);
-    }
-  };
-
-  // Format highlighted selection in main textarea
-  const applyTransform = (transformFn: (str: string) => string) => {
+  // Format highlighted selection in main textarea ONLY
+  const applyTransformToSelection = (transformFn: (str: string) => string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
-    let updated = '';
-    if (start !== end) {
-      const selected = text.substring(start, end);
-      const transformed = transformFn(selected);
-      updated = text.substring(0, start) + transformed + text.substring(end);
-    } else {
-      updated = transformFn(text);
+    if (start === end) {
+      showToast('Please select/highlight text in the editor first.', 'info');
+      return;
     }
+
+    const selected = text.substring(start, end);
+    const transformed = transformFn(selected);
+    const updated = text.substring(0, start) + transformed + text.substring(end);
 
     updateTextWithHistory(updated);
 
     setTimeout(() => {
       textarea.focus();
+      textarea.setSelectionRange(start, start + transformed.length);
     }, 50);
   };
 
+  // Toggle custom font dropdown & capture selection snapshot
+  const toggleFontDropdown = () => {
+    if (isFontDropdownOpen) {
+      closeFontDropdown();
+      return;
+    }
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start === end) {
+      showToast('Please select/highlight text in the editor to preview & apply font styles.', 'info');
+      return;
+    }
+
+    savedSelectionRef.current = { start, end };
+    originalTextBeforeHoverRef.current = text;
+    setIsFontDropdownOpen(true);
+  };
+
+  const closeFontDropdown = () => {
+    if (originalTextBeforeHoverRef.current !== null) {
+      setText(originalTextBeforeHoverRef.current);
+    }
+    savedSelectionRef.current = null;
+    originalTextBeforeHoverRef.current = null;
+    setHoveredFontId(null);
+    setIsFontDropdownOpen(false);
+  };
+
+  // Live hover preview handler: applies font style on hover
+  const handleFontOptionHover = (fontId: string) => {
+    setHoveredFontId(fontId);
+
+    if (!savedSelectionRef.current || originalTextBeforeHoverRef.current === null) return;
+
+    const { start, end } = savedSelectionRef.current;
+    const baseText = originalTextBeforeHoverRef.current;
+    const targetSlice = baseText.substring(start, end);
+    const transformedSlice = applyFontToText(targetSlice, fontId);
+    const previewFullText = baseText.substring(0, start) + transformedSlice + baseText.substring(end);
+
+    setText(previewFullText);
+  };
+
+  // Mouse leave dropdown panel handler -> reverts preview back to original text
+  const handleFontDropdownMouseLeave = () => {
+    setHoveredFontId(null);
+    if (originalTextBeforeHoverRef.current !== null) {
+      setText(originalTextBeforeHoverRef.current);
+    }
+  };
+
+  // Click handler -> permanently applies font style to history & text
+  const handleFontOptionSelect = (fontId: string) => {
+    if (!savedSelectionRef.current || originalTextBeforeHoverRef.current === null) {
+      closeFontDropdown();
+      return;
+    }
+
+    const { start, end } = savedSelectionRef.current;
+    const baseText = originalTextBeforeHoverRef.current;
+    const targetSlice = baseText.substring(start, end);
+    const transformedSlice = applyFontToText(targetSlice, fontId);
+    const finalFullText = baseText.substring(0, start) + transformedSlice + baseText.substring(end);
+
+    updateTextWithHistory(finalFullText);
+
+    savedSelectionRef.current = null;
+    originalTextBeforeHoverRef.current = null;
+    setHoveredFontId(null);
+    setIsFontDropdownOpen(false);
+
+    setTimeout(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(start, start + transformedSlice.length);
+      }
+    }, 50);
+  };
+
+  // Click outside listener
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (fontDropdownRef.current && !fontDropdownRef.current.contains(event.target as Node)) {
+        if (isFontDropdownOpen) {
+          closeFontDropdown();
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFontDropdownOpen]);
+
   const handleClearFormatting = () => {
-    applyTransform(unformatText);
-    showToast('Formatting cleared.', 'info');
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start !== end) {
+      applyTransformToSelection(unformatText);
+    } else {
+      updateTextWithHistory(unformatText(text));
+      showToast('All text formatting cleared.', 'info');
+    }
   };
 
   const insertEmoji = (emoji: string) => {
@@ -254,7 +389,7 @@ export default function FormatterPage() {
             LinkedIn Text Formatter
           </h1>
           <p style={{ fontSize: '14px', color: '#475569', margin: 0, lineHeight: '1.5' }}>
-            Easily format the text of your LinkedIn post with bold, italic, underlined and more for free.
+            Easily format the text of your LinkedIn post with bold, italic, underlined, custom fonts and multi-styling.
           </p>
         </div>
 
@@ -272,7 +407,7 @@ export default function FormatterPage() {
             marginBottom: '48px'
           }}
         >
-          {/* LEFT COLUMN: Text Editor & Separate Individual Toolbar Buttons */}
+          {/* LEFT COLUMN: Text Editor & Toolbar Controls */}
           <div
             style={{
               display: 'flex',
@@ -285,7 +420,7 @@ export default function FormatterPage() {
             {/* Toolbar Row: Separate, individually visible square icon buttons */}
             <div
               style={{
-                padding: '12px font-sans',
+                padding: '10px 14px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
@@ -294,12 +429,13 @@ export default function FormatterPage() {
                 backgroundColor: '#ffffff'
               }}
             >
-              {/* Bold */}
+              {/* Bold (Supports multi-formatting) */}
               <button
-                onClick={() => applyTransform(toBoldSans)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toggleBold)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -308,20 +444,21 @@ export default function FormatterPage() {
                   justifyContent: 'center',
                   fontSize: '13px',
                   fontWeight: 'bold',
-                  color: '#334155',
+                  color: '#1e293b',
                   cursor: 'pointer'
                 }}
-                title="Bold"
+                title="Bold (Applies to selection)"
               >
                 B
               </button>
 
-              {/* Italic */}
+              {/* Italic (Supports multi-formatting) */}
               <button
-                onClick={() => applyTransform(toItalicSans)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toggleItalic)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -331,20 +468,21 @@ export default function FormatterPage() {
                   fontSize: '13px',
                   fontStyle: 'italic',
                   fontFamily: 'serif',
-                  color: '#334155',
+                  color: '#1e293b',
                   cursor: 'pointer'
                 }}
-                title="Italic"
+                title="Italic (Applies to selection)"
               >
                 I
               </button>
 
-              {/* Underline */}
+              {/* Underline (Supports multi-formatting) */}
               <button
-                onClick={() => applyTransform(toUnderline)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toggleUnderline)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -353,20 +491,21 @@ export default function FormatterPage() {
                   justifyContent: 'center',
                   fontSize: '13px',
                   textDecoration: 'underline',
-                  color: '#334155',
+                  color: '#1e293b',
                   cursor: 'pointer'
                 }}
-                title="Underline"
+                title="Underline (Applies to selection)"
               >
                 U
               </button>
 
-              {/* Strikethrough */}
+              {/* Strikethrough (Supports multi-formatting) */}
               <button
-                onClick={() => applyTransform(toStrikethrough)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toggleStrikethrough)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -375,21 +514,22 @@ export default function FormatterPage() {
                   justifyContent: 'center',
                   fontSize: '13px',
                   textDecoration: 'line-through',
-                  color: '#334155',
+                  color: '#1e293b',
                   cursor: 'pointer'
                 }}
-                title="Strikethrough"
+                title="Strikethrough (Applies to selection)"
               >
                 S
               </button>
 
-              {/* Emoji */}
+              {/* Emoji Popover */}
               <div style={{ position: 'relative' }}>
                 <button
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '34px',
+                    height: '34px',
                     borderRadius: '8px',
                     backgroundColor: '#f1f5f9',
                     border: '1px solid #e2e8f0',
@@ -426,6 +566,7 @@ export default function FormatterPage() {
                     {EMOJI_LIST.map(emoji => (
                       <button
                         key={emoji}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => insertEmoji(emoji)}
                         style={{
                           padding: '4px',
@@ -444,11 +585,12 @@ export default function FormatterPage() {
                 )}
               </div>
 
-              {/* Image */}
+              {/* Image Icon */}
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -463,11 +605,12 @@ export default function FormatterPage() {
                 <ImageIcon size={15} />
               </button>
 
-              {/* Link */}
+              {/* Globe Icon */}
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -477,61 +620,103 @@ export default function FormatterPage() {
                   color: '#94a3b8',
                   cursor: 'pointer'
                 }}
-                title="Link Insert"
+                title="Web Link"
               >
                 <Globe size={15} />
               </button>
 
-              {/* Undo */}
-              <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#475569',
-                  opacity: historyIndex <= 0 ? 0.3 : 1,
-                  cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer'
-                }}
-                title="Undo"
-              >
-                <Undo2 size={15} />
-              </button>
+              {/* Custom Font Dropdown with Live Hover Preview */}
+              <div style={{ position: 'relative' }} ref={fontDropdownRef}>
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    toggleFontDropdown();
+                  }}
+                  style={{
+                    height: '34px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    backgroundColor: isFontDropdownOpen ? '#e2e8f0' : '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Select Font Style (Hover options to live preview)"
+                >
+                  <Type size={14} />
+                  <span>Font Style</span>
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: isFontDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.15s ease'
+                    }}
+                  />
+                </button>
 
-              {/* Redo */}
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#475569',
-                  opacity: historyIndex >= history.length - 1 ? 0.3 : 1,
-                  cursor: historyIndex >= history.length - 1 ? 'not-allowed' : 'pointer'
-                }}
-                title="Redo"
-              >
-                <Redo2 size={15} />
-              </button>
+                {isFontDropdownOpen && (
+                  <div
+                    onMouseLeave={handleFontDropdownMouseLeave}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '6px',
+                      width: '210px',
+                      maxHeight: '280px',
+                      overflowY: 'auto',
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                      zIndex: 50,
+                      padding: '6px'
+                    }}
+                  >
+                    {FONT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onMouseEnter={() => handleFontOptionHover(opt.id)}
+                        onClick={() => handleFontOptionSelect(opt.id)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: hoveredFontId === opt.id ? '#e0f2fe' : 'transparent',
+                          color: hoveredFontId === opt.id ? '#0284c7' : '#1e293b',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'background-color 0.1s ease'
+                        }}
+                      >
+                        <span>{opt.label}</span>
+                        <span style={{ fontSize: '12px', opacity: 0.85, fontWeight: 600 }}>{opt.sample}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Clear Formatting */}
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleClearFormatting}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -548,10 +733,11 @@ export default function FormatterPage() {
 
               {/* Bullet List */}
               <button
-                onClick={() => applyTransform(toBulletList)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toBulletList)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -568,10 +754,11 @@ export default function FormatterPage() {
 
               {/* Numbered List */}
               <button
-                onClick={() => applyTransform(toNumberedList)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toNumberedList)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -588,10 +775,11 @@ export default function FormatterPage() {
 
               {/* Sort / Checklist */}
               <button
-                onClick={() => applyTransform(toChecklist)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toChecklist)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #e2e8f0',
@@ -607,7 +795,7 @@ export default function FormatterPage() {
               </button>
             </div>
 
-            {/* Main Text Area (Clean Sans-Serif) */}
+            {/* Main Text Area */}
             <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
               <textarea
                 ref={textareaRef}
@@ -796,7 +984,6 @@ export default function FormatterPage() {
               >
                 {/* Profile Header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '12px' }}>
-                  {/* Profile Avatar / DP Container */}
                   <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                     <img
                       src="/profile.jpg"
@@ -852,7 +1039,7 @@ export default function FormatterPage() {
                   </div>
                 </div>
 
-                {/* Post Text (Clean Sans-Serif) */}
+                {/* Post Text */}
                 <div
                   style={{
                     fontSize: '13px',
@@ -920,7 +1107,7 @@ export default function FormatterPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
               gap: '24px'
             }}
           >
@@ -932,7 +1119,6 @@ export default function FormatterPage() {
                     {card.label}
                   </label>
                   
-                  {/* Clean Sans-Serif Formatted Box */}
                   <div
                     style={{
                       width: '100%',
@@ -953,7 +1139,6 @@ export default function FormatterPage() {
                     {formatted}
                   </div>
 
-                  {/* Soft Light-Blue Copy Text Button */}
                   <button
                     onClick={() => copyToClipboard(formatted, card.label)}
                     style={{
