@@ -136,25 +136,42 @@ export default function FormatterPage() {
   });
 
   const [savingDraft, setSavingDraft] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isInitializedRef = useRef(false);
 
-  // Check for text transferred from Content Studio on mount
+  // Check for text and draft ID transferred from Drafts or Content Studio on mount
   useEffect(() => {
     if (isInitializedRef.current) return;
     isInitializedRef.current = true;
 
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const draftIdFromUrl = urlParams.get('draftId');
+      const draftIdFromStorage = sessionStorage.getItem('format_draft_id');
+      const activeDraftId = draftIdFromUrl || draftIdFromStorage;
+
+      if (activeDraftId) {
+        setEditingDraftId(activeDraftId);
+      }
+
       const transferredText = sessionStorage.getItem('format_input_text');
       if (transferredText && transferredText.trim()) {
         setText(transferredText);
         setHistory([transferredText]);
         setHistoryIndex(0);
-        sessionStorage.removeItem('format_input_text');
-        showToast('Loaded post text from Content Studio!', 'success');
+        showToast(activeDraftId ? 'Loaded draft into Formatter!' : 'Loaded post text into Formatter!', 'success');
       }
     } catch { }
   }, [showToast]);
+
+  const handleClearDraftContext = () => {
+    setEditingDraftId(null);
+    try {
+      sessionStorage.removeItem('format_draft_id');
+    } catch { }
+    showToast('Switched to new draft mode.', 'info');
+  };
 
   const updateTextWithHistory = (newVal: string) => {
     setHistory(prev => [...prev.slice(0, historyIndex + 1), newVal]);
@@ -333,24 +350,60 @@ export default function FormatterPage() {
     setSavingDraft(true);
     try {
       const firstLine = text.split('\n')[0]?.slice(0, 60) || 'Formatted Post Draft';
-      const res = await fetch('/api/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic_summary: firstLine,
-          raw_notes_used: 'Created via LinkedIn Formatter Tool',
-          versions: [{
-            version: 1,
-            sections: { Content: text },
-            visualSuggestion: 'Created in Text Formatter'
-          }],
-          selected_version: 0,
-          status: 'draft'
-        })
-      });
+      let versionsPayload: any[] = [{
+        version: 1,
+        sections: { Content: text },
+        visualSuggestion: 'Formatted in Text Formatter'
+      }];
+
+      let res: Response;
+      if (editingDraftId) {
+        // Fetch existing post to preserve visual suggestions, resources, etc.
+        try {
+          const fetchExisting = await fetch(`/api/posts/${editingDraftId}`);
+          if (fetchExisting.ok) {
+            const existingPost = await fetchExisting.json();
+            if (existingPost?.versions && Array.isArray(existingPost.versions) && existingPost.versions.length > 0) {
+              const targetIdx = existingPost.selected_version || 0;
+              const existingVer = existingPost.versions[targetIdx] || existingPost.versions[0];
+              const updatedVer = {
+                ...existingVer,
+                sections: { Content: text }
+              };
+              const newVersionsList = [...existingPost.versions];
+              newVersionsList[targetIdx] = updatedVer;
+              versionsPayload = newVersionsList;
+            }
+          }
+        } catch { }
+
+        // OVERRIDE existing draft in database (preserving visual suggestions and resources)
+        res = await fetch(`/api/posts/${editingDraftId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic_summary: firstLine,
+            versions: versionsPayload,
+            character_count: text.length
+          })
+        });
+      } else {
+        // Create NEW draft in database
+        res = await fetch('/api/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic_summary: firstLine,
+            raw_notes_used: 'Created via LinkedIn Formatter Tool',
+            versions: versionsPayload,
+            selected_version: 0,
+            status: 'draft'
+          })
+        });
+      }
 
       if (res.ok) {
-        showToast('Scheduled / Saved to Drafts!', 'success');
+        showToast(editingDraftId ? 'Existing draft overridden and updated!' : 'Saved to Drafts!', 'success');
       } else {
         showToast('Failed to save draft.', 'error');
       }
@@ -363,17 +416,17 @@ export default function FormatterPage() {
 
   return (
     <div
-      className="min-h-screen w-full bg-[#f5f1f2] text-[#2c2c2c] p-6 max-w-7xl mx-auto font-sans"
+      className="min-h-screen w-full bg-[#EEECF1] text-[#1C1C1E] p-6 max-w-7xl mx-auto font-sans"
     >
       {ToastEl}
 
       <div style={{ maxWidth: '1150px', margin: '0 auto' }}>
         {/* Centered Large Title & Subtitle Header */}
         <div style={{ textAlign: 'center', maxWidth: '640px', margin: '0 auto 36px auto' }}>
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#2c2c2c] tracking-tight mb-2">
-            Format & Craft <span className="font-serif-italic text-[#c94731] font-normal">your LinkedIn posts</span>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#1C1C1E] tracking-tight mb-2">
+            Format & Craft <span className="font-serif-italic font-normal">your LinkedIn posts</span>
           </h1>
-          <p style={{ fontSize: '14px', color: '#4f6e7d', margin: 0, lineHeight: '1.5' }}>
+          <p style={{ fontSize: '14px', color: '#8B8A93', margin: 0, lineHeight: '1.5' }}>
             Format your LinkedIn posts with bold, italic, underlined, custom fonts and multi-styling.
           </p>
         </div>
@@ -384,11 +437,11 @@ export default function FormatterPage() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             gap: '0',
-            border: '1px solid rgba(79, 110, 125, 0.20)',
+            border: '1px solid rgba(139, 138, 147, 0.20)',
             borderRadius: '20px',
             overflow: 'hidden',
             backgroundColor: '#ffffff',
-            boxShadow: '0 4px 20px rgba(44, 44, 44, 0.04)',
+            boxShadow: '0 4px 20px rgba(28, 28, 30, 0.04)',
             marginBottom: '48px'
           }}
         >
@@ -398,7 +451,7 @@ export default function FormatterPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              borderRight: '1px solid rgba(79, 110, 125, 0.15)',
+              borderRight: '1px solid rgba(139, 138, 147, 0.15)',
               backgroundColor: '#ffffff'
             }}
           >
@@ -406,12 +459,12 @@ export default function FormatterPage() {
             <div
               style={{
                 padding: '10px 14px',
-                borderBottom: '1px solid rgba(79, 110, 125, 0.15)',
+                borderBottom: '1px solid rgba(139, 138, 147, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 flexWrap: 'wrap',
-                backgroundColor: '#f5f1f2'
+                backgroundColor: '#EEECF1'
               }}
             >
               {/* Bold (Supports multi-formatting) */}
@@ -759,7 +812,7 @@ export default function FormatterPage() {
               <button
                 onClick={handleSaveToDrafts}
                 disabled={savingDraft}
-                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-white bg-[#c94731] hover:bg-[#b83d28] cursor-pointer shadow-sm disabled:opacity-40"
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-white bg-[#A78BE0] hover:bg-[#9070CC] cursor-pointer shadow-sm disabled:opacity-40"
               >
                 <Save size={14} /> {savingDraft ? 'Saving Draft...' : 'Draft now'}
               </button>
@@ -836,7 +889,7 @@ export default function FormatterPage() {
               <div
                 style={{
                   width: '100%',
-                  maxWidth: previewMode === 'mobile' ? '340px' : '460px',
+                  maxWidth: previewMode === 'mobile' ? '360px' : '460px',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#ffffff',
@@ -905,8 +958,9 @@ export default function FormatterPage() {
                 {/* Post Text */}
                 <div
                   style={{
-                    fontSize: '13px',
-                    lineHeight: '1.5',
+                    fontSize: previewMode === 'mobile' ? '15px' : '14px',
+                    lineHeight: previewMode === 'mobile' ? '1.4' : '1.5',
+                    letterSpacing: previewMode === 'mobile' ? '-0.1px' : 'normal',
                     color: '#111827',
                     marginBottom: '16px',
                     whiteSpace: 'pre-wrap',
@@ -963,3 +1017,5 @@ export default function FormatterPage() {
     </div>
   );
 }
+
+

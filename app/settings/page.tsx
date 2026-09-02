@@ -158,7 +158,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
           tags={donts}
           onChange={setDonts}
           placeholder="Type a rule and press Enter"
-          accentColor="#c94731"
+          accentColor="#A78BE0"
           error={dontsError}
         />
       </div>
@@ -674,28 +674,17 @@ function SettingsContent() {
       )}
 
       {/* Page Header */}
-      <div className="shrink-0 border-b border-[#4f6e7d]/15 px-8 py-5 flex items-center justify-between bg-white/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#2c2c2c] text-white shadow-xs flex items-center justify-center">
-            <Settings size={20} className="text-[#c94731]" />
-          </div>
-          <div>
-            <h1 className="font-extrabold text-lg text-[#2c2c2c] tracking-tight">
-              {activeTab === 'about' && 'About Me & Context'}
-              {activeTab === 'pillars' && 'Post Pillars'}
-              {activeTab === 'anatomy' && 'Post Anatomy Builder'}
-              {activeTab === 'tone' && 'Tone & Voice Rules'}
-              {activeTab === 'mechanics' && 'Writing Mechanics'}
-            </h1>
-            <p className="text-xs font-medium text-[#4f6e7d]">
-              {activeTab === 'about' && 'Manage your bio & background context injected into AI generation.'}
-              {activeTab === 'pillars' && 'Configure content pillars, DOs/DON\'Ts, and visual format directives.'}
-              {activeTab === 'anatomy' && 'Define structural sections and instructions for generated post types.'}
-              {activeTab === 'tone' && 'Set formality, sentence rhythm, banned buzzwords, and simplicity parameters.'}
-              {activeTab === 'mechanics' && 'Manage strict writing mechanics and style enforcement directives.'}
-            </p>
-          </div>
-        </div>
+      <div className="shrink-0 px-8 pt-6 pb-4">
+        <h1 className="font-extrabold text-xl sm:text-2xl text-[#2C2C2C] tracking-tight">
+          <span>System Settings</span> <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>& Directives</span>
+        </h1>
+        <p className="text-xs font-medium text-[#8B8A93] mt-1">
+          {activeTab === 'about' && 'Manage your bio & background context injected into AI generation.'}
+          {activeTab === 'pillars' && 'Configure content pillars, DOs/DON\'Ts, and visual format directives.'}
+          {activeTab === 'anatomy' && 'Define structural sections and instructions for generated post types.'}
+          {activeTab === 'tone' && 'Set formality, sentence rhythm, banned buzzwords, and simplicity parameters.'}
+          {activeTab === 'mechanics' && 'Manage strict writing mechanics and style enforcement directives.'}
+        </p>
       </div>
 
       {/* Tab Content - scrollable */}
@@ -1223,7 +1212,7 @@ function SettingsContent() {
                   tags={avoidWords}
                   onChange={setAvoidWords}
                   placeholder="Type a word to avoid and press Enter"
-                  accentColor="#c94731"
+                  accentColor="#A78BE0"
                 />
                 <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                   Words that sound like formal AI writing (e.g. <em>resilience, leverage, robust, seamless, delve</em>). Generator will strictly avoid them and independent audit will flag them as failures.
@@ -1349,8 +1338,10 @@ function SettingsContent() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-[#4f6e7d] font-medium">Loading settings...</div>}>
+    <Suspense fallback={<div className="p-8 text-[#8B8A93] font-medium">Loading settings...</div>}>
       <SettingsContent />
     </Suspense>
   );
 }
+
+

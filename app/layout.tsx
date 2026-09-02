@@ -25,11 +25,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable}`}>
-      <body className="bg-[#f5f1f2] text-[#2c2c2c] antialiased selection:bg-[#4f6e7d]/20 selection:text-[#2c2c2c] font-sans relative">
-        {/* Soft ambient blurred gradient blobs sitting behind all content */}
+      <body className="bg-[#E4E1E8] text-[#2C2C2C] antialiased selection:bg-[#A78BE0]/20 selection:text-[#2C2C2C] font-sans relative">
+        {/* Ambient lavender glow — bottom-left and faint top-right */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-[#4f6e7d]/12 blur-[120px]" />
-          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-[#c94731]/10 blur-[120px]" />
+          <div
+            className="absolute -bottom-40 -left-40 w-[650px] h-[650px] rounded-full blur-[140px]"
+            style={{ background: 'radial-gradient(circle at 30% 70%, rgba(187,178,245,0.30) 0%, rgba(201,190,240,0.18) 35%, transparent 65%)' }}
+          />
+          <div
+            className="absolute -top-32 -right-32 w-[450px] h-[450px] rounded-full blur-[120px]"
+            style={{ background: 'rgba(214,236,114,0.10)' }}
+          />
         </div>
 
         <AppProvider>

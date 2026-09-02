@@ -25,31 +25,33 @@ export async function callWithGeminiFallback<T>(
     throw new Error('GEMINI_API_KEY environment variable is not set.');
   }
 
+  const MAX_PASSES = 2;
   let lastError: unknown = null;
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    try {
-      const genAI = new GoogleGenerativeAI(key);
-      return await fn(genAI, key);
-    } catch (err: any) {
-      const errStr = String(err?.message || err);
-      console.warn(`Gemini API key #${i + 1} (${key.slice(0, 8)}...) failed:`, errStr);
-      lastError = err;
 
-      // If it's a quota, rate limit, resource exhausted, or network error, continue to next key
-      const isQuotaOrLimit =
-        errStr.includes('429') ||
-        errStr.includes('RESOURCE_EXHAUSTED') ||
-        errStr.includes('Quota') ||
-        errStr.includes('fetch failed') ||
-        errStr.includes('limit');
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    if (pass > 0) {
+      // Pause briefly before second pass to let temporary 503/429 spikes clear
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
 
-      if (isQuotaOrLimit && i < keys.length - 1) {
-        console.info(`Rotating to fallback Gemini API key #${i + 2}...`);
-        continue;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      try {
+        const genAI = new GoogleGenerativeAI(key);
+        return await fn(genAI, key);
+      } catch (err: any) {
+        const errStr = String(err?.message || err);
+        console.warn(`Gemini API key #${i + 1} (${key.slice(0, 8)}...) failed (Pass ${pass + 1}):`, errStr);
+        lastError = err;
+
+        // On ANY error (503, 429, 500, network timeout, etc.), immediately rotate to next API key if available
+        if (i < keys.length - 1) {
+          console.info(`Rotating to fallback Gemini API key #${i + 2}...`);
+          continue;
+        }
       }
     }
   }
 
-  throw lastError || new Error('All Gemini API keys failed.');
+  throw lastError || new Error('All Gemini API keys failed after multiple retries.');
 }

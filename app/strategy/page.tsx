@@ -166,35 +166,42 @@ export default function StrategyPage() {
     <div className="max-w-5xl mx-auto px-6 py-8">
       {ToastEl}
 
-      <div className="flex items-center gap-3 mb-6">
-        <LayoutGrid size={20} style={{ color: 'var(--accent)' }} />
-        <h1 className="text-xl font-semibold">Strategy & Pillar Quotas</h1>
+      <div className="mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2C2C2C]">
+          <span>Pillar Strategy</span> <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>& Quotas</span>
+        </h1>
       </div>
 
       <div>
         <div className="flex items-center justify-between gap-4 mb-6">
           <div>
-            <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+            <h3 className="font-bold text-base text-[#2C2C2C]">
               Weekly Target Quotas
             </h3>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-[#8B8A93]">
               Configure weekly target quotas for individual pillars or merged combinations (e.g. Value + Authority).
             </p>
           </div>
 
           <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex-shrink-0"
-            style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 2px 10px rgba(108,99,255,0.3)' }}>
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex-shrink-0 cursor-pointer text-white bg-[#A78BE0] hover:bg-[#9070CC]">
             <Plus size={14} /> Combine / Add Pillar Rule
           </button>
         </div>
 
         <div className="grid grid-cols-1 gap-3">
-          {pillarRules.map(rule => {
+          {pillarRules.map((rule, rIdx) => {
             const isQuotaReached = rule.used_this_week >= rule.target_count && rule.target_count > 0;
+            const cardBg = rIdx % 3 === 0
+              ? 'linear-gradient(135deg, rgba(187,178,245,0.15) 0%, rgba(255,255,255,0.96) 100%)'
+              : rIdx % 3 === 1
+                ? 'linear-gradient(135deg, rgba(214,236,114,0.18) 0%, rgba(255,255,255,0.96) 100%)'
+                : 'linear-gradient(135deg, rgba(210,212,218,0.22) 0%, rgba(255,255,255,0.96) 100%)';
+            const cardBorder = rIdx % 3 === 0 ? 'rgba(187,178,245,0.35)' : rIdx % 3 === 1 ? 'rgba(214,236,114,0.40)' : 'rgba(210,212,218,0.35)';
+
             return (
-              <div key={rule.id} className="flex items-center justify-between px-5 py-4 rounded-xl border transition-all hover:border-purple-500/30"
-                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+              <div key={rule.id} className="flex items-center justify-between px-5 py-4 rounded-2xl border transition-all hover:shadow-md"
+                style={{ background: cardBg, borderColor: cardBorder }}>
 
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0"
@@ -376,3 +383,5 @@ export default function StrategyPage() {
     </div>
   );
 }
+
+

@@ -122,7 +122,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const key = CACHE_KEY_PREFIX + query.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 80);
       localStorage.setItem(key, JSON.stringify({ resultsText, resultCount, savedAt: Date.now() }));
-    } catch {}
+    } catch { }
   };
 
   const startWebSearchGenerate = useCallback(async (params: GenerationParams) => {
@@ -204,7 +204,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           postFormat: params.postFormat,
           postDate: params.postDate
         }));
-      } catch {}
+      } catch { }
 
     } catch (e) {
       setGenerationError(String(e));
@@ -263,7 +263,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           postFormat: params.postFormat,
           postDate: params.postDate
         }));
-      } catch {}
+      } catch { }
 
     } catch (e) {
       setGenerationError(String(e));

@@ -5,6 +5,34 @@ import { v4 as uuidv4 } from 'uuid';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { callWithGeminiFallback } from '@/lib/gemini';
 
+function safeParseJSON(rawText: string): any {
+  let cleaned = rawText.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const sanitized = cleaned.replace(/[\u0000-\u001F\u007F-\u009F]/g, (match) => {
+      if (match === '\n') return '\\n';
+      if (match === '\r') return '\\r';
+      if (match === '\t') return '\\t';
+      return '';
+    });
+    try {
+      return JSON.parse(sanitized);
+    } catch {
+      console.error('Failed to parse Gemini JSON output:', rawText);
+      throw new Error('Gemini response was not formatted as valid JSON. Please try generating again.');
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -263,13 +291,13 @@ ${anatomyPrompt}
 WRITING MECHANICS DIRECTIVES (mandatory formatting & structural constraints):
 ${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive || m.description}`).join('\n') : '• Keep lines short and scannable. Avoid wall of text blocks.'}
 
-AVAILABLE HOOK TYPES (structural moves, not literal text):
+AVAILABLE HOOK TYPES (structural formulas, not literal text):
 ${hookBankList || 'No hook types configured.'}
 
-From the hook types above, pick ONE that best fits today's pillar and topic. 
-Write an original sentence per version following one of its angles — never 
-copy the angle text directly. All 3 versions use the SAME hook type, each 
-with a different angle/wording.
+HOOK SELECTION & DIVERSITY RULES (MANDATORY):
+- DO NOT use the same hook type across all 3 versions.
+- Assign DIFFERENT hook types or distinct hook angles from the list above across Version 1, Version 2, and Version 3.
+  - E.g., Version 1 MUST use Hook Type #1 (or Angle #1), Version 2 MUST use Hook Type #2 (or Angle #2), and Version 3 MUST use Hook Type #3 (or Angle #3).
 
 TONE & VOICE PROFILE:
 - Formality: ${tone.formality}
@@ -324,21 +352,18 @@ Respond with ONLY valid JSON — no markdown fences, no commentary before or aft
 CRITICAL RULES:
 - **ANTI-EXAGGERATION DIRECTIVE**: Do not upgrade the raw input's language into stronger claims. If the raw notes say a result was "reduced" or "improved," do not restate it as "eliminated," "solved completely," "instantly," or similar absolute terms unless the raw notes themselves use that strength of language.
 - Each version must be genuinely distinct (different angle, opening hook, or framing — not just rephrased).
-- All 3 versions apply the SAME hook type but different angles/wording — never repeat the exact same hook sentence across versions.
-- Never include placeholder text or meta-commentary unless the Showcase/Authority pillar exception applies (thin input with no real project detail).
-- Every section listed in the anatomy must appear in every version.
+- Each version MUST use a DIFFERENT hook type or distinct hook angle from the available list across versions.
 - **RESOURCES ARRAY**: In every version, include 1-4 specific URLs or official doc references in the "resources" array. In Mode B (Web Search), extract the exact source URLs/titles from the provided search results. In Mode A, list official framework doc URLs, GitHub repos, or technical specs relevant to the topic (e.g. LangChain Docs (https://python.langchain.com), PostgreSQL pgvector (https://github.com/pgvector/pgvector)).
 - The post must be ready to copy-paste to LinkedIn as-is.`;
 
-    const jsonText = await callWithGeminiFallback(async (genAI) => {
+    const rawResponseText = await callWithGeminiFallback(async (genAI) => {
       const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
-      return text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      return result.response.text();
     });
 
-    const parsed = JSON.parse(jsonText);
+    const parsed = safeParseJSON(rawResponseText);
     const sanitizedVersions = (parsed.versions || []).map((v: Record<string, unknown>) => ({
       ...v,
       resources: Array.isArray(v.resources) ? v.resources.map((r: unknown) => String(r)) : []
@@ -368,12 +393,6 @@ async function generateSingleSection(
   donts: string[],
   coreFocus: string
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not configured.');
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-  const model = genAI.getGenerativeModel({ model: modelName });
-
   const prompt = `You are an expert LinkedIn content strategist. Rewrite ONLY the "${section.section_name}" section of a LinkedIn post for an AI Engineer building in public.
 
 SECTION RULE: ${section.rule_description}
@@ -399,6 +418,10 @@ INSTRUCTION: Apply intent analysis first — if the notes are detailed, use them
 
 Respond with ONLY the section content text. No labels, no quotes, no extra formatting.`;
 
-  const result = await model.generateContent(prompt);
-  return result.response.text().trim();
+  return await callWithGeminiFallback(async (genAI) => {
+    const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  });
 }

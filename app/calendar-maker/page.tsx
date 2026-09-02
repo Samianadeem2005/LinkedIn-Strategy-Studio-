@@ -157,24 +157,19 @@ export default function CalendarMakerPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#c94731] text-white shadow-sm">
-              <Sparkles size={18} />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#2c2c2c]">
-              <span>Calendar Maker</span> <span className="font-serif-italic text-[#c94731] font-normal">AI Schedule</span>
-            </h1>
-          </div>
-          <p className="text-xs mt-1.5 text-[#4f6e7d]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#2C2C2C]">
+            <span>Calendar Maker</span> <span className="font-serif-italic font-normal">AI Schedule</span>
+          </h1>
+          <p className="text-xs mt-1.5 text-[#8B8A93]">
             Turn raw strategy dumps into a structured, date-mapped content calendar for any duration.
           </p>
         </div>
       </div>
 
       {/* Generator Card */}
-      <div className="rounded-3xl border border-[#4f6e7d]/20 bg-white p-6 mb-8 shadow-sm">
+      <div className="rounded-3xl border border-[#8B8A93]/20 bg-white p-6 mb-8 shadow-sm">
         
-        <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-[#4f6e7d]">
+        <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-[#8B8A93]">
           Raw Strategy Dump / Content Notes
         </label>
         <textarea
@@ -182,7 +177,7 @@ export default function CalendarMakerPage() {
           onChange={e => setRawDump(e.target.value)}
           placeholder="Paste raw notes, research summaries, video ideas, or transcript dumps here..."
           rows={6}
-          className="w-full text-sm p-4 rounded-2xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] mb-5 font-mono leading-relaxed transition-colors focus:outline-none focus:ring-2 focus:ring-[#c94731]/40"
+          className="w-full text-sm p-4 rounded-2xl border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] mb-5 font-mono leading-relaxed transition-colors focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40"
         />
 
         {/* Controls Grid */}
@@ -394,3 +389,5 @@ export default function CalendarMakerPage() {
     </div>
   );
 }
+
+

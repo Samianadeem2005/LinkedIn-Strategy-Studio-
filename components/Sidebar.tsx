@@ -82,7 +82,7 @@ const navGroups: NavGroupItem[] = [
 
 function TreeElbow({ active, dark }: { active?: boolean; dark?: boolean }) {
   return (
-    <svg className={`w-4 h-6 flex-shrink-0 ${active ? 'text-[#c94731]' : dark ? 'text-white/40' : 'text-[#4f6e7d]/35'}`} viewBox="0 0 16 24" fill="none">
+    <svg className={`w-4 h-6 flex-shrink-0 ${active ? 'text-[#A78BE0]' : dark ? 'text-white/40' : 'text-[#8B8A93]/35'}`} viewBox="0 0 16 24" fill="none">
       <path
         d="M 2 0 L 2 12 Q 2 18 8 18 L 16 18"
         stroke="currentColor"
@@ -124,12 +124,9 @@ export default function Sidebar() {
     return pathname === subHref;
   };
 
-  // Accordion expanded state for each nav group
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    navGroups.forEach(g => {
-      initial[g.href] = true;
-    });
+    navGroups.forEach(g => { initial[g.href] = true; });
     return initial;
   });
 
@@ -163,32 +160,31 @@ export default function Sidebar() {
   };
 
   const toggleGroupExpand = (href: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [href]: !prev[href]
-    }));
+    setExpandedGroups(prev => ({ ...prev, [href]: !prev[href] }));
   };
 
   return (
     <aside
       className={`relative ${collapsed ? 'w-20 z-50 overflow-visible' : 'w-60 z-30'
-        } flex-shrink-0 flex flex-col border-r h-screen sticky top-0 transition-all duration-300 ease-out select-none bg-[#f5f1f2] border-[#4f6e7d]/20`}
+        } flex-shrink-0 flex flex-col border-r h-screen sticky top-0 transition-all duration-300 ease-out select-none`}
+      style={{ background: '#E4E1E8', borderColor: 'rgba(167,139,224,0.18)' }}
     >
       {/* Header / Logo */}
       <div
-        className={`p-4 border-b border-[#4f6e7d]/15 flex items-center ${collapsed ? 'flex-col gap-3 justify-center' : 'justify-between'
-          }`}
+        className={`p-4 border-b flex items-center ${collapsed ? 'flex-col gap-3 justify-center' : 'justify-between'}`}
+        style={{ borderColor: 'rgba(167,139,224,0.14)' }}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8.5 h-8.5 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#2c2c2c] text-white shadow-xs">
-            <Layers size={17} className="text-[#c94731]" />
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+            style={{ background: '#1A1A1D' }}>
+            <Layers size={16} className="text-[#A78BE0]" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <div className="font-bold text-sm text-[#2c2c2c] tracking-tight">
-                Content <span className="font-serif-italic text-[#c94731] font-normal">OS</span>
+              <div className="font-bold text-sm tracking-tight" style={{ color: '#1C1C1E' }}>
+                Content <span className="font-serif-italic font-normal" style={{ color: '#A78BE0' }}>OS</span>
               </div>
-              <div className="text-[11px] text-[#4f6e7d]">
+              <div className="text-[11px]" style={{ color: '#8B8A93' }}>
                 LinkedIn Workspace
               </div>
             </div>
@@ -197,7 +193,8 @@ export default function Sidebar() {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-7 h-7 rounded-full border border-[#4f6e7d]/25 text-[#4f6e7d] hover:text-[#2c2c2c] hover:bg-white transition-all duration-200 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-xs"
+          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-all duration-200"
+          style={{ border: '1px solid rgba(167,139,224,0.25)', color: '#8B8A93', background: '#FFFFFF' }}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
@@ -227,56 +224,68 @@ export default function Sidebar() {
                 hasSubpages ? (
                   <div
                     onClick={() => toggleGroupExpand(group.href)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer group ${
-                      groupActive
-                        ? 'bg-white text-[#2c2c2c] shadow-2xs border border-[#4f6e7d]/20 font-bold'
-                        : 'text-[#2c2c2c] hover:bg-white/70 hover:text-[#2c2c2c]'
-                    }`}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer"
+                    style={{
+                      background: groupActive ? '#FFFFFF' : 'transparent',
+                      color: '#1C1C1E',
+                      boxShadow: groupActive ? '0 2px 12px rgba(100,80,160,0.08)' : 'none',
+                      border: groupActive ? '1px solid rgba(167,139,224,0.20)' : '1px solid transparent',
+                    }}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${groupActive ? 'bg-[#2c2c2c] text-white shadow-xs' : 'bg-[#4f6e7d]/10 text-[#4f6e7d]'}`}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{
+                          background: groupActive ? '#1A1A1D' : 'rgba(167,139,224,0.12)',
+                          color: groupActive ? '#FFFFFF' : '#A78BE0',
+                        }}>
                         <Icon size={15} />
                       </div>
-                      <span className="text-xs font-bold tracking-tight truncate">{group.label}</span>
+                      <span className="text-xs font-bold tracking-tight truncate" style={{ color: '#1C1C1E' }}>{group.label}</span>
                     </div>
-
                     <ChevronDown
                       size={13}
-                      className={`text-[#4f6e7d] transition-transform duration-200 ${isExpanded ? 'rotate-180 text-[#2c2c2c]' : ''}`}
+                      className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                      style={{ color: '#8B8A93' }}
                     />
                   </div>
                 ) : (
                   <Link
                     href={group.href}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer ${
-                      groupActive
-                        ? 'bg-[#2c2c2c] text-white shadow-sm font-bold'
-                        : 'text-[#2c2c2c] hover:bg-white/70 hover:text-[#2c2c2c]'
-                    }`}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer"
+                    style={{
+                      background: groupActive ? '#1A1A1D' : 'transparent',
+                      color: groupActive ? '#FFFFFF' : '#1C1C1E',
+                    }}
                   >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${groupActive ? 'bg-white/15 text-white' : 'bg-[#4f6e7d]/10 text-[#4f6e7d]'}`}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{
+                        background: groupActive ? 'rgba(255,255,255,0.15)' : 'rgba(167,139,224,0.12)',
+                        color: groupActive ? '#FFFFFF' : '#A78BE0',
+                      }}>
                       <Icon size={15} />
                     </div>
                     <span className="text-xs font-bold tracking-tight truncate">{group.label}</span>
                   </Link>
                 )
               ) : (
-                /* Collapsed Icon Only Button */
                 <Link
                   href={group.href}
-                  className={`w-12 h-12 mx-auto rounded-2xl flex items-center justify-center transition-all duration-150 cursor-pointer ${
-                    groupActive
-                      ? 'bg-[#2c2c2c] text-white shadow-md'
-                      : 'bg-white/60 text-[#4f6e7d] hover:bg-white hover:text-[#2c2c2c] border border-[#4f6e7d]/15'
-                  }`}
+                  className="w-12 h-12 mx-auto rounded-2xl flex items-center justify-center transition-all duration-150 cursor-pointer"
+                  style={{
+                    background: groupActive ? '#1A1A1D' : '#FFFFFF',
+                    color: groupActive ? '#FFFFFF' : '#A78BE0',
+                    boxShadow: groupActive ? '0 4px 16px rgba(26,26,29,0.25)' : '0 2px 8px rgba(100,80,160,0.08)',
+                    border: groupActive ? 'none' : '1px solid rgba(167,139,224,0.15)',
+                  }}
                 >
                   <Icon size={18} />
                 </Link>
               )}
 
-              {/* Subpages Tree View when Sidebar is Expanded */}
+              {/* Subpages Tree View */}
               {!collapsed && hasSubpages && isExpanded && (
-                <div className="ml-4 pl-2 border-l-2 border-[#4f6e7d]/20 py-1 space-y-1 my-1">
+                <div className="ml-4 pl-2 py-1 space-y-1 my-1"
+                  style={{ borderLeft: '2px solid rgba(167,139,224,0.20)' }}>
                   {group.subpages!.map((sub) => {
                     const active = isSubActive(sub.href);
                     return (
@@ -284,11 +293,12 @@ export default function Sidebar() {
                         <TreeElbow active={active} />
                         <Link
                           href={sub.href}
-                          className={`flex-1 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
-                            active
-                              ? 'bg-[#2c2c2c] text-white font-semibold shadow-sm'
-                              : 'text-[#4f6e7d] hover:bg-white hover:text-[#2c2c2c] font-medium'
-                          }`}
+                          className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          style={{
+                            background: active ? '#1A1A1D' : 'transparent',
+                            color: active ? '#FFFFFF' : '#8B8A93',
+                            fontWeight: active ? 600 : 500,
+                          }}
                         >
                           <span className="truncate">{sub.label}</span>
                           {active && <ChevronRight size={12} className="text-white flex-shrink-0 ml-1" />}
@@ -299,25 +309,23 @@ export default function Sidebar() {
                 </div>
               )}
 
-              {/* Floating Tree Popover when Sidebar is Collapsed */}
+              {/* Collapsed Flyout Popover */}
               {collapsed && isFlyoutOpen && (
                 <div
-                  onMouseEnter={() => {
-                    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-                  }}
+                  onMouseEnter={() => { if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current); }}
                   onMouseLeave={handleMouseLeave}
                   className="absolute left-full top-0 pl-2.5 z-50 flex flex-col items-start space-y-2 animate-fade-in"
                 >
-                  {/* Floating Header Label Pill */}
-                  <div className="px-3 py-1.5 rounded-xl bg-[#2c2c2c] text-white text-xs font-bold flex items-center gap-2 shadow-md border border-[#4f6e7d]/30 whitespace-nowrap">
-                    <Icon size={14} className="text-[#c94731]" />
+                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md whitespace-nowrap"
+                    style={{ background: '#1A1A1D', color: '#FFFFFF', border: '1px solid rgba(167,139,224,0.25)' }}>
+                    <Icon size={14} className="text-[#A78BE0]" />
                     <span>{group.label}</span>
                   </div>
 
-                  {/* Subpage Tree Card with Elbow Connectors */}
                   {hasSubpages && (
-                    <div className="w-52 bg-[#2c2c2c] border border-[#4f6e7d]/30 text-white rounded-2xl p-3 shadow-2xl space-y-1.5 backdrop-blur-md">
-                      <div className="ml-1 pl-2 border-l-2 border-[#4f6e7d]/40 space-y-1">
+                    <div className="w-52 rounded-2xl p-3 shadow-2xl space-y-1.5"
+                      style={{ background: '#1A1A1D', border: '1px solid rgba(167,139,224,0.25)', color: '#FFFFFF' }}>
+                      <div className="ml-1 pl-2 space-y-1" style={{ borderLeft: '2px solid rgba(167,139,224,0.35)' }}>
                         {group.subpages!.map((sub) => {
                           const active = isSubActive(sub.href);
                           return (
@@ -326,11 +334,13 @@ export default function Sidebar() {
                               <Link
                                 href={sub.href}
                                 onClick={() => setActiveFlyout(null)}
-                                className={`flex-1 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
-                                  active
-                                    ? 'bg-white/15 border border-white/20 text-white font-bold shadow-xs'
-                                    : 'text-white/70 hover:bg-white/10 hover:text-white font-medium'
-                                }`}
+                                className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                                style={{
+                                  background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+                                  color: active ? '#FFFFFF' : 'rgba(255,255,255,0.65)',
+                                  border: active ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                                  fontWeight: active ? 700 : 500,
+                                }}
                               >
                                 <span className="truncate">{sub.label}</span>
                                 {active && <ChevronRight size={12} className="text-white flex-shrink-0 ml-1" />}
@@ -347,16 +357,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Generation Status Footer (Quiet Precision removed) */}
-      {generating && (
-        <div className="p-3 border-t border-[#4f6e7d]/15">
-          <div className="w-full flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#c94731]/10 text-[#c94731] border border-[#c94731]/30 animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-[#c94731] animate-ping" />
-            {!collapsed ? (webSearchStatus || 'Generating...') : '...'}
-          </div>
-        </div>
-      )}
     </aside>
   );
 }

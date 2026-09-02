@@ -19,22 +19,27 @@ export default function Modal({ title, onClose, children, footer, width = 'max-w
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden bg-[#2c2c2c]/40 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden backdrop-blur-sm animate-fade-in"
+      style={{ background: 'rgba(28,28,30,0.38)' }}>
       <div
-        className={`w-full ${width} rounded-3xl border border-[#4f6e7d]/20 bg-[#ffffff] text-[#2c2c2c] shadow-2xl animate-panel-settle overflow-hidden`}
+        className={`w-full ${width} rounded-3xl bg-white text-[#1C1C1E] animate-panel-settle overflow-hidden`}
         style={{
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: 0
+          minHeight: 0,
+          border: '1px solid rgba(167,139,224,0.20)',
+          boxShadow: '0 24px 64px rgba(100,80,160,0.14)'
         }}
       >
         {/* Pinned Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#4f6e7d]/15 bg-[#f5f1f2] flex-shrink-0">
-          <h2 className="font-bold text-base text-[#2c2c2c] tracking-tight">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+          style={{ borderBottom: '1px solid rgba(167,139,224,0.14)', background: '#F6F5F8' }}>
+          <h2 className="font-bold text-base tracking-tight" style={{ color: '#1C1C1E' }}>{title}</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full border border-[#4f6e7d]/20 text-[#4f6e7d] hover:text-white hover:bg-[#4f6e7d] hover:border-[#4f6e7d] transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs"
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer"
+            style={{ border: '1px solid rgba(167,139,224,0.22)', color: '#8B8A93', background: '#FFFFFF' }}
           >
             <X size={14} />
           </button>
@@ -47,7 +52,8 @@ export default function Modal({ title, onClose, children, footer, width = 'max-w
 
         {/* Pinned Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-[#4f6e7d]/15 bg-[#f5f1f2] flex items-center justify-end gap-2 flex-shrink-0">
+          <div className="px-6 py-4 flex items-center justify-end gap-2 flex-shrink-0"
+            style={{ borderTop: '1px solid rgba(167,139,224,0.14)', background: '#F6F5F8' }}>
             {footer}
           </div>
         )}

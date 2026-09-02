@@ -158,11 +158,11 @@ export default function IngestPage() {
 
   const getTableBadgeStyle = (table: string) => {
     switch (table) {
-      case 'post_types': return { bg: 'rgba(79, 110, 125, 0.12)', color: '#4f6e7d', label: 'Post Pillar' };
-      case 'post_anatomy': return { bg: 'rgba(201, 71, 49, 0.12)', color: '#c94731', label: 'Post Anatomy' };
-      case 'writing_mechanics': return { bg: 'rgba(79, 110, 125, 0.12)', color: '#4f6e7d', label: 'Writing Mechanic' };
-      case 'hook_types': return { bg: 'rgba(201, 71, 49, 0.12)', color: '#c94731', label: 'Hook Types' };
-      default: return { bg: 'rgba(79, 110, 125, 0.12)', color: '#4f6e7d', label: table };
+      case 'post_types': return { bg: 'rgba(139, 138, 147, 0.12)', color: '#8B8A93', label: 'Post Pillar' };
+      case 'post_anatomy': return { bg: 'rgba(167, 139, 224, 0.12)', color: '#A78BE0', label: 'Post Anatomy' };
+      case 'writing_mechanics': return { bg: 'rgba(139, 138, 147, 0.12)', color: '#8B8A93', label: 'Writing Mechanic' };
+      case 'hook_types': return { bg: 'rgba(167, 139, 224, 0.12)', color: '#A78BE0', label: 'Hook Types' };
+      default: return { bg: 'rgba(139, 138, 147, 0.12)', color: '#8B8A93', label: table };
     }
   };
 
@@ -171,18 +171,13 @@ export default function IngestPage() {
       {ToastEl}
 
       {/* Top Header */}
-      <div className="shrink-0 border-b border-[#4f6e7d]/15 px-8 py-5 flex items-center justify-between bg-white/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#4f6e7d]/12 border border-[#4f6e7d]/20 flex items-center justify-center text-[#4f6e7d]">
-            <Sparkles size={20} />
-          </div>
-          <div>
-            <h1 className="font-extrabold text-lg text-[#2c2c2c] tracking-tight">Strategy Ingestion Pipeline</h1>
-            <p className="text-xs font-medium text-[#4f6e7d]">
-              Paste raw strategy articles to extract clean summaries, new pillars, anatomy rules, and hooks.
-            </p>
-          </div>
-        </div>
+      <div className="shrink-0 px-8 pt-6 pb-4">
+        <h1 className="font-extrabold text-xl sm:text-2xl text-[#2C2C2C] tracking-tight">
+          <span>Strategy Ingestion</span> <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>Pipeline</span>
+        </h1>
+        <p className="text-xs font-medium text-[#8B8A93] mt-1">
+          Paste raw strategy articles to extract clean summaries, new pillars, anatomy rules, and hooks.
+        </p>
       </div>
 
       {/* Main Content Scroll Container */}
@@ -192,8 +187,8 @@ export default function IngestPage() {
           {/* Raw Text Input Card */}
           <div className="mosaic-card p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <FileText size={16} className="text-[#c94731]" />
-              <h2 className="font-bold text-sm text-[#2c2c2c]">Raw Strategy Document / Article Notes</h2>
+              <FileText size={16} className="text-[#A78BE0]" />
+              <h2 className="font-bold text-sm text-[#1C1C1E]">Raw Strategy Document / Article Notes</h2>
             </div>
 
             <textarea
@@ -202,18 +197,18 @@ export default function IngestPage() {
               disabled={extracting}
               rows={7}
               placeholder="Paste raw strategy article, book excerpt, or LinkedIn guide here..."
-              className="w-full p-4 rounded-xl text-sm border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] focus:outline-none focus:ring-2 focus:ring-[#4f6e7d]/20 focus:border-[#4f6e7d] resize-none transition-all"
+              className="w-full p-4 rounded-xl text-sm border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#8B8A93]/20 focus:border-[#8B8A93] resize-none transition-all"
             />
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-xs font-medium text-[#4f6e7d]">
+              <span className="text-xs font-medium text-[#8B8A93]">
                 {rawText.trim() ? `${rawText.trim().split(/\s+/).length} words` : '0 words'}
               </span>
 
               <button
                 onClick={extractStrategy}
                 disabled={extracting || !rawText.trim()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#c94731] hover:bg-[#b83d28] transition-all cursor-pointer shadow-md disabled:opacity-40"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#A78BE0] hover:bg-[#9070CC] transition-all cursor-pointer shadow-md disabled:opacity-40"
               >
                 {extracting ? (
                   <>
@@ -232,17 +227,17 @@ export default function IngestPage() {
 
           {/* Success Banner */}
           {completed && (
-            <div className="p-6 rounded-3xl border border-[#4f6e7d]/20 bg-white text-center space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
-              <CheckCircle2 size={32} className="mx-auto text-[#4f6e7d]" />
-              <h3 className="font-bold text-base text-[#2c2c2c]">
+            <div className="p-6 rounded-3xl border border-[#8B8A93]/20 bg-white text-center space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
+              <CheckCircle2 size={32} className="mx-auto text-[#8B8A93]" />
+              <h3 className="font-bold text-base text-[#1C1C1E]">
                 Strategy Integrated Live!
               </h3>
-              <p className="text-xs text-[#4f6e7d] max-w-md mx-auto">
+              <p className="text-xs text-[#8B8A93] max-w-md mx-auto">
                 All confirmed items have been applied to your database. Studio, Settings, and Hook Bank are live-updated.
               </p>
               <button
                 onClick={() => { setRawText(''); setNewItems([]); setUpdates([]); setErrorItems([]); setDumpId(null); setCleanSummary(null); setCompleted(false); }}
-                className="px-4 py-2 rounded-xl text-xs font-bold border border-[#4f6e7d]/25 text-[#4f6e7d] bg-white hover:bg-[#4f6e7d]/10 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold border border-[#8B8A93]/25 text-[#8B8A93] bg-white hover:bg-[#8B8A93]/10 transition-all cursor-pointer"
               >
                 Process Another Document
               </button>
@@ -255,34 +250,34 @@ export default function IngestPage() {
 
               {/* SECTION 1: Clean Summary (Read-Only Outline) */}
               {cleanSummary && (
-                <div className="p-6 rounded-3xl border border-[#4f6e7d]/20 bg-white space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
-                  <div className="flex items-center justify-between border-b border-[#4f6e7d]/15 pb-3">
+                <div className="p-6 rounded-3xl border border-[#8B8A93]/20 bg-white space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
+                  <div className="flex items-center justify-between border-b border-[#8B8A93]/15 pb-3">
                     <div className="flex items-center gap-2">
-                      <BookOpen size={18} className="text-[#4f6e7d]" />
-                      <h2 className="font-bold text-sm text-[#2c2c2c]">
+                      <BookOpen size={18} className="text-[#8B8A93]" />
+                      <h2 className="font-bold text-sm text-[#1C1C1E]">
                         Section 1 — Clean Strategy Overview (Read-Only Outline)
                       </h2>
                     </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#4f6e7d]/12 text-[#4f6e7d]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#8B8A93]/12 text-[#8B8A93]">
                       Cleaned Outline
                     </span>
                   </div>
 
-                  <div className="text-xs leading-relaxed font-medium text-[#2c2c2c] space-y-2 whitespace-pre-wrap">
+                  <div className="text-xs leading-relaxed font-medium text-[#1C1C1E] space-y-2 whitespace-pre-wrap">
                     {cleanSummary}
                   </div>
                 </div>
               )}
 
               {/* Dynamic Global Summary Counter */}
-              <div className="px-5 py-3.5 rounded-2xl border border-[#4f6e7d]/20 bg-white flex items-center justify-between shadow-xs">
+              <div className="px-5 py-3.5 rounded-2xl border border-[#8B8A93]/20 bg-white flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-2">
-                  <Database size={15} className="text-[#c94731]" />
-                  <span className="text-xs font-bold text-[#2c2c2c]">
-                    Ready to confirm <strong className="text-[#c94731]">{totalKeptCount}</strong> items
+                  <Database size={15} className="text-[#A78BE0]" />
+                  <span className="text-xs font-bold text-[#1C1C1E]">
+                    Ready to confirm <strong className="text-[#A78BE0]">{totalKeptCount}</strong> items
                   </span>
                 </div>
-                <span className="text-[11px] font-medium text-[#4f6e7d]">
+                <span className="text-[11px] font-medium text-[#8B8A93]">
                   ({newItemsToInsert} new + {updatesToApply} updates to apply)
                 </span>
               </div>
@@ -292,7 +287,7 @@ export default function IngestPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="text-base">🆕</span>
-                    <h3 className="font-bold text-sm text-[#2c2c2c]">
+                    <h3 className="font-bold text-sm text-[#1C1C1E]">
                       Section 2 — New Things Detected ({newItems.length})
                     </h3>
                   </div>
@@ -317,11 +312,11 @@ export default function IngestPage() {
                                 {badge.label}
                               </span>
                               {item.target_table === 'post_anatomy' && item.suggested_order_index != null && (
-                                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#c94731]/12 text-[#c94731] border border-[#c94731]/30">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#A78BE0]/12 text-[#A78BE0] border border-[#A78BE0]/30">
                                   Sequence Position: #{item.suggested_order_index}
                                 </span>
                               )}
-                              <span className="font-bold text-sm truncate text-[#2c2c2c]">
+                              <span className="font-bold text-sm truncate text-[#1C1C1E]">
                                 {item.heading}
                               </span>
                             </div>
@@ -329,8 +324,8 @@ export default function IngestPage() {
                             <button
                               onClick={() => setDecision(item.id, isKeep ? 'discard' : 'keep', true)}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isKeep
-                                  ? 'bg-[#4f6e7d]/12 text-[#4f6e7d] border border-[#4f6e7d]/30'
-                                  : 'bg-[#c94731]/12 text-[#c94731] border border-[#c94731]/30'
+                                  ? 'bg-[#8B8A93]/12 text-[#8B8A93] border border-[#8B8A93]/30'
+                                  : 'bg-[#A78BE0]/12 text-[#A78BE0] border border-[#A78BE0]/30'
                                 }`}
                             >
                               {isKeep ? <><CheckCircle2 size={13} /> Add New Item</> : <><XCircle size={13} /> Discarded</>}
@@ -341,7 +336,7 @@ export default function IngestPage() {
                             value={item.point_text}
                             onChange={e => updateItemText(item.id, e.target.value, true)}
                             rows={3}
-                            className="w-full px-3.5 py-2.5 rounded-xl text-xs border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] focus:outline-none focus:ring-2 focus:ring-[#4f6e7d]/20 focus:border-[#4f6e7d] resize-none transition-colors leading-relaxed font-medium"
+                            className="w-full px-3.5 py-2.5 rounded-xl text-xs border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#8B8A93]/20 focus:border-[#8B8A93] resize-none transition-colors leading-relaxed font-medium"
                             placeholder="Extracted rule text..."
                           />
                         </div>
@@ -356,7 +351,7 @@ export default function IngestPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="text-base">📝</span>
-                    <h3 className="font-bold text-sm text-[#2c2c2c]">
+                    <h3 className="font-bold text-sm text-[#1C1C1E]">
                       Section 3 — Updates to Existing Rules ({updates.length})
                     </h3>
                   </div>
@@ -375,7 +370,7 @@ export default function IngestPage() {
                         >
                           {/* Card Header */}
                           <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <span className="text-xs font-extrabold text-[#c94731]">
+                            <span className="text-xs font-extrabold text-[#A78BE0]">
                               {item.target_row_name || 'Existing Rule'}
                             </span>
 
@@ -385,8 +380,8 @@ export default function IngestPage() {
                               <button
                                 onClick={() => setDecision(item.id, 'apply_update', false)}
                                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isApply
-                                    ? 'bg-[#c94731] text-white shadow-xs'
-                                    : 'bg-[#f5f1f2] text-[#4f6e7d] border border-[#4f6e7d]/20'
+                                    ? 'bg-[#A78BE0] text-white shadow-xs'
+                                    : 'bg-[#EEECF1] text-[#8B8A93] border border-[#8B8A93]/20'
                                   }`}
                               >
                                 <Check size={13} /> Apply Update
@@ -396,8 +391,8 @@ export default function IngestPage() {
                               <button
                                 onClick={() => setDecision(item.id, 'keep_previous', false)}
                                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isKeepPrev
-                                    ? 'bg-[#4f6e7d] text-white shadow-xs'
-                                    : 'bg-[#f5f1f2] text-[#4f6e7d] border border-[#4f6e7d]/20'
+                                    ? 'bg-[#8B8A93] text-white shadow-xs'
+                                    : 'bg-[#EEECF1] text-[#8B8A93] border border-[#8B8A93]/20'
                                   }`}
                               >
                                 <ShieldCheck size={13} /> Keep Previous (Untouched)
@@ -408,21 +403,21 @@ export default function IngestPage() {
                           {/* BEFORE vs AFTER Comparison Box */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* BEFORE Box */}
-                            <div className="p-3.5 rounded-2xl border border-[#4f6e7d]/15 bg-[#f5f1f2] space-y-1.5">
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider block text-[#4f6e7d]">
+                            <div className="p-3.5 rounded-2xl border border-[#8B8A93]/15 bg-[#EEECF1] space-y-1.5">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider block text-[#8B8A93]">
                                 BEFORE (Current in DB):
                               </span>
-                              <p className="text-xs leading-relaxed italic text-[#2c2c2c] font-medium">
+                              <p className="text-xs leading-relaxed italic text-[#1C1C1E] font-medium">
                                 &ldquo;{item.current_text || 'No current text found.'}&rdquo;
                               </p>
                             </div>
 
                             {/* AFTER Box */}
                             <div
-                              className="p-3.5 rounded-2xl border border-[#4f6e7d]/20 bg-white space-y-1.5 transition-all"
+                              className="p-3.5 rounded-2xl border border-[#8B8A93]/20 bg-white space-y-1.5 transition-all"
                               style={{ opacity: isApply ? 1 : 0.6 }}
                             >
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider block text-[#c94731]">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider block text-[#A78BE0]">
                                 AFTER (Proposed Update):
                               </span>
                               <textarea
@@ -430,7 +425,7 @@ export default function IngestPage() {
                                 onChange={e => updateItemText(item.id, e.target.value, false)}
                                 disabled={!isApply}
                                 rows={3}
-                                className="w-full text-xs bg-transparent border-0 focus:outline-none resize-none leading-relaxed text-[#2c2c2c] font-medium"
+                                className="w-full text-xs bg-transparent border-0 focus:outline-none resize-none leading-relaxed text-[#1C1C1E] font-medium"
                                 placeholder="Proposed text..."
                               />
                             </div>
@@ -438,32 +433,32 @@ export default function IngestPage() {
 
                           {/* Apply Mode Radio Options (Only enabled when Apply Update is active) */}
                           {isApply && (
-                            <div className="pt-2 flex items-center gap-6 text-xs border-t border-[#4f6e7d]/15">
-                              <span className="font-bold text-[#4f6e7d]">Apply as:</span>
+                            <div className="pt-2 flex items-center gap-6 text-xs border-t border-[#8B8A93]/15">
+                              <span className="font-bold text-[#8B8A93]">Apply as:</span>
 
-                              <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#2c2c2c]">
+                              <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#1C1C1E]">
                                 <input
                                   type="radio"
                                   name={`apply_mode_${item.id}`}
                                   checked={mode === 'merge'}
                                   onChange={() => updateApplyMode(item.id, 'merge')}
-                                  className="accent-[#c94731]"
+                                  className="accent-[#A78BE0]"
                                 />
                                 <span className="flex items-center gap-1">
-                                  <GitMerge size={13} className="text-[#4f6e7d]" /> Merge with existing (AI combine)
+                                  <GitMerge size={13} className="text-[#8B8A93]" /> Merge with existing (AI combine)
                                 </span>
                               </label>
 
-                              <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#2c2c2c]">
+                              <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#1C1C1E]">
                                 <input
                                   type="radio"
                                   name={`apply_mode_${item.id}`}
                                   checked={mode === 'replace'}
                                   onChange={() => updateApplyMode(item.id, 'replace')}
-                                  className="accent-[#c94731]"
+                                  className="accent-[#A78BE0]"
                                 />
                                 <span className="flex items-center gap-1">
-                                  <Replace size={13} className="text-[#c94731]" /> Replace completely
+                                  <Replace size={13} className="text-[#A78BE0]" /> Replace completely
                                 </span>
                               </label>
                             </div>
@@ -478,13 +473,13 @@ export default function IngestPage() {
               {/* SECTION: ⚠️ Couldn't Process — Check Manually */}
               {errorItems.length > 0 && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 p-3.5 rounded-2xl border border-[#c94731]/30 bg-[#c94731]/10 text-[#c94731]">
+                  <div className="flex items-center gap-2 p-3.5 rounded-2xl border border-[#A78BE0]/30 bg-[#A78BE0]/10 text-[#A78BE0]">
                     <AlertTriangle size={18} />
                     <h3 className="font-bold text-sm">
                       ⚠️ Couldn&apos;t process — check manually ({errorItems.length})
                     </h3>
                   </div>
-                  <p className="text-xs font-medium text-[#4f6e7d]">
+                  <p className="text-xs font-medium text-[#8B8A93]">
                     These items encountered pipeline or embedding errors during processing and could not be automatically evaluated.
                   </p>
 
@@ -495,14 +490,14 @@ export default function IngestPage() {
                         className="mosaic-card p-5 space-y-3"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <span className="font-bold text-sm text-[#2c2c2c]">
+                          <span className="font-bold text-sm text-[#1C1C1E]">
                             {item.heading}
                           </span>
-                          <span className="text-[11px] px-2.5 py-1 rounded-md font-mono bg-[#c94731]/12 text-[#c94731] font-bold">
+                          <span className="text-[11px] px-2.5 py-1 rounded-md font-mono bg-[#A78BE0]/12 text-[#A78BE0] font-bold">
                             {item.reason || 'Pipeline Error'}
                           </span>
                         </div>
-                        <p className="text-xs leading-relaxed text-[#4f6e7d] font-medium">
+                        <p className="text-xs leading-relaxed text-[#8B8A93] font-medium">
                           {item.point_text}
                         </p>
                       </div>
@@ -512,18 +507,18 @@ export default function IngestPage() {
               )}
 
               {/* Bottom Sticky Confirm Bar */}
-              <div className="sticky bottom-4 p-4 rounded-3xl border border-[#4f6e7d]/20 bg-white/95 backdrop-blur-md flex items-center justify-between shadow-[0_8px_30px_rgba(44,44,44,0.12)] z-20">
-                <div className="flex items-center gap-2 text-xs text-[#4f6e7d]">
-                  <Database size={15} className="text-[#c94731]" />
+              <div className="sticky bottom-4 p-4 rounded-3xl border border-[#8B8A93]/20 bg-white/95 backdrop-blur-md flex items-center justify-between shadow-[0_8px_30px_rgba(44,44,44,0.12)] z-20">
+                <div className="flex items-center gap-2 text-xs text-[#8B8A93]">
+                  <Database size={15} className="text-[#A78BE0]" />
                   <span>
-                    Ready to confirm <strong className="text-[#2c2c2c]">{totalKeptCount}</strong> items into database
+                    Ready to confirm <strong className="text-[#1C1C1E]">{totalKeptCount}</strong> items into database
                   </span>
                 </div>
 
                 <button
                   onClick={confirmAll}
                   disabled={saving || totalKeptCount === 0}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#c94731] hover:bg-[#b83d28] transition-all cursor-pointer shadow-md disabled:opacity-40"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#A78BE0] hover:bg-[#9070CC] transition-all cursor-pointer shadow-md disabled:opacity-40"
                 >
                   {saving ? (
                     <>
@@ -547,3 +542,5 @@ export default function IngestPage() {
     </div>
   );
 }
+
+

@@ -168,16 +168,16 @@ export default function StudioPage() {
       if (saved) {
         const parsed = JSON.parse(saved);
         const todayStr = getTodayLocalDate();
+        if (parsed.rawNotes) setRawNotes(parsed.rawNotes);
+        if (parsed.selectedPostTypeId) setSelectedPostTypeId(parsed.selectedPostTypeId);
+        if (parsed.postId) setPostId(parsed.postId);
+        if (parsed.postFormat) setPostFormat(parsed.postFormat);
+        if (parsed.postDate && parsed.postDate >= todayStr) {
+          setPostDate(parsed.postDate);
+        }
         if (parsed.versions && parsed.versions.length > 0) {
           setVersions(parsed.versions);
           if (parsed.editedSectionsMap) setEditedSectionsMap(parsed.editedSectionsMap);
-          if (parsed.rawNotes) setRawNotes(parsed.rawNotes);
-          if (parsed.selectedPostTypeId) setSelectedPostTypeId(parsed.selectedPostTypeId);
-          if (parsed.postId) setPostId(parsed.postId);
-          if (parsed.postFormat) setPostFormat(parsed.postFormat);
-          if (parsed.postDate && parsed.postDate >= todayStr) {
-            setPostDate(parsed.postDate);
-          }
         }
       }
     } catch { }
@@ -497,7 +497,7 @@ export default function StudioPage() {
   const hasOutput = versions.length > 0;
 
   return (
-    <div className="min-h-screen bg-[#f5f1f2] text-[#2c2c2c] p-6 space-y-8 max-w-7xl mx-auto w-full">
+    <div className="min-h-screen bg-[#E4E1E8] text-[#2C2C2C] p-6 space-y-8 max-w-7xl mx-auto w-full">
       {ToastEl}
 
       {/* Top Section: Mosaic 2-Column Bento Grid */}
@@ -507,21 +507,28 @@ export default function StudioPage() {
         <div
           className={`lg:col-span-3 mosaic-card p-5 flex flex-col justify-between space-y-4 ${isLoaded ? 'animate-panel-settle' : ''}`}
           style={{
-            background: '#ffffff',
-            borderColor: 'rgba(79, 110, 125, 0.20)',
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(238,236,241,0.90) 100%)',
+            borderColor: 'rgba(187,178,245,0.30)',
+            boxShadow: '0 4px 20px rgba(100,80,160,0.06)',
             ...getEntranceStyle(40)
           }}
         >
-          <div className="flex items-center justify-between border-b border-[#4f6e7d]/15 pb-3">
-            <span className="text-xs font-bold text-[#2c2c2c] uppercase tracking-wider flex items-center gap-1.5">
-              <Zap size={13} className="text-[#c94731]" /> Weekly Schedule
+          <div className="flex items-center justify-between border-b border-[#8B8A93]/15 pb-3">
+            <span className="text-xs font-bold text-[#2C2C2C] uppercase tracking-wider flex items-center gap-1.5">
+              <Zap size={13} className="text-[#A78BE0]" /> Weekly Schedule
             </span>
           </div>
 
           {/* 7 Vertical Oval Pills */}
           <div className="flex flex-col gap-2.5 flex-1 justify-around py-1">
-            {weeklySchedule.map(item => {
+            {weeklySchedule.map((item, idx) => {
               const savedForDay = daySavedMap[item.dayName];
+              const tintStyle = idx % 3 === 0
+                ? item.isToday || item.isSelected ? 'border-[#BBB2F5] bg-[#BBB2F5]/30 font-bold' : 'border-[#BBB2F5]/60 bg-[#BBB2F5]/15 hover:bg-[#BBB2F5]/25'
+                : idx % 3 === 1
+                  ? item.isToday || item.isSelected ? 'border-[#D6EC72] bg-[#D6EC72]/35 font-bold' : 'border-[#D6EC72]/70 bg-[#D6EC72]/20 hover:bg-[#D6EC72]/30'
+                  : item.isToday || item.isSelected ? 'border-[#D2D4DA] bg-[#D2D4DA]/40 font-bold' : 'border-[#D2D4DA]/60 bg-[#D2D4DA]/20 hover:bg-[#D2D4DA]/30';
+
               return (
                 <div
                   key={item.dayName}
@@ -529,25 +536,20 @@ export default function StudioPage() {
                     const targetDateStr = getDateForDayOfWeek(item.dayName);
                     setPostDate(targetDateStr);
                   }}
-                  className={`h-9 px-3.5 rounded-2xl border text-xs flex items-center justify-between transition-all duration-200 cursor-pointer ${item.isToday
-                    ? 'border-[#c94731] bg-[#c94731]/10 text-[#2c2c2c] shadow-2xs font-bold'
-                    : item.isSelected
-                      ? 'border-[#4f6e7d]/60 bg-white text-[#2c2c2c] shadow-2xs font-semibold'
-                      : 'border-[#4f6e7d]/15 bg-[#f5f1f2] text-[#2c2c2c] hover:border-[#4f6e7d]/30 hover:bg-white'
-                    }`}>
+                  className={`h-9 px-3.5 rounded-2xl border text-xs flex items-center justify-between transition-all duration-200 cursor-pointer text-[#2C2C2C] shadow-2xs ${tintStyle}`}>
                   <div className="flex items-center gap-2 min-w-0 font-semibold">
                     {item.isToday ? (
-                      <span className="w-2 h-2 rounded-full bg-[#c94731] flex-shrink-0 animate-pulse" title="Real-time Today" />
+                      <span className="w-2 h-2 rounded-full bg-[#A78BE0] flex-shrink-0 animate-pulse" title="Real-time Today" />
                     ) : item.isSelected ? (
-                      <span className="w-2 h-2 rounded-full bg-[#4f6e7d] flex-shrink-0" title="Selected Target Date" />
+                      <span className="w-2 h-2 rounded-full bg-[#776497] flex-shrink-0" title="Selected Target Date" />
                     ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#4f6e7d]/40 flex-shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#8B8A93]/50 flex-shrink-0" />
                     )}
-                    <span className="truncate text-xs text-[#2c2c2c] font-medium">{item.dayName}</span>
+                    <span className="truncate text-xs text-[#2C2C2C] font-medium">{item.dayName}</span>
                   </div>
 
                   {savedForDay && (
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-[#c94731] text-white flex-shrink-0 leading-none">
+                    <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-[#776497] text-white flex-shrink-0 leading-none">
                       {savedForDay.pillar_name.slice(0, 9)}
                     </span>
                   )}
@@ -556,9 +558,9 @@ export default function StudioPage() {
             })}
           </div>
 
-          <div className="pt-2 border-t border-[#4f6e7d]/15 flex items-center justify-between text-[11px] text-[#4f6e7d]">
+          <div className="pt-2 border-t border-[#8B8A93]/15 flex items-center justify-between text-[11px] text-[#8B8A93]">
             <span>Content Strategy</span>
-            <span className="text-[#2c2c2c] font-semibold">{ruleList.length} Pillars</span>
+            <span className="text-[#1C1C1E] font-semibold">{ruleList.length} Pillars</span>
           </div>
         </div>
 
@@ -569,19 +571,19 @@ export default function StudioPage() {
           <div
             className={`mosaic-card p-6 flex flex-col justify-between space-y-5 ${isLoaded ? 'animate-panel-settle' : ''}`}
             style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f5f1f2 100%)',
-              borderColor: 'rgba(79, 110, 125, 0.20)',
+              background: 'linear-gradient(135deg, rgba(214,236,114,0.10) 0%, rgba(187,178,245,0.08) 60%, rgba(238,236,241,0.95) 100%)',
+              borderColor: 'rgba(187,178,245,0.22)',
               ...getEntranceStyle(80)
             }}
           >
             {/* Header Title */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2c2c2c] flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1C1C1E] flex items-center gap-2 flex-wrap">
                   <span>Automate your posts</span>
-                  <span className="font-serif-italic text-[#c94731] font-normal">with quiet precision</span>
+                  <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>with quiet precision</span>
                 </h2>
-                <p className="text-xs sm:text-sm text-[#4f6e7d] mt-1 font-normal">
+                <p className="text-xs sm:text-sm text-[#8B8A93] mt-1 font-normal">
                   Minimal AI content workflows that elevate your creator footprint.
                 </p>
               </div>
@@ -589,12 +591,12 @@ export default function StudioPage() {
 
             {/* Calendar Context Banner (If active) */}
             {calendarEntry && calendarEntry.date === postDate && (
-              <div className="p-3.5 rounded-xl border border-[#c94731]/30 bg-[#c94731]/5 text-xs flex items-center justify-between gap-3">
+              <div className="p-3.5 rounded-xl border border-[#A78BE0]/30 bg-[#A78BE0]/5 text-xs flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <BookOpen size={14} className="text-[#c94731] flex-shrink-0" />
+                  <BookOpen size={14} className="text-[#A78BE0] flex-shrink-0" />
                   <div className="truncate">
-                    <span className="font-bold text-[#2c2c2c]">Calendar Plan: </span>
-                    <span className="text-[#4f6e7d] font-medium">{calendarEntry.post_title}</span>
+                    <span className="font-bold text-[#1C1C1E]">Calendar Plan: </span>
+                    <span className="text-[#8B8A93] font-medium">{calendarEntry.post_title}</span>
                   </div>
                 </div>
               </div>
@@ -602,9 +604,9 @@ export default function StudioPage() {
 
             {/* Inset Textarea Container (Intellecta soft input box aesthetic) */}
             <div className="flex flex-col space-y-1.5 flex-1">
-              <div className="flex items-center justify-between text-xs font-semibold text-[#2c2c2c] px-0.5">
-                <span className="text-xs font-bold text-[#2c2c2c]">Raw Notes Input</span>
-                <span className="text-[#4f6e7d] font-mono text-[11px]">{rawNotes.length} chars</span>
+              <div className="flex items-center justify-between text-xs font-semibold text-[#1C1C1E] px-0.5">
+                <span className="text-xs font-bold text-[#1C1C1E]">Raw Notes Input</span>
+                <span className="text-[#8B8A93] font-mono text-[11px]">{rawNotes.length} chars</span>
               </div>
 
               <textarea
@@ -613,7 +615,7 @@ export default function StudioPage() {
                 onChange={e => setRawNotes(e.target.value)}
                 placeholder="Hi there! Paste your raw notes, article key points, or framework thoughts here..."
                 rows={4}
-                className="w-full px-3.5 py-3 rounded-2xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] text-xs leading-relaxed placeholder-[#4f6e7d]/50 focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 focus:border-[#c94731] transition-all duration-200 resize-none font-sans"
+                className="w-full px-3.5 py-3 rounded-2xl border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] text-xs leading-relaxed placeholder-[#8B8A93]/50 focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 focus:border-[#A78BE0] transition-all duration-200 resize-none font-sans"
               />
             </div>
 
@@ -623,7 +625,7 @@ export default function StudioPage() {
                 id="btn-generate-notes"
                 onClick={() => handleGenerate()}
                 disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 text-white bg-[#c94731] hover:bg-[#b83d28] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm hover:shadow-md active:scale-[0.985]">
+                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 text-white bg-[#A78BE0] hover:bg-[#9070CC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm hover:shadow-md active:scale-[0.985]">
                 {generating && !webSearchStatus ? (
                   <><Loader2 size={14} className="spinner" /> Generating…</>
                 ) : (
@@ -635,11 +637,11 @@ export default function StudioPage() {
                 id="btn-generate-websearch"
                 onClick={() => handleWebSearchGenerate()}
                 disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 border border-[#4f6e7d]/30 text-[#2c2c2c] bg-[#f5f1f2] hover:bg-[#4f6e7d]/15 hover:border-[#4f6e7d]/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.985]">
+                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 border border-[#8B8A93]/30 text-[#1C1C1E] bg-[#EEECF1] hover:bg-[#8B8A93]/15 hover:border-[#8B8A93]/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.985]">
                 {generating && webSearchStatus ? (
                   <><Loader2 size={14} className="spinner" /> Searching…</>
                 ) : (
-                  <><Search size={14} className="text-[#4f6e7d]" /> Web Search</>
+                  <><Search size={14} className="text-[#8B8A93]" /> Web Search</>
                 )}
               </button>
             </div>
@@ -647,12 +649,12 @@ export default function StudioPage() {
 
           {/* CARD 2: Post Configuration */}
           <div
-            className={`bg-white rounded-3xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 border border-[#4f6e7d]/15 shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
-            style={getEntranceStyle(140)}
+            className={`rounded-3xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 border shadow-[0_8px_30px_rgba(214,236,114,0.12)] transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
+            style={{ background: 'linear-gradient(135deg, rgba(214,236,114,0.18) 0%, rgba(255,255,255,0.96) 100%)', borderColor: 'rgba(214,236,114,0.40)', ...getEntranceStyle(140) }}
           >
-            <div className="flex items-center justify-between border-b border-[#4f6e7d]/10 pb-2.5">
-              <h3 className="text-xs font-bold text-[#2c2c2c] uppercase tracking-wider flex items-center gap-2">
-                <Zap size={13} className="text-[#c94731]" /> Post Configuration & Format
+            <div className="flex items-center justify-between border-b border-[#8B8A93]/10 pb-2.5">
+              <h3 className="text-xs font-bold text-[#1C1C1E] uppercase tracking-wider flex items-center gap-2">
+                <Zap size={13} className="text-[#A78BE0]" /> Post Configuration & Format
               </h3>
             </div>
 
@@ -660,68 +662,68 @@ export default function StudioPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Pillar Dropdown */}
               <div className="flex flex-col space-y-1">
-                <label className="text-[11px] font-bold text-[#2c2c2c]">Pillar Strategy:</label>
+                <label className="text-[11px] font-bold text-[#1C1C1E]">Pillar Strategy:</label>
                 <div className="relative">
                   <select
                     value={selectedPostTypeId}
                     onChange={e => setSelectedPostTypeId(e.target.value)}
-                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-xs text-[#2c2c2c] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 hover:border-[#4f6e7d]/50 transition-all">
-                    <option value="" className="bg-white text-[#2c2c2c]">— Select Pillar —</option>
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all">
+                    <option value="" className="bg-white text-[#1C1C1E]">— Select Pillar —</option>
                     {ruleList.map(r => (
-                      <option key={r.id} value={r.id} className="bg-white text-[#2c2c2c]">
+                      <option key={r.id} value={r.id} className="bg-white text-[#1C1C1E]">
                         {r.name} {r.is_hybrid ? ' (Merged)' : ''}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#4f6e7d]" />
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8B8A93]" />
                 </div>
               </div>
 
               {/* Format Dropdown */}
               <div className="flex flex-col space-y-1">
-                <label className="text-[11px] font-bold text-[#2c2c2c]">Output Format:</label>
+                <label className="text-[11px] font-bold text-[#1C1C1E]">Output Format:</label>
                 <div className="relative">
                   <select
                     value={postFormat}
                     onChange={e => setPostFormat(e.target.value as any)}
-                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-xs text-[#2c2c2c] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 hover:border-[#4f6e7d]/50 transition-all">
-                    <option value="text_post" className="bg-white text-[#2c2c2c]">Text Post (600–1,200 chars)</option>
-                    <option value="image_post" className="bg-white text-[#2c2c2c]">Image Post (900–1,500 chars)</option>
-                    <option value="carousel" className="bg-white text-[#2c2c2c]">Carousel (1,200–1,500 chars)</option>
-                    <option value="video_post" className="bg-white text-[#2c2c2c]">Video Post (500–800 chars)</option>
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all">
+                    <option value="text_post" className="bg-white text-[#1C1C1E]">Text Post (600–1,200 chars)</option>
+                    <option value="image_post" className="bg-white text-[#1C1C1E]">Image Post (900–1,500 chars)</option>
+                    <option value="carousel" className="bg-white text-[#1C1C1E]">Carousel (1,200–1,500 chars)</option>
+                    <option value="video_post" className="bg-white text-[#1C1C1E]">Video Post (500–800 chars)</option>
                   </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#4f6e7d]" />
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8B8A93]" />
                 </div>
               </div>
 
               {/* Target Date Picker */}
               <div className="flex flex-col space-y-1">
-                <label className="text-[11px] font-bold text-[#2c2c2c]">Target Schedule Date:</label>
+                <label className="text-[11px] font-bold text-[#1C1C1E]">Target Schedule Date:</label>
                 <input
                   type="date"
                   value={postDate}
                   onChange={e => setPostDate(e.target.value)}
-                  className="h-9 px-3 rounded-xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-xs text-[#2c2c2c] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 hover:border-[#4f6e7d]/50 transition-all"
+                  className="h-9 px-3 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-xs text-[#1C1C1E] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all"
                 />
               </div>
             </div>
 
             {/* Inline Quota Exceeded Confirmation Banner */}
             {inlineQuotaConfirm?.open && selectedQuota && (
-              <div className="p-3 rounded-2xl border border-[#c94731]/30 bg-[#c94731]/10 text-[#2c2c2c] text-xs flex flex-col gap-2 animate-fade-in">
+              <div className="p-3 rounded-2xl border border-[#A78BE0]/30 bg-[#A78BE0]/10 text-[#1C1C1E] text-xs flex flex-col gap-2 animate-fade-in">
                 <div className="flex items-start gap-2.5">
-                  <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-[#c94731]" />
+                  <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-[#A78BE0]" />
                   <div>
-                    <p className="font-bold text-[#2c2c2c] text-xs">Weekly Goal Reached for &quot;{selectedQuota.name}&quot;</p>
-                    <p className="text-[11px] text-[#4f6e7d] mt-0.5">
+                    <p className="font-bold text-[#1C1C1E] text-xs">Weekly Goal Reached for &quot;{selectedQuota.name}&quot;</p>
+                    <p className="text-[11px] text-[#8B8A93] mt-0.5">
                       You have already saved {selectedQuota.used_this_week} of {selectedQuota.target_count} target posts. Do you still want to generate an extra post?
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#c94731]/20">
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#A78BE0]/20">
                   <button
                     onClick={() => setInlineQuotaConfirm(null)}
-                    className="px-3 py-1 rounded-lg text-[11px] font-semibold border border-[#4f6e7d]/30 text-[#4f6e7d] hover:bg-white cursor-pointer">
+                    className="px-3 py-1 rounded-lg text-[11px] font-semibold border border-[#8B8A93]/30 text-[#8B8A93] hover:bg-white cursor-pointer">
                     Cancel
                   </button>
                   <button
@@ -734,7 +736,7 @@ export default function StudioPage() {
                         handleWebSearchGenerate(true);
                       }
                     }}
-                    className="px-3 py-1 rounded-lg text-[11px] font-bold bg-[#c94731] text-white shadow-sm hover:bg-[#b83d28] cursor-pointer">
+                    className="px-3 py-1 rounded-lg text-[11px] font-bold bg-[#A78BE0] text-white shadow-sm hover:bg-[#9070CC] cursor-pointer">
                     Yes, Generate Anyway
                   </button>
                 </div>
@@ -748,12 +750,12 @@ export default function StudioPage() {
 
       {/* Repeat warning */}
       {repeatWarning && (
-        <div className="flex items-start gap-3 p-3.5 rounded-2xl border border-[#c94731]/30 bg-white text-[#2c2c2c] shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-200">
-          <AlertTriangle size={17} className="text-[#c94731] flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-3.5 rounded-2xl border border-[#A78BE0]/30 bg-white text-[#1C1C1E] shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-200">
+          <AlertTriangle size={17} className="text-[#A78BE0] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs font-bold text-[#c94731]">Similar topic detected</p>
-            <p className="text-xs mt-0.5 text-[#4f6e7d]">{repeatWarning}</p>
-            <p className="text-[11px] mt-1 text-[#4f6e7d]/80">You can still proceed — this is non-blocking.</p>
+            <p className="text-xs font-bold text-[#A78BE0]">Similar topic detected</p>
+            <p className="text-xs mt-0.5 text-[#8B8A93]">{repeatWarning}</p>
+            <p className="text-[11px] mt-1 text-[#8B8A93]/80">You can still proceed — this is non-blocking.</p>
           </div>
         </div>
       )}
@@ -761,16 +763,16 @@ export default function StudioPage() {
       {/* Bottom Section: 3-Column Generated Output Preview Grid (Intellecta Card Style) */}
       {(hasOutput || generating) && (
         <div
-          className={`bg-white rounded-3xl p-5 space-y-5 border border-[#4f6e7d]/15 shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-300 ${isLoaded ? 'animate-studio-settle' : ''}`}
-          style={getEntranceStyle(300)}>
+          className={`rounded-3xl p-5 space-y-5 border shadow-[0_8px_30px_rgba(187,178,245,0.10)] transition-all duration-300 ${isLoaded ? 'animate-studio-settle' : ''}`}
+          style={{ background: 'linear-gradient(145deg, rgba(187,178,245,0.09) 0%, rgba(255,255,255,0.96) 100%)', borderColor: 'rgba(187,178,245,0.22)', ...getEntranceStyle(300) }}>
 
-          <div className="flex items-center justify-between border-b border-[#4f6e7d]/10 pb-3">
+          <div className="flex items-center justify-between border-b border-[#8B8A93]/10 pb-3">
             <div>
-              <h2 className="text-base font-bold text-[#2c2c2c] flex items-center gap-2">
-                <Sparkles size={17} className="text-[#c94731]" />
+              <h2 className="text-base font-bold text-[#1C1C1E] flex items-center gap-2">
+                <Sparkles size={17} className="text-[#A78BE0]" />
                 Generated Post Angles
               </h2>
-              <p className="text-xs text-[#4f6e7d] mt-0.5">
+              <p className="text-xs text-[#8B8A93] mt-0.5">
                 Compare all 3 generated options side-by-side. Edit sections directly or save your preferred version to Drafts.
               </p>
             </div>
@@ -778,20 +780,20 @@ export default function StudioPage() {
             {versions.length > 0 && (
               <button
                 onClick={() => { setVersions([]); setEditedSectionsMap({}); showToast('Discarded generated posts.', 'info'); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#c94731]/30 text-[#c94731] hover:bg-[#c94731]/10 active:scale-[0.98] cursor-pointer">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#A78BE0]/30 text-[#A78BE0] hover:bg-[#A78BE0]/10 active:scale-[0.98] cursor-pointer">
                 <Trash2 size={13} /> Discard All
               </button>
             )}
           </div>
 
           {generating ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-[#4f6e7d]/15 py-12 bg-[#f5f1f2]">
-              <Loader2 size={32} className="spinner text-[#c94731]" />
-              <p className="text-xs font-semibold text-[#2c2c2c] mt-3">
-                {webSearchStatus ?? 'Generating 3 unique post versions…'}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-[#8B8A93]/15 py-12 bg-[#EEECF1]">
+              <Loader2 size={32} className="spinner text-[#A78BE0]" />
+              <p className="text-xs font-semibold text-[#1C1C1E] mt-3">
+                Generating post...
               </p>
-              <p className="text-[11px] text-[#4f6e7d] mt-1">
-                {webSearchStatus ? 'Tavily → Gemini pipeline running' : 'Gemini is crafting 3 distinct hooks and structural frameworks'}
+              <p className="text-[11px] text-[#8B8A93] mt-1">
+                Crafting 3 distinct post versions
               </p>
             </div>
           ) : (
@@ -802,23 +804,31 @@ export default function StudioPage() {
                 const isCopied = copiedVersionIdx === vIdx;
                 const isSaved = savedVersionIdx === vIdx;
 
-                return (
-                  <div key={vIdx} className="flex flex-col rounded-2xl border border-[#4f6e7d]/15 bg-[#f5f1f2] p-4 space-y-3 shadow-2xs hover:border-[#c94731]/40 transition-all duration-200">
+                  return (
+                  <div key={vIdx} className="flex flex-col rounded-2xl border p-4 space-y-3 shadow-2xs transition-all duration-200"
+                    style={{
+                      background: vIdx === 0
+                        ? 'linear-gradient(135deg, rgba(187,178,245,0.12) 0%, rgba(238,236,241,0.90) 100%)'
+                        : vIdx === 1
+                          ? 'linear-gradient(135deg, rgba(214,236,114,0.11) 0%, rgba(238,236,241,0.88) 100%)'
+                          : 'linear-gradient(135deg, rgba(210,212,218,0.14) 0%, rgba(238,236,241,0.90) 100%)',
+                      borderColor: vIdx === 0 ? 'rgba(187,178,245,0.30)' : vIdx === 1 ? 'rgba(214,236,114,0.35)' : 'rgba(210,212,218,0.35)'
+                    }}>
 
                     {/* Version Column Header */}
-                    <div className="flex items-center justify-between pb-2.5 border-b border-[#4f6e7d]/15">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-[#8B8A93]/15">
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-2xs bg-[#c94731]">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-2xs bg-[#A78BE0]">
                           Version {ver.version}
                         </span>
-                        <span className="text-[11px] font-semibold text-[#4f6e7d]">
+                        <span className="text-[11px] font-semibold text-[#8B8A93]">
                           {charCount} chars
                         </span>
                       </div>
 
                       <button
                         onClick={() => handleCopyFullPost(vIdx)}
-                        className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${isCopied ? 'border-[#4f6e7d] text-[#4f6e7d] bg-white' : 'border-[#c94731] text-[#c94731] hover:bg-[#c94731]/10'
+                        className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${isCopied ? 'border-[#8B8A93] text-[#8B8A93] bg-white' : 'border-[#A78BE0] text-[#A78BE0] hover:bg-[#A78BE0]/10'
                           }`}>
                         <Copy size={12} />
                         {isCopied ? 'Copied!' : 'Copy'}
@@ -833,17 +843,17 @@ export default function StudioPage() {
                         const isRegen = regeneratingSection === isRegenKey;
 
                         return (
-                          <div key={section.id} className="rounded-xl border border-[#4f6e7d]/15 bg-white overflow-hidden shadow-2xs">
-                            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#4f6e7d]/10 bg-[#f5f1f2]">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#c94731]">
+                          <div key={section.id} className="rounded-xl border border-[#8B8A93]/15 bg-white overflow-hidden shadow-2xs">
+                            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#8B8A93]/10 bg-[#EEECF1]">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#A78BE0]">
                                 {section.section_name}
                               </span>
                               <button
                                 onClick={() => handleRegenerateSection(section.id, section.section_name, vIdx)}
                                 disabled={isRegen}
                                 title="Regenerate this section only"
-                                className="p-1 rounded-full text-[#4f6e7d] hover:text-[#2c2c2c] hover:bg-white transition-colors cursor-pointer">
-                                {isRegen ? <Loader2 size={12} className="spinner text-[#c94731]" /> : <RefreshCw size={12} />}
+                                className="p-1 rounded-full text-[#8B8A93] hover:text-[#1C1C1E] hover:bg-white transition-colors cursor-pointer">
+                                {isRegen ? <Loader2 size={12} className="spinner text-[#A78BE0]" /> : <RefreshCw size={12} />}
                               </button>
                             </div>
                             <textarea
@@ -854,7 +864,7 @@ export default function StudioPage() {
                                 e.target.style.height = 'auto';
                                 e.target.style.height = `${Math.max(50, e.target.scrollHeight)}px`;
                               }}
-                              className="section-textarea w-full px-3 py-2 bg-white text-xs text-[#2c2c2c] resize-none focus:outline-none focus:ring-1 focus:ring-[#c94731]/40 leading-relaxed block transition-colors font-sans"
+                              className="section-textarea w-full px-3 py-2 bg-white text-xs text-[#1C1C1E] resize-none focus:outline-none focus:ring-1 focus:ring-[#A78BE0]/40 leading-relaxed block transition-colors font-sans"
                               style={{ height: 'auto', minHeight: '50px', overflow: 'hidden' }}
                             />
                           </div>
@@ -863,32 +873,32 @@ export default function StudioPage() {
 
                       {/* Visual suggestion */}
                       {ver.visualSuggestion && (
-                        <div className="px-3 py-2 rounded-xl border border-[#4f6e7d]/20 bg-white">
+                        <div className="px-3 py-2 rounded-xl border border-[#8B8A93]/20 bg-white">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <Image size={12} className="text-[#4f6e7d]" />
-                            <span className="text-[11px] font-semibold text-[#4f6e7d]">Visual Suggestion</span>
+                            <Image size={12} className="text-[#8B8A93]" />
+                            <span className="text-[11px] font-semibold text-[#8B8A93]">Visual Suggestion</span>
                           </div>
-                          <p className="text-[11px] text-[#2c2c2c] leading-relaxed">{ver.visualSuggestion}</p>
+                          <p className="text-[11px] text-[#1C1C1E] leading-relaxed">{ver.visualSuggestion}</p>
                         </div>
                       )}
 
                       {/* Resources */}
                       {ver.resources && ver.resources.length > 0 && (
-                        <div className="px-3 py-2 rounded-xl border border-[#4f6e7d]/20 bg-white">
+                        <div className="px-3 py-2 rounded-xl border border-[#8B8A93]/20 bg-white">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <BookOpen size={12} className="text-[#4f6e7d]" />
-                            <span className="text-[11px] font-semibold text-[#4f6e7d]">References</span>
+                            <BookOpen size={12} className="text-[#8B8A93]" />
+                            <span className="text-[11px] font-semibold text-[#8B8A93]">References</span>
                           </div>
                           <div className="space-y-0.5">
                             {ver.resources.map((resItem, idx) => {
                               const urlMatch = resItem.match(/https?:\/\/[^\s\)]+/);
                               const targetUrl = urlMatch ? urlMatch[0] : (resItem.startsWith('http') ? resItem : null);
                               return (
-                                <div key={idx} className="flex items-start gap-1.5 text-[10px] text-[#4f6e7d]">
+                                <div key={idx} className="flex items-start gap-1.5 text-[10px] text-[#8B8A93]">
                                   <span className="text-[8px] mt-0.5">•</span>
                                   {targetUrl ? (
                                     <a href={targetUrl} target="_blank" rel="noopener noreferrer"
-                                      className="underline hover:text-[#2c2c2c] transition-colors flex items-center gap-1 break-all">
+                                      className="underline hover:text-[#1C1C1E] transition-colors flex items-center gap-1 break-all">
                                       {resItem}
                                       <ExternalLink size={9} className="inline flex-shrink-0" />
                                     </a>
@@ -904,10 +914,10 @@ export default function StudioPage() {
                     </div>
 
                     {/* Version Save & Format Buttons */}
-                    <div className="pt-2 border-t border-[#4f6e7d]/15 flex items-center gap-2">
+                    <div className="pt-2 border-t border-[#8B8A93]/15 flex items-center gap-2">
                       <button
                         onClick={() => handleSaveEdits(vIdx)}
-                        className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer bg-[#c94731] text-white hover:bg-[#b83d28]">
+                        className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer bg-[#A78BE0] text-white hover:bg-[#9070CC]">
                         {isSaved ? (
                           <><CheckCircle size={13} /> Saved!</>
                         ) : (
@@ -917,7 +927,7 @@ export default function StudioPage() {
 
                       <button
                         onClick={() => handleFormatPost(vIdx)}
-                        className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer border border-[#4f6e7d]/30 text-[#4f6e7d] hover:bg-[#4f6e7d]/10 bg-white">
+                        className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer border border-[#8B8A93]/30 text-[#8B8A93] hover:bg-[#8B8A93]/10 bg-white">
                         <Type size={13} /> Format Post
                       </button>
                     </div>
@@ -931,3 +941,5 @@ export default function StudioPage() {
     </div>
   );
 }
+
+

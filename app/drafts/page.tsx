@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
-import { FileText, Trash2, Copy, Loader2, Sparkles, Save, Check, Calendar } from 'lucide-react';
+import { FileText, Trash2, Copy, Loader2, Sparkles, Save, Check, Calendar, Type } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface PostVersion {
   version: number;
@@ -45,6 +46,7 @@ const extractUnifiedText = (sections: Record<string, string>): string => {
 };
 
 export default function DraftsPage() {
+  const router = useRouter();
   const { show: showToast, ToastEl } = useToast();
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,19 @@ export default function DraftsPage() {
   const [savingIds, setSavingIds] = useState<Record<string, boolean>>({});
   const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleFormatDraft = (post: PostItem) => {
+    const activeVer = post.versions[post.selected_version || 0] || post.versions[0];
+    const textToFormat = editedTexts[post.id] !== undefined
+      ? editedTexts[post.id]
+      : extractUnifiedText(activeVer?.sections || {});
+
+    try {
+      sessionStorage.setItem('format_input_text', textToFormat);
+      sessionStorage.setItem('format_draft_id', post.id);
+    } catch { }
+    router.push(`/formatter?draftId=${post.id}`);
+  };
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -199,27 +214,22 @@ export default function DraftsPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#c94731] text-white shadow-sm">
-            <FileText size={20} />
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2C2C2C]">
+              <span>Saved</span> <span className="font-serif-italic font-normal">Drafts</span>
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8B8A93]/10 text-[#8B8A93] border border-[#8B8A93]/20">
+              {posts.length} saved
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2c2c2c]">
-                <span>Saved</span> <span className="font-serif-italic text-[#c94731] font-normal">Drafts</span>
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#4f6e7d]/10 text-[#4f6e7d] border border-[#4f6e7d]/20">
-                {posts.length} saved
-              </span>
-            </div>
-            <p className="text-xs text-[#4f6e7d] mt-0.5">
-              Your generated posts saved as drafts. Edit text directly in unified scrollable cards.
-            </p>
-          </div>
+          <p className="text-xs text-[#8B8A93] mt-0.5">
+            Your generated posts saved as drafts. Edit text directly in unified scrollable cards.
+          </p>
         </div>
 
         <Link href="/"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-[#c94731] text-white hover:bg-[#b83d28] shadow-sm">
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-[#A78BE0] text-white hover:bg-[#9070CC] shadow-sm">
           <Sparkles size={14} /> Open Studio
         </Link>
       </div>
@@ -358,6 +368,12 @@ export default function DraftsPage() {
                       <Copy size={13} /> Copy Text
                     </button>
 
+                    <button onClick={() => handleFormatDraft(post)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-[#8B8A93]/15 text-[#8B8A93] border border-[#8B8A93]/30 hover:bg-[#8B8A93]/25"
+                      title="Open and format this draft in LinkedIn Formatter">
+                      <Type size={13} /> Format Draft
+                    </button>
+
                     {isModified && (
                       <button onClick={() => handleSaveDraft(post)}
                         disabled={isSaving}
@@ -410,5 +426,7 @@ export default function DraftsPage() {
     </div>
   );
 }
+
+
 
 
