@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
-import { Sparkles, Loader2, CheckCircle2, XCircle, FileText, Database, BookOpen, GitMerge, Replace, ShieldCheck, Check, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, FileText, Database, BookOpen, GitMerge, Replace, ShieldCheck, Check, AlertTriangle } from 'lucide-react';
 
 interface ReviewItem {
   id: string;
@@ -217,7 +217,6 @@ export default function IngestPage() {
                   </>
                 ) : (
                   <>
-                    <Sparkles size={15} />
                     Extract Strategy
                   </>
                 )}
@@ -250,7 +249,7 @@ export default function IngestPage() {
 
               {/* SECTION 1: Clean Summary (Read-Only Outline) */}
               {cleanSummary && (
-                <div className="p-6 rounded-3xl border border-[#8B8A93]/20 bg-white space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
+                <div className="mosaic-card p-6 space-y-3">
                   <div className="flex items-center justify-between border-b border-[#8B8A93]/15 pb-3">
                     <div className="flex items-center gap-2">
                       <BookOpen size={18} className="text-[#8B8A93]" />
@@ -270,7 +269,7 @@ export default function IngestPage() {
               )}
 
               {/* Dynamic Global Summary Counter */}
-              <div className="px-5 py-3.5 rounded-2xl border border-[#8B8A93]/20 bg-white flex items-center justify-between shadow-xs">
+              <div className="inner-card px-5 py-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Database size={15} className="text-[#A78BE0]" />
                   <span className="text-xs font-bold text-[#1C1C1E]">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useToast } from '@/components/Toast';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, Sparkles, X, FileText, BookOpen } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, X, FileText, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
 interface CalendarItem {
@@ -349,28 +349,30 @@ export default function CalendarPage() {
 
         <Link href="/strategy"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-white border border-[#8B8A93]/20 text-[#1C1C1E] hover:bg-[#EEECF1]">
-          <Sparkles size={13} className="text-[#A78BE0]" /> Strategy & Quotas
+          Strategy & Quotas
         </Link>
       </div>
 
-      {/* Weekday Labels Header */}
-      <div className="grid grid-cols-7 gap-2 mb-2 text-center shrink-0">
-        {WEEKDAYS.map((day, idx) => (
-          <div key={day} className="text-[11px] font-bold uppercase tracking-wider py-0.5"
-            style={{ color: idx === 0 || idx === 1 ? 'var(--accent)' : 'var(--text-muted)' }}>
-            {day}
-          </div>
-        ))}
-      </div>
-
-      {/* Monthly Grid driven by aspect-square per cell */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--text-muted)' }}>
-          <Loader2 size={28} className="spinner" />
-          <p className="text-sm font-medium">Loading calendar schedule...</p>
+      {/* Main Glassmorphic Parent Container */}
+      <div className="mosaic-card p-6">
+        {/* Weekday Labels Header */}
+        <div className="grid grid-cols-7 gap-2 mb-3 text-center shrink-0">
+          {WEEKDAYS.map((day, idx) => (
+            <div key={day} className="text-[11px] font-bold uppercase tracking-wider py-0.5"
+              style={{ color: idx === 0 || idx === 1 ? 'var(--accent)' : 'var(--text-muted)' }}>
+              {day}
+            </div>
+          ))}
         </div>
-      ) : (
-        <div ref={gridRef} className="grid grid-cols-7 gap-2 w-full">
+
+        {/* Monthly Grid driven by aspect-square per cell */}
+        {loading ? (
+          <div className="py-20 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--text-muted)' }}>
+            <Loader2 size={28} className="spinner" />
+            <p className="text-sm font-medium">Loading calendar schedule...</p>
+          </div>
+        ) : (
+          <div ref={gridRef} className="grid grid-cols-7 gap-2 w-full">
           {gridDays.map((cell, idx) => {
             if (!cell) {
               return (
@@ -559,6 +561,7 @@ export default function CalendarPage() {
           })}
         </div>
       )}
+      </div>
 
       {/* ── Pop-Up Modal Overlay for Selected Date Event ────────────────── */}
       {selectedDayEvent && (

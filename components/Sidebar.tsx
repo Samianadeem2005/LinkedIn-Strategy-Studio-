@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
-  Zap,
   Settings,
   LayoutGrid,
   Calendar,
@@ -36,9 +35,9 @@ const navGroups: NavGroupItem[] = [
   {
     href: '/',
     label: 'Studio',
-    icon: Zap,
+    icon: Sparkles,
     subpages: [
-      { href: '/', label: 'Studio Creator', icon: Zap },
+      { href: '/', label: 'Studio Creator', icon: Sparkles },
       { href: '/formatter', label: 'Text Formatter', icon: Type },
     ],
   },

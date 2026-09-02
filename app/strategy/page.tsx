@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { LayoutGrid, Save, Loader2, Plus, Trash2, X, Sparkles, Layers } from 'lucide-react';
+import { LayoutGrid, Save, Loader2, Plus, Trash2, X, Check, Layers } from 'lucide-react';
 
 interface PillarRule {
   id: string;
@@ -320,7 +320,7 @@ export default function StrategyPage() {
                       <input type="checkbox" checked={isChecked} onChange={() => { }} className="hidden" />
                       <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isChecked ? 'bg-purple-600 border-purple-500' : 'border-gray-600'
                         }`}>
-                        {isChecked && <Sparkles size={10} className="text-white" />}
+                        {isChecked && <Check size={10} className="text-white" />}
                       </div>
                       <span className="text-xs font-semibold" style={{ color: isChecked ? 'var(--accent)' : 'var(--text-primary)' }}>
                         {pt.name}
@@ -372,7 +372,7 @@ export default function StrategyPage() {
               <button onClick={handleCreateRule} disabled={creatingRule}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold shadow-sm"
                 style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 2px 10px rgba(108,99,255,0.3)' }}>
-                {creatingRule ? <Loader2 size={13} className="spinner" /> : <Sparkles size={13} />}
+                {creatingRule ? <Loader2 size={13} className="spinner" /> : null}
                 Save Pillar Rule
               </button>
             </div>

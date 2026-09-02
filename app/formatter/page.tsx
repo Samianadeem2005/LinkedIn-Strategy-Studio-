@@ -416,7 +416,7 @@ export default function FormatterPage() {
 
   return (
     <div
-      className="min-h-screen w-full bg-[#EEECF1] text-[#1C1C1E] p-6 max-w-7xl mx-auto font-sans"
+      className="min-h-screen w-full bg-transparent text-[#1C1C1E] p-6 max-w-7xl mx-auto font-sans animate-fade-in"
     >
       {ToastEl}
 
@@ -437,11 +437,13 @@ export default function FormatterPage() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             gap: '0',
-            border: '1px solid rgba(139, 138, 147, 0.20)',
-            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.70)',
+            borderRadius: '24px',
             overflow: 'hidden',
-            backgroundColor: '#ffffff',
-            boxShadow: '0 4px 20px rgba(28, 28, 30, 0.04)',
+            backgroundColor: 'rgba(255, 255, 255, 0.89)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.8), 0 10px 30px -5px rgba(0, 0, 0, 0.03)',
             marginBottom: '48px'
           }}
         >

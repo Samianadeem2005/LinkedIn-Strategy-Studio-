@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { Zap, ChevronDown, AlertTriangle, Save, CheckCircle, RefreshCw, Image, Loader2, BookOpen, Sparkles, Search, Trash2, ExternalLink, Copy, Type } from 'lucide-react';
+import { ChevronDown, AlertTriangle, Save, CheckCircle, RefreshCw, Image, Loader2, BookOpen, Search, Trash2, ExternalLink, Copy, Type } from 'lucide-react';
 
 interface PostVersion {
   version: number;
@@ -497,7 +497,7 @@ export default function StudioPage() {
   const hasOutput = versions.length > 0;
 
   return (
-    <div className="min-h-screen bg-[#E4E1E8] text-[#2C2C2C] p-6 space-y-8 max-w-7xl mx-auto w-full">
+    <div className="min-h-screen text-[#2C2C2C] p-6 space-y-8 max-w-7xl mx-auto w-full">
       {ToastEl}
 
       {/* Top Section: Mosaic 2-Column Bento Grid */}
@@ -505,17 +505,17 @@ export default function StudioPage() {
 
         {/* LEFT COLUMN: Vertical Weekly Pillar Schedule (3 cols on desktop) */}
         <div
-          className={`lg:col-span-3 mosaic-card p-5 flex flex-col justify-between space-y-4 ${isLoaded ? 'animate-panel-settle' : ''}`}
+          className={`lg:col-span-3 mosaic-card p-5 flex flex-col justify-between space-y-4 rounded-3xl backdrop-blur-xl border transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
           style={{
-            background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(238,236,241,0.90) 100%)',
-            borderColor: 'rgba(187,178,245,0.30)',
-            boxShadow: '0 4px 20px rgba(100,80,160,0.06)',
+            background: 'rgba(255, 255, 255, 0.88)',
+            borderColor: 'rgba(255, 255, 255, 0.80)',
+            boxShadow: '0 8px 32px rgba(100, 80, 160, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
             ...getEntranceStyle(40)
           }}
         >
           <div className="flex items-center justify-between border-b border-[#8B8A93]/15 pb-3">
             <span className="text-xs font-bold text-[#2C2C2C] uppercase tracking-wider flex items-center gap-1.5">
-              <Zap size={13} className="text-[#A78BE0]" /> Weekly Schedule
+              Weekly Schedule
             </span>
           </div>
 
@@ -524,10 +524,10 @@ export default function StudioPage() {
             {weeklySchedule.map((item, idx) => {
               const savedForDay = daySavedMap[item.dayName];
               const tintStyle = idx % 3 === 0
-                ? item.isToday || item.isSelected ? 'border-[#BBB2F5] bg-[#BBB2F5]/30 font-bold' : 'border-[#BBB2F5]/60 bg-[#BBB2F5]/15 hover:bg-[#BBB2F5]/25'
+                ? item.isToday || item.isSelected ? 'border-[#BBB2F5] bg-[#BBB2F5]/30 font-bold shadow-xs' : 'border-[#BBB2F5]/40 bg-white hover:bg-[#BBB2F5]/10 shadow-2xs'
                 : idx % 3 === 1
-                  ? item.isToday || item.isSelected ? 'border-[#D6EC72] bg-[#D6EC72]/35 font-bold' : 'border-[#D6EC72]/70 bg-[#D6EC72]/20 hover:bg-[#D6EC72]/30'
-                  : item.isToday || item.isSelected ? 'border-[#D2D4DA] bg-[#D2D4DA]/40 font-bold' : 'border-[#D2D4DA]/60 bg-[#D2D4DA]/20 hover:bg-[#D2D4DA]/30';
+                  ? item.isToday || item.isSelected ? 'border-[#D6EC72] bg-[#D6EC72]/35 font-bold shadow-xs' : 'border-[#95b32b]/40 bg-white hover:bg-[#D6EC72]/15 shadow-2xs'
+                  : item.isToday || item.isSelected ? 'border-[#D2D4DA] bg-[#D2D4DA]/40 font-bold shadow-xs' : 'border-[#D2D4DA]/40 bg-white hover:bg-[#D2D4DA]/15 shadow-2xs';
 
               return (
                 <div
@@ -536,7 +536,7 @@ export default function StudioPage() {
                     const targetDateStr = getDateForDayOfWeek(item.dayName);
                     setPostDate(targetDateStr);
                   }}
-                  className={`h-9 px-3.5 rounded-2xl border text-xs flex items-center justify-between transition-all duration-200 cursor-pointer text-[#2C2C2C] shadow-2xs ${tintStyle}`}>
+                  className={`h-9 px-3.5 rounded-2xl border text-xs flex items-center justify-between transition-all duration-200 cursor-pointer text-[#2C2C2C] ${tintStyle}`}>
                   <div className="flex items-center gap-2 min-w-0 font-semibold">
                     {item.isToday ? (
                       <span className="w-2 h-2 rounded-full bg-[#A78BE0] flex-shrink-0 animate-pulse" title="Real-time Today" />
@@ -569,10 +569,11 @@ export default function StudioPage() {
 
           {/* CARD 1: Hero Creator Card */}
           <div
-            className={`mosaic-card p-6 flex flex-col justify-between space-y-5 ${isLoaded ? 'animate-panel-settle' : ''}`}
+            className={`mosaic-card p-6 flex flex-col justify-between space-y-5 rounded-3xl backdrop-blur-xl border transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
             style={{
-              background: 'linear-gradient(135deg, rgba(214,236,114,0.10) 0%, rgba(187,178,245,0.08) 60%, rgba(238,236,241,0.95) 100%)',
-              borderColor: 'rgba(187,178,245,0.22)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(245,242,252,0.86) 100%)',
+              borderColor: 'rgba(255,255,255,0.90)',
+              boxShadow: '0 8px 32px rgba(100,80,160,0.08), inset 0 1px 0 rgba(255,255,255,0.95)',
               ...getEntranceStyle(80)
             }}
           >
@@ -591,7 +592,7 @@ export default function StudioPage() {
 
             {/* Calendar Context Banner (If active) */}
             {calendarEntry && calendarEntry.date === postDate && (
-              <div className="p-3.5 rounded-xl border border-[#A78BE0]/30 bg-[#A78BE0]/5 text-xs flex items-center justify-between gap-3">
+              <div className="p-3.5 rounded-xl border border-[#A78BE0]/30 bg-white/80 backdrop-blur-md text-xs flex items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-center gap-2 min-w-0">
                   <BookOpen size={14} className="text-[#A78BE0] flex-shrink-0" />
                   <div className="truncate">
@@ -615,7 +616,7 @@ export default function StudioPage() {
                 onChange={e => setRawNotes(e.target.value)}
                 placeholder="Hi there! Paste your raw notes, article key points, or framework thoughts here..."
                 rows={4}
-                className="w-full px-3.5 py-3 rounded-2xl border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] text-xs leading-relaxed placeholder-[#8B8A93]/50 focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 focus:border-[#A78BE0] transition-all duration-200 resize-none font-sans"
+                className="w-full px-3.5 py-3 rounded-2xl border border-[#8B8A93]/20 bg-white text-[#1C1C1E] text-xs leading-relaxed placeholder-[#8B8A93]/50 focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 focus:border-[#A78BE0] transition-all duration-200 resize-none font-sans shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
               />
             </div>
 
@@ -625,11 +626,11 @@ export default function StudioPage() {
                 id="btn-generate-notes"
                 onClick={() => handleGenerate()}
                 disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 text-white bg-[#A78BE0] hover:bg-[#9070CC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm hover:shadow-md active:scale-[0.985]">
+                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 text-white bg-[#A78BE0] hover:bg-[#9070CC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md hover:shadow-lg active:scale-[0.985]">
                 {generating && !webSearchStatus ? (
                   <><Loader2 size={14} className="spinner" /> Generating…</>
                 ) : (
-                  <><Zap size={14} /> From Notes</>
+                  <>From Notes</>
                 )}
               </button>
 
@@ -637,7 +638,7 @@ export default function StudioPage() {
                 id="btn-generate-websearch"
                 onClick={() => handleWebSearchGenerate()}
                 disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 border border-[#8B8A93]/30 text-[#1C1C1E] bg-[#EEECF1] hover:bg-[#8B8A93]/15 hover:border-[#8B8A93]/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.985]">
+                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 border border-[#8B8A93]/25 text-[#1C1C1E] bg-white hover:bg-[#EEECF1] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs hover:shadow-md active:scale-[0.985]">
                 {generating && webSearchStatus ? (
                   <><Loader2 size={14} className="spinner" /> Searching…</>
                 ) : (
@@ -649,12 +650,17 @@ export default function StudioPage() {
 
           {/* CARD 2: Post Configuration */}
           <div
-            className={`rounded-3xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 border shadow-[0_8px_30px_rgba(214,236,114,0.12)] transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
-            style={{ background: 'linear-gradient(135deg, rgba(214,236,114,0.18) 0%, rgba(255,255,255,0.96) 100%)', borderColor: 'rgba(214,236,114,0.40)', ...getEntranceStyle(140) }}
+            className={`rounded-3xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 border backdrop-blur-xl transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
+            style={{
+              background: 'linear-gradient(135deg, rgba(149,179,43,0.18) 0%, rgba(255,255,255,0.92) 100%)',
+              borderColor: 'rgba(149,179,43,0.40)',
+              boxShadow: '0 8px 32px rgba(149,179,43,0.12), inset 0 1px 0 rgba(255,255,255,0.90)',
+              ...getEntranceStyle(140)
+            }}
           >
             <div className="flex items-center justify-between border-b border-[#8B8A93]/10 pb-2.5">
               <h3 className="text-xs font-bold text-[#1C1C1E] uppercase tracking-wider flex items-center gap-2">
-                <Zap size={13} className="text-[#A78BE0]" /> Post Configuration & Format
+                Post Configuration & Format
               </h3>
             </div>
 
@@ -667,7 +673,7 @@ export default function StudioPage() {
                   <select
                     value={selectedPostTypeId}
                     onChange={e => setSelectedPostTypeId(e.target.value)}
-                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all">
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-white text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
                     <option value="" className="bg-white text-[#1C1C1E]">— Select Pillar —</option>
                     {ruleList.map(r => (
                       <option key={r.id} value={r.id} className="bg-white text-[#1C1C1E]">
@@ -686,7 +692,7 @@ export default function StudioPage() {
                   <select
                     value={postFormat}
                     onChange={e => setPostFormat(e.target.value as any)}
-                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all">
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-white text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
                     <option value="text_post" className="bg-white text-[#1C1C1E]">Text Post (600–1,200 chars)</option>
                     <option value="image_post" className="bg-white text-[#1C1C1E]">Image Post (900–1,500 chars)</option>
                     <option value="carousel" className="bg-white text-[#1C1C1E]">Carousel (1,200–1,500 chars)</option>
@@ -703,7 +709,7 @@ export default function StudioPage() {
                   type="date"
                   value={postDate}
                   onChange={e => setPostDate(e.target.value)}
-                  className="h-9 px-3 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-xs text-[#1C1C1E] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all"
+                  className="h-9 px-3 rounded-xl border border-[#8B8A93]/20 bg-white text-xs text-[#1C1C1E] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
                 />
               </div>
             </div>
@@ -768,13 +774,9 @@ export default function StudioPage() {
 
           <div className="flex items-center justify-between border-b border-[#8B8A93]/10 pb-3">
             <div>
-              <h2 className="text-base font-bold text-[#1C1C1E] flex items-center gap-2">
-                <Sparkles size={17} className="text-[#A78BE0]" />
+              <h2 className="text-base font-bold text-[#1C1C1E]">
                 Generated Post Angles
               </h2>
-              <p className="text-xs text-[#8B8A93] mt-0.5">
-                Compare all 3 generated options side-by-side. Edit sections directly or save your preferred version to Drafts.
-              </p>
             </div>
 
             {versions.length > 0 && (
@@ -804,7 +806,7 @@ export default function StudioPage() {
                 const isCopied = copiedVersionIdx === vIdx;
                 const isSaved = savedVersionIdx === vIdx;
 
-                  return (
+                return (
                   <div key={vIdx} className="flex flex-col rounded-2xl border p-4 space-y-3 shadow-2xs transition-all duration-200"
                     style={{
                       background: vIdx === 0

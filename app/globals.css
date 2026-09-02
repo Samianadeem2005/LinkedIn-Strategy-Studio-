@@ -1,22 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  /* ── New Lavender-Grey Design System ── */
-  --bg-primary: #E4E1E8;        /* Page background — slightly deeper soft lavender-grey for clear contrast */
-  --bg-surface: #FFFFFF;        /* Main content panel surface */
-  --bg-card: #FFFFFF;           /* Elevated card fill */
-  --bg-elevated: #FFFFFF;       /* Same as card */
-  --bg-input: #F0EEF5;          /* Form input fills */
+  /* ── Desaturated Pale Lavender Design System ── */
+  --bg-primary: #F8F7FC;        /* Very light desaturated pale lavender canvas background */
+  --bg-surface: rgba(255, 255, 255, 0.89);
+  /* Main glassmorphic content panel surface */
+  --bg-card: #FFFFFF;
+  /* Elevated inner card fill */
+  --bg-elevated: #FFFFFF;
+  /* Same as card */
+  --bg-input: #FFFFFF;
+  /* Form input fills */
   --bg-hover: rgba(167, 139, 224, 0.08);
 
   /* Typography */
-  --text-primary: #2C2C2C;      /* Single consistent dark text color */
-  --text-secondary: #3A3A3C;    /* Medium dark secondary */
-  --text-muted: #8B8A93;        /* Muted / timestamp text */
+  --text-primary: #2C2C2C;
+  /* Single consistent dark text color */
+  --text-secondary: #3A3A3C;
+  /* Medium dark secondary */
+  --text-muted: #8B8A93;
+  /* Muted / timestamp text */
 
   /* Violet accent (primary CTA, badges, icons) */
   --accent: #A78BE0;
-  --accent-dark: #1A1A1D;       /* Active nav fill (near-black) */
+  --accent-dark: #1A1A1D;
+  /* Active nav fill (near-black) */
   --accent-glow: rgba(167, 139, 224, 0.15);
   --accent-hover: #9070CC;
   --accent-tint: rgba(167, 139, 224, 0.10);
@@ -30,12 +38,12 @@
   --status-lavender-light: #EDE9FA;
 
   /* Borders & Shadows */
-  --border: rgba(167, 139, 224, 0.20);
-  --border-subtle: rgba(167, 139, 224, 0.12);
+  --border: rgba(255, 255, 255, 0.70);
+  --border-subtle: rgba(0, 0, 0, 0.03);
   --border-focus: rgba(167, 139, 224, 0.50);
-  --shadow-soft: 0 4px 32px rgba(100, 80, 160, 0.06);
-  --shadow-hover: 0 8px 32px rgba(100, 80, 160, 0.10);
-  --shadow-card: 0 2px 20px rgba(100, 80, 160, 0.05), 0 1px 4px rgba(100, 80, 160, 0.04);
+  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-hover: inset 0 1px 2px rgba(255, 255, 255, 0.9), 0 14px 36px -5px rgba(0, 0, 0, 0.05);
+  --shadow-card: inset 0 1px 2px rgba(255, 255, 255, 0.8), 0 10px 30px -5px rgba(0, 0, 0, 0.03);
 
   /* Legacy compat aliases */
   --slate: #8B8A93;
@@ -48,20 +56,21 @@
 }
 
 body {
-  background-color: var(--bg-primary);
+  background-color: #F8F7FC;
   color: #2C2C2C;
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Base Form Input & Textarea Rule */
+/* Base Form Input, Textarea & Select Rules for High Contrast & Prominence */
 input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
 textarea,
 select {
-  background-color: #F0EEF5 !important;
+  background-color: #FFFFFF !important;
   color: #2C2C2C !important;
   border-radius: 14px !important;
-  border: 1px solid rgba(167, 139, 224, 0.22) !important;
+  border: 1px solid rgba(0, 0, 0, 0.03) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
   transition: all 0.2s ease-in-out !important;
 }
 
@@ -70,7 +79,7 @@ textarea:focus,
 select:focus {
   outline: none !important;
   border-color: #A78BE0 !important;
-  box-shadow: 0 0 0 3px rgba(167, 139, 224, 0.18) !important;
+  box-shadow: 0 4px 14px rgba(167, 139, 224, 0.18) !important;
 }
 
 input::placeholder,
@@ -137,62 +146,122 @@ a:active {
 
 /* Keyframe Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes panelSettle {
-  from { opacity: 0; transform: translateY(10px) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes contentRise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
-.animate-slide-in-right { animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.spinner { animation: spin 0.8s linear infinite; }
-.animate-panel-settle { animation: panelSettle 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-.animate-content-rise { animation: contentRise 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
 
-/* ── Card Surface & Component Utility Classes ── */
-.mosaic-card {
+.animate-slide-in-right {
+  animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.animate-panel-settle {
+  animation: panelSettle 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.animate-content-rise {
+  animation: contentRise 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* ── Glassmorphism Parent Container & Inner Card Utility Classes ── */
+.mosaic-card,
+.glass-container,
+.parent-container,
+.glass-card {
   border-radius: 24px;
-  border: 1px solid rgba(167, 139, 224, 0.16);
-  background: #FFFFFF;
+  background: rgba(255, 255, 255, 0.89);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   overflow: hidden;
   position: relative;
-  box-shadow: var(--shadow-card);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.8), 0 10px 30px -5px rgba(0, 0, 0, 0.03);
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 
-.mosaic-card:hover {
+.mosaic-card:hover,
+.glass-container:hover,
+.parent-container:hover,
+.glass-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(167, 139, 224, 0.30);
-  box-shadow: var(--shadow-hover);
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.9), 0 14px 36px -5px rgba(0, 0, 0, 0.05);
 }
 
+.inner-card,
+.inner-pill,
+.inner-box,
 .mini-card-pill {
   border-radius: 16px;
-  background-color: rgba(167, 139, 224, 0.08);
-  border: 1px solid rgba(167, 139, 224, 0.15);
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   color: #1C1C1E;
   transition: all 0.2s ease-in-out;
 }
 
+.inner-card:hover,
+.inner-pill:hover,
+.inner-box:hover,
 .mini-card-pill:hover {
-  background-color: rgba(167, 139, 224, 0.14);
+  background-color: #FFFFFF;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
   transform: translateY(-1px);
 }
 
@@ -298,7 +367,10 @@ a:active {
 
 /* Reduced Motion Respect */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

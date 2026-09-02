@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
-import { FileText, Trash2, Copy, Loader2, Sparkles, Save, Check, Calendar, Type } from 'lucide-react';
+import { FileText, Trash2, Copy, Loader2, Save, Check, Calendar, Type } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -223,15 +223,7 @@ export default function DraftsPage() {
               {posts.length} saved
             </span>
           </div>
-          <p className="text-xs text-[#8B8A93] mt-0.5">
-            Your generated posts saved as drafts. Edit text directly in unified scrollable cards.
-          </p>
         </div>
-
-        <Link href="/"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-[#A78BE0] text-white hover:bg-[#9070CC] shadow-sm">
-          <Sparkles size={14} /> Open Studio
-        </Link>
       </div>
 
       {/* Content */}
@@ -247,12 +239,9 @@ export default function DraftsPage() {
           <h3 className="font-semibold text-base mb-1" style={{ color: 'var(--text-primary)' }}>
             No saved drafts found
           </h3>
-          <p className="text-xs max-w-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
             Generate posts in Studio and click &quot;Save to Drafts&quot; to store them here.
           </p>
-          <Link href="/" className="px-4 py-2 rounded-lg text-xs font-medium" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-            Go to Studio
-          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -269,8 +258,7 @@ export default function DraftsPage() {
             const formattedDateStr = postDate ? new Date(postDate.includes('T') ? postDate : postDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Set Date';
 
             return (
-              <div key={post.id} className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-purple-500/40"
-                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+              <div key={post.id} className="mosaic-card p-5 flex flex-col justify-between transition-all hover:border-[#A78BE0]/40">
 
                 <div>
                   {/* Badges Bar */}
@@ -280,8 +268,7 @@ export default function DraftsPage() {
                         style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
                         {post.post_type_name || 'Pillar Post'}
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium"
-                        style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white text-[#3A3A3C] border border-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
                         {formatLabel.split(' ')[0]} {formatLabel.split(' ')[1]}
                       </span>
                       <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -294,12 +281,11 @@ export default function DraftsPage() {
                       type="date"
                       value={postDate.slice(0, 10)}
                       onChange={(e) => handleDateChange(post.id, e.target.value)}
-                      className="px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all hover:bg-white/10 hover:border-purple-500/50 cursor-pointer outline-none"
+                      className="px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all hover:bg-white hover:border-purple-500/50 cursor-pointer outline-none shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
                       style={{
-                        background: 'var(--bg-elevated)',
-                        borderColor: 'var(--border)',
-                        color: 'var(--text-muted)',
-                        colorScheme: 'dark',
+                        background: '#FFFFFF',
+                        borderColor: 'rgba(0, 0, 0, 0.05)',
+                        color: 'var(--text-primary)',
                         fontSize: '11px'
                       }}
                       title="Click to change date"
@@ -323,8 +309,9 @@ export default function DraftsPage() {
                       placeholder="Draft content..."
                       className="w-full p-3.5 rounded-xl border text-xs leading-relaxed transition-all overflow-y-auto focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                       style={{
-                        background: 'var(--bg-primary)',
-                        borderColor: isModified ? 'var(--accent)' : 'var(--border-subtle)',
+                        background: '#FFFFFF',
+                        borderColor: isModified ? 'var(--accent)' : 'rgba(0, 0, 0, 0.03)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
                         color: 'var(--text-primary)',
                         resize: 'vertical',
                         minHeight: '150px',

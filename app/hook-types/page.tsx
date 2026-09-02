@@ -146,12 +146,9 @@ export default function HookTypesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] tracking-tight mb-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] tracking-tight">
             <span>Hook Types</span> <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>Bank</span>
           </h1>
-          <p className="text-sm font-medium text-[#8B8A93]">
-            Structured hook strategies, directional angles, and pillar pairings used live during AI post generation.
-          </p>
         </div>
 
         <button
@@ -227,7 +224,7 @@ export default function HookTypesPage() {
                 </div>
 
                 {/* Directional Angles List */}
-                <div className="p-4 rounded-2xl bg-[#EEECF1] border border-[#8B8A93]/15">
+                <div className="inner-card p-4">
                   <div className="text-[11px] uppercase tracking-wider font-extrabold text-[#8B8A93] mb-2.5">
                     Directional Angles ({ht.angles?.length ?? 0}):
                   </div>
@@ -304,8 +301,8 @@ export default function HookTypesPage() {
                         type="button"
                         onClick={() => togglePillar(p)}
                         className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
-                            ? 'bg-[#A78BE0] text-white border-[#A78BE0] shadow-xs'
-                            : 'bg-[#EEECF1] text-[#8B8A93] border-[#8B8A93]/20 hover:border-[#8B8A93]/40'
+                          ? 'bg-[#A78BE0] text-white border-[#A78BE0] shadow-xs'
+                          : 'bg-[#EEECF1] text-[#8B8A93] border-[#8B8A93]/20 hover:border-[#8B8A93]/40'
                           }`}
                       >
                         {isSelected && <Check size={13} />}

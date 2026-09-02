@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
-import { Sparkles, Loader2, AlertTriangle, CheckCircle, Trash2, Save, XCircle, Tag } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Trash2, Save, XCircle, Tag } from 'lucide-react';
 
 interface CalendarEntry {
   day_index: number;
@@ -167,7 +167,7 @@ export default function CalendarMakerPage() {
       </div>
 
       {/* Generator Card */}
-      <div className="rounded-3xl border border-[#8B8A93]/20 bg-white p-6 mb-8 shadow-sm">
+      <div className="mosaic-card p-6 mb-8">
         
         <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-[#8B8A93]">
           Raw Strategy Dump / Content Notes
@@ -177,12 +177,11 @@ export default function CalendarMakerPage() {
           onChange={e => setRawDump(e.target.value)}
           placeholder="Paste raw notes, research summaries, video ideas, or transcript dumps here..."
           rows={6}
-          className="w-full text-sm p-4 rounded-2xl border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] mb-5 font-mono leading-relaxed transition-colors focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40"
+          className="w-full text-sm p-4 rounded-2xl border border-black/5 bg-white text-[#1C1C1E] mb-5 font-mono leading-relaxed transition-all shadow-[0_4px_12px_rgba(0,0,0,0.04)] focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40"
         />
 
         {/* Controls Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6 p-4 rounded-xl border"
-          style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+        <div className="inner-card grid grid-cols-1 md:grid-cols-2 gap-5 mb-6 p-4">
           
           {/* Start Date */}
           <div>
@@ -242,7 +241,7 @@ export default function CalendarMakerPage() {
           <button onClick={generateCalendar} disabled={generating}
             className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold disabled:opacity-50 transition-all shadow-lg"
             style={{ background: 'var(--accent)', color: 'white', boxShadow: '0 4px 20px var(--accent-glow)' }}>
-            {generating ? <><Loader2 size={16} className="spinner" /> Generating Plan ({effectiveDuration} Days)...</> : <><Sparkles size={16} /> Generate Strategy Plan</>}
+            {generating ? <><Loader2 size={16} className="spinner" /> Generating Plan ({effectiveDuration} Days)...</> : <>Generate Strategy Plan</>}
           </button>
         </div>
       </div>

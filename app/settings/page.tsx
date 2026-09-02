@@ -8,7 +8,7 @@ import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import TagInput from '@/components/TagInput';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Settings, Plus, Pencil, Trash2, GripVertical, ChevronDown, Save, Loader2, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, GripVertical, ChevronDown, Save, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 export interface WritingMechanic {
   id: string;
@@ -674,17 +674,10 @@ function SettingsContent() {
       )}
 
       {/* Page Header */}
-      <div className="shrink-0 px-8 pt-6 pb-4">
+      <div className="shrink-0 px-8 pt-6 pb-2">
         <h1 className="font-extrabold text-xl sm:text-2xl text-[#2C2C2C] tracking-tight">
           <span>System Settings</span> <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>& Directives</span>
         </h1>
-        <p className="text-xs font-medium text-[#8B8A93] mt-1">
-          {activeTab === 'about' && 'Manage your bio & background context injected into AI generation.'}
-          {activeTab === 'pillars' && 'Configure content pillars, DOs/DON\'Ts, and visual format directives.'}
-          {activeTab === 'anatomy' && 'Define structural sections and instructions for generated post types.'}
-          {activeTab === 'tone' && 'Set formality, sentence rhythm, banned buzzwords, and simplicity parameters.'}
-          {activeTab === 'mechanics' && 'Manage strict writing mechanics and style enforcement directives.'}
-        </p>
       </div>
 
       {/* Tab Content - scrollable */}
@@ -945,7 +938,7 @@ function SettingsContent() {
                             {customizing ? (
                               <><Loader2 size={13} className="spinner" /> Customizing...</>
                             ) : (
-                              <><Sparkles size={13} /> Customize This Type</>
+                              <>Customize This Type</>
                             )}
                           </button>
                         </div>
