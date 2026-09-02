@@ -63,7 +63,7 @@ export default function DraftsPage() {
       if (res.ok) {
         const data: PostItem[] = await res.json();
         setPosts(data);
-        
+
         // Initialize edited text map
         const initialTexts: Record<string, string> = {};
         data.forEach(post => {
@@ -117,7 +117,7 @@ export default function DraftsPage() {
     try {
       const updatedVersions = [...(post.versions || [])];
       const targetIndex = post.selected_version || 0;
-      
+
       // Save all together under unified content section, completely removing anatomy labels
       updatedVersions[targetIndex] = {
         ...updatedVersions[targetIndex],
@@ -136,7 +136,7 @@ export default function DraftsPage() {
       if (res.ok) {
         showToast('Draft content saved!', 'success');
         setSavedStatus(prev => ({ ...prev, [post.id]: true }));
-        
+
         // Update local posts array
         setPosts(prev => prev.map(p => {
           if (p.id === post.id) {
@@ -178,8 +178,8 @@ export default function DraftsPage() {
 
   const handleCopyText = (post: PostItem) => {
     const activeVer = post.versions[post.selected_version || 0] || post.versions[0];
-    const currentText = editedTexts[post.id] !== undefined 
-      ? editedTexts[post.id] 
+    const currentText = editedTexts[post.id] !== undefined
+      ? editedTexts[post.id]
       : extractUnifiedText(activeVer?.sections || {});
 
     if (!currentText.trim()) {
@@ -200,27 +200,26 @@ export default function DraftsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, var(--accent), #a78bfa)', color: 'white' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#c94731] text-white shadow-sm">
             <FileText size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Drafts</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                style={{ background: 'var(--bg-elevated)', color: 'var(--accent)', border: '1px solid var(--border)' }}>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2c2c2c]">
+                <span>Saved</span> <span className="font-serif-italic text-[#c94731] font-normal">Drafts</span>
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#4f6e7d]/10 text-[#4f6e7d] border border-[#4f6e7d]/20">
                 {posts.length} saved
               </span>
             </div>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-[#4f6e7d] mt-0.5">
               Your generated posts saved as drafts. Edit text directly in unified scrollable cards.
             </p>
           </div>
         </div>
 
         <Link href="/"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
-          style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 4px 16px var(--accent-glow)' }}>
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-[#c94731] text-white hover:bg-[#b83d28] shadow-sm">
           <Sparkles size={14} /> Open Studio
         </Link>
       </div>
@@ -262,7 +261,7 @@ export default function DraftsPage() {
             return (
               <div key={post.id} className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-purple-500/40"
                 style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-                
+
                 <div>
                   {/* Badges Bar */}
                   <div className="flex items-center justify-between gap-2 mb-3">

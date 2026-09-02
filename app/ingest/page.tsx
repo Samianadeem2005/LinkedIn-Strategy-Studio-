@@ -158,28 +158,27 @@ export default function IngestPage() {
 
   const getTableBadgeStyle = (table: string) => {
     switch (table) {
-      case 'post_types': return { bg: 'rgba(167, 139, 250, 0.15)', color: '#a78bfa', label: 'Post Pillar' };
-      case 'post_anatomy': return { bg: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', label: 'Post Anatomy' };
-      case 'writing_mechanics': return { bg: 'rgba(52, 211, 153, 0.15)', color: '#34d399', label: 'Writing Mechanic' };
-      case 'hook_types': return { bg: 'rgba(251, 146, 60, 0.15)', color: '#fb923c', label: 'Hook Types' };
-      default: return { bg: 'var(--bg-hover)', color: 'var(--text-muted)', label: table };
+      case 'post_types': return { bg: 'rgba(79, 110, 125, 0.12)', color: '#4f6e7d', label: 'Post Pillar' };
+      case 'post_anatomy': return { bg: 'rgba(201, 71, 49, 0.12)', color: '#c94731', label: 'Post Anatomy' };
+      case 'writing_mechanics': return { bg: 'rgba(79, 110, 125, 0.12)', color: '#4f6e7d', label: 'Writing Mechanic' };
+      case 'hook_types': return { bg: 'rgba(201, 71, 49, 0.12)', color: '#c94731', label: 'Hook Types' };
+      default: return { bg: 'rgba(79, 110, 125, 0.12)', color: '#4f6e7d', label: table };
     }
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden animate-fade-in">
       {ToastEl}
 
       {/* Top Header */}
-      <div
-        className="flex-shrink-0 border-b px-6 py-4 flex items-center justify-between"
-        style={{ background: 'rgba(10,10,15,0.9)', borderColor: 'var(--border)', backdropFilter: 'blur(8px)' }}
-      >
+      <div className="shrink-0 border-b border-[#4f6e7d]/15 px-8 py-5 flex items-center justify-between bg-white/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <Sparkles size={18} style={{ color: 'var(--accent)' }} />
+          <div className="w-10 h-10 rounded-2xl bg-[#4f6e7d]/12 border border-[#4f6e7d]/20 flex items-center justify-center text-[#4f6e7d]">
+            <Sparkles size={20} />
+          </div>
           <div>
-            <h1 className="font-semibold text-base">Strategy Ingestion Pipeline</h1>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <h1 className="font-extrabold text-lg text-[#2c2c2c] tracking-tight">Strategy Ingestion Pipeline</h1>
+            <p className="text-xs font-medium text-[#4f6e7d]">
               Paste raw strategy articles to extract clean summaries, new pillars, anatomy rules, and hooks.
             </p>
           </div>
@@ -188,16 +187,13 @@ export default function IngestPage() {
 
       {/* Main Content Scroll Container */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-          
+        <div className="max-w-4xl mx-auto px-8 py-8 space-y-8">
+
           {/* Raw Text Input Card */}
-          <div
-            className="p-5 rounded-2xl border space-y-4"
-            style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
-          >
+          <div className="mosaic-card p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <FileText size={16} style={{ color: 'var(--accent)' }} />
-              <h2 className="font-medium text-sm">Raw Strategy Document / Article Notes</h2>
+              <FileText size={16} className="text-[#c94731]" />
+              <h2 className="font-bold text-sm text-[#2c2c2c]">Raw Strategy Document / Article Notes</h2>
             </div>
 
             <textarea
@@ -206,27 +202,18 @@ export default function IngestPage() {
               disabled={extracting}
               rows={7}
               placeholder="Paste raw strategy article, book excerpt, or LinkedIn guide here..."
-              className="w-full p-4 rounded-xl text-sm border focus:outline-none resize-none transition-all"
-              style={{
-                background: 'var(--bg-primary)',
-                borderColor: 'var(--border)',
-                color: 'var(--text-primary)'
-              }}
+              className="w-full p-4 rounded-xl text-sm border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] focus:outline-none focus:ring-2 focus:ring-[#4f6e7d]/20 focus:border-[#4f6e7d] resize-none transition-all"
             />
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs font-medium text-[#4f6e7d]">
                 {rawText.trim() ? `${rawText.trim().split(/\s+/).length} words` : '0 words'}
               </span>
 
               <button
                 onClick={extractStrategy}
                 disabled={extracting || !rawText.trim()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 shadow-lg shadow-purple-600/20"
-                style={{
-                  background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
-                  color: 'white'
-                }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#c94731] hover:bg-[#b83d28] transition-all cursor-pointer shadow-md disabled:opacity-40"
               >
                 {extracting ? (
                   <>
@@ -245,21 +232,17 @@ export default function IngestPage() {
 
           {/* Success Banner */}
           {completed && (
-            <div
-              className="p-6 rounded-2xl border text-center space-y-3"
-              style={{ background: 'rgba(34, 197, 94, 0.08)', borderColor: 'rgba(34, 197, 94, 0.3)' }}
-            >
-              <CheckCircle2 size={32} className="mx-auto" style={{ color: 'var(--success)' }} />
-              <h3 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
+            <div className="p-6 rounded-3xl border border-[#4f6e7d]/20 bg-white text-center space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
+              <CheckCircle2 size={32} className="mx-auto text-[#4f6e7d]" />
+              <h3 className="font-bold text-base text-[#2c2c2c]">
                 Strategy Integrated Live!
               </h3>
-              <p className="text-xs max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-xs text-[#4f6e7d] max-w-md mx-auto">
                 All confirmed items have been applied to your database. Studio, Settings, and Hook Bank are live-updated.
               </p>
               <button
                 onClick={() => { setRawText(''); setNewItems([]); setUpdates([]); setErrorItems([]); setDumpId(null); setCleanSummary(null); setCompleted(false); }}
-                className="px-4 py-2 rounded-lg text-xs font-medium border transition-colors hover:bg-white/5"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                className="px-4 py-2 rounded-xl text-xs font-bold border border-[#4f6e7d]/25 text-[#4f6e7d] bg-white hover:bg-[#4f6e7d]/10 transition-all cursor-pointer"
               >
                 Process Another Document
               </button>
@@ -269,43 +252,37 @@ export default function IngestPage() {
           {/* Extracted Strategy Review Interface */}
           {!completed && (newItems.length > 0 || updates.length > 0 || errorItems.length > 0 || cleanSummary) && (
             <div className="space-y-8">
-              
+
               {/* SECTION 1: Clean Summary (Read-Only Outline) */}
               {cleanSummary && (
-                <div
-                  className="p-6 rounded-2xl border space-y-3"
-                  style={{ background: 'rgba(124, 58, 237, 0.05)', borderColor: 'rgba(124, 58, 237, 0.25)' }}
-                >
-                  <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'rgba(124, 58, 237, 0.2)' }}>
+                <div className="p-6 rounded-3xl border border-[#4f6e7d]/20 bg-white space-y-3 shadow-[0_8px_30px_rgba(44,44,44,0.06)]">
+                  <div className="flex items-center justify-between border-b border-[#4f6e7d]/15 pb-3">
                     <div className="flex items-center gap-2">
-                      <BookOpen size={18} style={{ color: 'var(--accent)' }} />
-                      <h2 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <BookOpen size={18} className="text-[#4f6e7d]" />
+                      <h2 className="font-bold text-sm text-[#2c2c2c]">
                         Section 1 — Clean Strategy Overview (Read-Only Outline)
                       </h2>
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md" style={{ background: 'rgba(124, 58, 237, 0.15)', color: '#a78bfa' }}>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#4f6e7d]/12 text-[#4f6e7d]">
                       Cleaned Outline
                     </span>
                   </div>
 
-                  <div className="text-xs leading-relaxed font-normal space-y-2 whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+                  <div className="text-xs leading-relaxed font-medium text-[#2c2c2c] space-y-2 whitespace-pre-wrap">
                     {cleanSummary}
                   </div>
                 </div>
               )}
 
               {/* Dynamic Global Summary Counter */}
-              <div
-                className="px-5 py-3 rounded-xl border flex items-center justify-between"
-                style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
-              >
+              <div className="px-5 py-3.5 rounded-2xl border border-[#4f6e7d]/20 bg-white flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-2">
-                  <Database size={15} style={{ color: 'var(--accent)' }} />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Ready to confirm <strong style={{ color: 'var(--accent)' }}>{totalKeptCount}</strong> items
+                  <Database size={15} className="text-[#c94731]" />
+                  <span className="text-xs font-bold text-[#2c2c2c]">
+                    Ready to confirm <strong className="text-[#c94731]">{totalKeptCount}</strong> items
                   </span>
                 </div>
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-[11px] font-medium text-[#4f6e7d]">
                   ({newItemsToInsert} new + {updatesToApply} updates to apply)
                 </span>
               </div>
@@ -315,7 +292,7 @@ export default function IngestPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="text-base">🆕</span>
-                    <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                    <h3 className="font-bold text-sm text-[#2c2c2c]">
                       Section 2 — New Things Detected ({newItems.length})
                     </h3>
                   </div>
@@ -328,42 +305,33 @@ export default function IngestPage() {
                       return (
                         <div
                           key={item.id}
-                          className="rounded-2xl p-5 border transition-all space-y-3"
-                          style={{
-                            background: isKeep ? 'var(--bg-elevated)' : 'rgba(255, 255, 255, 0.02)',
-                            borderColor: isKeep ? 'var(--border)' : 'rgba(255, 255, 255, 0.06)',
-                            opacity: isKeep ? 1 : 0.6
-                          }}
+                          className="mosaic-card p-5 space-y-3"
+                          style={{ opacity: isKeep ? 1 : 0.6 }}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2 min-w-0 flex-wrap">
                               <span
-                                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md"
+                                className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md"
                                 style={{ background: badge.bg, color: badge.color }}
                               >
                                 {badge.label}
                               </span>
                               {item.target_table === 'post_anatomy' && item.suggested_order_index != null && (
-                                <span
-                                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
-                                  style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' }}
-                                >
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#c94731]/12 text-[#c94731] border border-[#c94731]/30">
                                   Sequence Position: #{item.suggested_order_index}
                                 </span>
                               )}
-                              <span className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                              <span className="font-bold text-sm truncate text-[#2c2c2c]">
                                 {item.heading}
                               </span>
                             </div>
 
                             <button
                               onClick={() => setDecision(item.id, isKeep ? 'discard' : 'keep', true)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                              style={{
-                                background: isKeep ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                color: isKeep ? 'var(--success)' : '#ef4444',
-                                border: `1px solid ${isKeep ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                              }}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isKeep
+                                  ? 'bg-[#4f6e7d]/12 text-[#4f6e7d] border border-[#4f6e7d]/30'
+                                  : 'bg-[#c94731]/12 text-[#c94731] border border-[#c94731]/30'
+                                }`}
                             >
                               {isKeep ? <><CheckCircle2 size={13} /> Add New Item</> : <><XCircle size={13} /> Discarded</>}
                             </button>
@@ -373,12 +341,7 @@ export default function IngestPage() {
                             value={item.point_text}
                             onChange={e => updateItemText(item.id, e.target.value, true)}
                             rows={3}
-                            className="w-full px-3.5 py-2.5 rounded-xl text-xs resize-none focus:outline-none transition-colors leading-relaxed"
-                            style={{
-                              background: 'var(--bg-primary)',
-                              borderColor: 'var(--border)',
-                              color: 'var(--text-primary)'
-                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl text-xs border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] focus:outline-none focus:ring-2 focus:ring-[#4f6e7d]/20 focus:border-[#4f6e7d] resize-none transition-colors leading-relaxed font-medium"
                             placeholder="Extracted rule text..."
                           />
                         </div>
@@ -393,7 +356,7 @@ export default function IngestPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="text-base">📝</span>
-                    <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                    <h3 className="font-bold text-sm text-[#2c2c2c]">
                       Section 3 — Updates to Existing Rules ({updates.length})
                     </h3>
                   </div>
@@ -408,29 +371,23 @@ export default function IngestPage() {
                       return (
                         <div
                           key={item.id}
-                          className="rounded-2xl p-5 border transition-all space-y-4"
-                          style={{
-                            background: isApply ? 'var(--bg-elevated)' : 'rgba(255, 255, 255, 0.02)',
-                            borderColor: isApply ? 'var(--accent)' : 'var(--border)'
-                          }}
+                          className="mosaic-card p-5 space-y-4"
                         >
                           {/* Card Header */}
                           <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>
+                            <span className="text-xs font-extrabold text-[#c94731]">
                               {item.target_row_name || 'Existing Rule'}
                             </span>
 
                             {/* 2 Explicit Choice Action Buttons */}
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                               {/* Option 1: Apply Update */}
                               <button
                                 onClick={() => setDecision(item.id, 'apply_update', false)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                style={{
-                                  background: isApply ? 'rgba(34, 197, 94, 0.2)' : 'var(--bg-primary)',
-                                  color: isApply ? '#4ade80' : 'var(--text-muted)',
-                                  border: `1px solid ${isApply ? '#34d399' : 'var(--border)'}`
-                                }}
+                                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isApply
+                                    ? 'bg-[#c94731] text-white shadow-xs'
+                                    : 'bg-[#f5f1f2] text-[#4f6e7d] border border-[#4f6e7d]/20'
+                                  }`}
                               >
                                 <Check size={13} /> Apply Update
                               </button>
@@ -438,12 +395,10 @@ export default function IngestPage() {
                               {/* Option 2: Keep Previous (Default) */}
                               <button
                                 onClick={() => setDecision(item.id, 'keep_previous', false)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                style={{
-                                  background: isKeepPrev ? 'rgba(168, 85, 247, 0.2)' : 'var(--bg-primary)',
-                                  color: isKeepPrev ? '#c084fc' : 'var(--text-muted)',
-                                  border: `1px solid ${isKeepPrev ? '#a855f7' : 'var(--border)'}`
-                                }}
+                                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isKeepPrev
+                                    ? 'bg-[#4f6e7d] text-white shadow-xs'
+                                    : 'bg-[#f5f1f2] text-[#4f6e7d] border border-[#4f6e7d]/20'
+                                  }`}
                               >
                                 <ShieldCheck size={13} /> Keep Previous (Untouched)
                               </button>
@@ -453,25 +408,21 @@ export default function IngestPage() {
                           {/* BEFORE vs AFTER Comparison Box */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* BEFORE Box */}
-                            <div className="p-3.5 rounded-xl border space-y-1.5" style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'var(--border)' }}>
-                              <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+                            <div className="p-3.5 rounded-2xl border border-[#4f6e7d]/15 bg-[#f5f1f2] space-y-1.5">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider block text-[#4f6e7d]">
                                 BEFORE (Current in DB):
                               </span>
-                              <p className="text-xs leading-relaxed italic" style={{ color: 'var(--text-secondary)' }}>
+                              <p className="text-xs leading-relaxed italic text-[#2c2c2c] font-medium">
                                 &ldquo;{item.current_text || 'No current text found.'}&rdquo;
                               </p>
                             </div>
 
                             {/* AFTER Box */}
                             <div
-                              className="p-3.5 rounded-xl border space-y-1.5 transition-all"
-                              style={{
-                                background: isApply ? 'var(--bg-primary)' : 'rgba(0,0,0,0.1)',
-                                borderColor: isApply ? 'var(--accent)' : 'var(--border)',
-                                opacity: isApply ? 1 : 0.6
-                              }}
+                              className="p-3.5 rounded-2xl border border-[#4f6e7d]/20 bg-white space-y-1.5 transition-all"
+                              style={{ opacity: isApply ? 1 : 0.6 }}
                             >
-                              <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: isApply ? 'var(--accent)' : 'var(--text-muted)' }}>
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider block text-[#c94731]">
                                 AFTER (Proposed Update):
                               </span>
                               <textarea
@@ -479,8 +430,7 @@ export default function IngestPage() {
                                 onChange={e => updateItemText(item.id, e.target.value, false)}
                                 disabled={!isApply}
                                 rows={3}
-                                className="w-full text-xs bg-transparent border-0 focus:outline-none resize-none leading-relaxed"
-                                style={{ color: isApply ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                                className="w-full text-xs bg-transparent border-0 focus:outline-none resize-none leading-relaxed text-[#2c2c2c] font-medium"
                                 placeholder="Proposed text..."
                               />
                             </div>
@@ -488,32 +438,32 @@ export default function IngestPage() {
 
                           {/* Apply Mode Radio Options (Only enabled when Apply Update is active) */}
                           {isApply && (
-                            <div className="pt-1 flex items-center gap-6 text-xs border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                              <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Apply as:</span>
+                            <div className="pt-2 flex items-center gap-6 text-xs border-t border-[#4f6e7d]/15">
+                              <span className="font-bold text-[#4f6e7d]">Apply as:</span>
 
-                              <label className="flex items-center gap-2 cursor-pointer">
+                              <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#2c2c2c]">
                                 <input
                                   type="radio"
                                   name={`apply_mode_${item.id}`}
                                   checked={mode === 'merge'}
                                   onChange={() => updateApplyMode(item.id, 'merge')}
-                                  className="accent-purple-500"
+                                  className="accent-[#c94731]"
                                 />
-                                <span className="flex items-center gap-1" style={{ color: mode === 'merge' ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                                  <GitMerge size={13} style={{ color: 'var(--accent)' }} /> Merge with existing (AI combine)
+                                <span className="flex items-center gap-1">
+                                  <GitMerge size={13} className="text-[#4f6e7d]" /> Merge with existing (AI combine)
                                 </span>
                               </label>
 
-                              <label className="flex items-center gap-2 cursor-pointer">
+                              <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#2c2c2c]">
                                 <input
                                   type="radio"
                                   name={`apply_mode_${item.id}`}
                                   checked={mode === 'replace'}
                                   onChange={() => updateApplyMode(item.id, 'replace')}
-                                  className="accent-purple-500"
+                                  className="accent-[#c94731]"
                                 />
-                                <span className="flex items-center gap-1" style={{ color: mode === 'replace' ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                                  <Replace size={13} style={{ color: '#ef4444' }} /> Replace completely
+                                <span className="flex items-center gap-1">
+                                  <Replace size={13} className="text-[#c94731]" /> Replace completely
                                 </span>
                               </label>
                             </div>
@@ -528,13 +478,13 @@ export default function IngestPage() {
               {/* SECTION: ⚠️ Couldn't Process — Check Manually */}
               {errorItems.length > 0 && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 p-3.5 rounded-xl border" style={{ background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
+                  <div className="flex items-center gap-2 p-3.5 rounded-2xl border border-[#c94731]/30 bg-[#c94731]/10 text-[#c94731]">
                     <AlertTriangle size={18} />
                     <h3 className="font-bold text-sm">
                       ⚠️ Couldn&apos;t process — check manually ({errorItems.length})
                     </h3>
                   </div>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs font-medium text-[#4f6e7d]">
                     These items encountered pipeline or embedding errors during processing and could not be automatically evaluated.
                   </p>
 
@@ -542,18 +492,17 @@ export default function IngestPage() {
                     {errorItems.map(item => (
                       <div
                         key={item.id}
-                        className="rounded-2xl p-5 border space-y-3"
-                        style={{ background: 'rgba(245, 158, 11, 0.04)', borderColor: 'rgba(245, 158, 11, 0.2)' }}
+                        className="mosaic-card p-5 space-y-3"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                          <span className="font-bold text-sm text-[#2c2c2c]">
                             {item.heading}
                           </span>
-                          <span className="text-[11px] px-2.5 py-1 rounded-md font-mono" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                          <span className="text-[11px] px-2.5 py-1 rounded-md font-mono bg-[#c94731]/12 text-[#c94731] font-bold">
                             {item.reason || 'Pipeline Error'}
                           </span>
                         </div>
-                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                        <p className="text-xs leading-relaxed text-[#4f6e7d] font-medium">
                           {item.point_text}
                         </p>
                       </div>
@@ -563,28 +512,18 @@ export default function IngestPage() {
               )}
 
               {/* Bottom Sticky Confirm Bar */}
-              <div
-                className="sticky bottom-4 p-4 rounded-2xl border flex items-center justify-between backdrop-blur-md shadow-2xl z-20"
-                style={{
-                  background: 'rgba(18, 18, 26, 0.95)',
-                  borderColor: 'var(--accent)'
-                }}
-              >
-                <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  <Database size={15} style={{ color: 'var(--accent)' }} />
+              <div className="sticky bottom-4 p-4 rounded-3xl border border-[#4f6e7d]/20 bg-white/95 backdrop-blur-md flex items-center justify-between shadow-[0_8px_30px_rgba(44,44,44,0.12)] z-20">
+                <div className="flex items-center gap-2 text-xs text-[#4f6e7d]">
+                  <Database size={15} className="text-[#c94731]" />
                   <span>
-                    Ready to confirm <strong style={{ color: 'var(--text-primary)' }}>{totalKeptCount}</strong> items into database
+                    Ready to confirm <strong className="text-[#2c2c2c]">{totalKeptCount}</strong> items into database
                   </span>
                 </div>
 
                 <button
                   onClick={confirmAll}
                   disabled={saving || totalKeptCount === 0}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 shadow-lg shadow-purple-600/30"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
-                    color: 'white'
-                  }}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#c94731] hover:bg-[#b83d28] transition-all cursor-pointer shadow-md disabled:opacity-40"
                 >
                   {saving ? (
                     <>

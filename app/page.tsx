@@ -37,10 +37,33 @@ export default function StudioPage() {
   } = useApp();
   const { show: showToast, ToastEl } = useToast();
 
+  const getTodayLocalDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDateForDayOfWeek = (targetDayName: string): string => {
+    const now = new Date();
+    const currentDayIdx = (now.getDay() + 6) % 7; // Monday = 0 ... Sunday = 6
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const targetDayIdx = daysOfWeek.indexOf(targetDayName);
+    if (targetDayIdx === -1) return getTodayLocalDate();
+    const diff = targetDayIdx - currentDayIdx;
+
+    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [selectedPostTypeId, setSelectedPostTypeId] = useState('');
   const [postFormat, setPostFormat] = useState<'text_post' | 'image_post' | 'carousel' | 'video_post'>('text_post');
   const [rawNotes, setRawNotes] = useState('');
-  const [postDate, setPostDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [postDate, setPostDate] = useState(() => getTodayLocalDate());
   const today = postDate;
   const [calendarEntry, setCalendarEntry] = useState<CalendarEntry | null>(null);
 
@@ -144,6 +167,7 @@ export default function StudioPage() {
       const saved = sessionStorage.getItem('studio_page_state');
       if (saved) {
         const parsed = JSON.parse(saved);
+        const todayStr = getTodayLocalDate();
         if (parsed.versions && parsed.versions.length > 0) {
           setVersions(parsed.versions);
           if (parsed.editedSectionsMap) setEditedSectionsMap(parsed.editedSectionsMap);
@@ -151,10 +175,12 @@ export default function StudioPage() {
           if (parsed.selectedPostTypeId) setSelectedPostTypeId(parsed.selectedPostTypeId);
           if (parsed.postId) setPostId(parsed.postId);
           if (parsed.postFormat) setPostFormat(parsed.postFormat);
-          if (parsed.postDate) setPostDate(parsed.postDate);
+          if (parsed.postDate && parsed.postDate >= todayStr) {
+            setPostDate(parsed.postDate);
+          }
         }
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // Save Studio state to sessionStorage on state change
@@ -170,13 +196,14 @@ export default function StudioPage() {
           postFormat,
           postDate
         }));
-      } catch {}
+      } catch { }
     }
   }, [versions, editedSectionsMap, rawNotes, selectedPostTypeId, postId, postFormat, postDate]);
 
   const [weeklySchedule, setWeeklySchedule] = useState<{
     dayName: string;
     isToday: boolean;
+    isSelected: boolean;
     isPast: boolean;
     isFuture: boolean;
     pillarName: string;
@@ -186,8 +213,10 @@ export default function StudioPage() {
   useEffect(() => {
     async function resolveToday() {
       const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      
-      let selectedDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+      const actualTodayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+      let selectedDayName = actualTodayName;
       if (postDate) {
         const parts = postDate.split('-');
         if (parts.length === 3) {
@@ -197,7 +226,8 @@ export default function StudioPage() {
           }
         }
       }
-      const selectedDayIdx = daysOfWeek.indexOf(selectedDayName);
+
+      const actualTodayIdx = daysOfWeek.indexOf(actualTodayName);
 
       const defaultMix: Record<string, string> = {
         'Monday': 'Value',
@@ -221,11 +251,12 @@ export default function StudioPage() {
       } catch { /* fall through */ }
 
       const list = daysOfWeek.map((dayName, idx) => {
-        const isToday = dayName === selectedDayName;
-        const isPast = idx < selectedDayIdx;
-        const isFuture = idx > selectedDayIdx;
+        const isToday = dayName === actualTodayName;
+        const isSelected = dayName === selectedDayName;
+        const isPast = idx < actualTodayIdx;
+        const isFuture = idx > actualTodayIdx;
         const pillarName = mappingMap[dayName] || defaultMix[dayName] || 'Value';
-        return { dayName, isToday, isPast, isFuture, pillarName };
+        return { dayName, isToday, isSelected, isPast, isFuture, pillarName };
       });
       setWeeklySchedule(list);
 
@@ -466,68 +497,58 @@ export default function StudioPage() {
   const hasOutput = versions.length > 0;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-dark)] text-white p-6 space-y-8 max-w-7xl mx-auto w-full">
+    <div className="min-h-screen bg-[#f5f1f2] text-[#2c2c2c] p-6 space-y-8 max-w-7xl mx-auto w-full">
       {ToastEl}
 
-      {/* Top Section: Input Card (Full Width) */}
-      <div
-        className={`rounded-2xl border p-6 space-y-5 shadow-xl shadow-black/20 ${isLoaded ? 'animate-studio-settle' : ''}`}
-        style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', ...getEntranceStyle(0) }}>
-        
-        {/* Calendar context banner if available */}
-        {calendarEntry && calendarEntry.date === postDate && (
-          <div
-            className={`p-4 rounded-xl border transition-all duration-200 ${isLoaded ? 'animate-studio-settle' : ''}`}
-            style={{ background: 'rgba(13, 31, 46, 0.8)', borderColor: '#1a4a7a', ...getEntranceStyle(60) }}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <BookOpen size={14} style={{ color: '#60a5fa' }} />
-              <span className="text-xs font-semibold" style={{ color: '#60a5fa' }}>From your Calendar Plan</span>
-            </div>
-            <p className="text-sm font-bold text-white">{calendarEntry.post_title}</p>
-            {calendarEntry.bridge_logic && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Bridge: {calendarEntry.bridge_logic}</p>
-            )}
-          </div>
-        )}
+      {/* Top Section: Mosaic 2-Column Bento Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
 
-        {/* Main Grid: Weekly Schedule + Controls & Raw Notes */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          
-          {/* Side Column: 7 Weekly Days in Vertical Ovals */}
-          <div className="lg:col-span-1 flex flex-col gap-2.5">
-            <div className="text-[11px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-              <span>Weekly Schedule</span>
-            </div>
-            
+        {/* LEFT COLUMN: Vertical Weekly Pillar Schedule (3 cols on desktop) */}
+        <div
+          className={`lg:col-span-3 mosaic-card p-5 flex flex-col justify-between space-y-4 ${isLoaded ? 'animate-panel-settle' : ''}`}
+          style={{
+            background: '#ffffff',
+            borderColor: 'rgba(79, 110, 125, 0.20)',
+            ...getEntranceStyle(40)
+          }}
+        >
+          <div className="flex items-center justify-between border-b border-[#4f6e7d]/15 pb-3">
+            <span className="text-xs font-bold text-[#2c2c2c] uppercase tracking-wider flex items-center gap-1.5">
+              <Zap size={13} className="text-[#c94731]" /> Weekly Schedule
+            </span>
+          </div>
+
+          {/* 7 Vertical Oval Pills */}
+          <div className="flex flex-col gap-2.5 flex-1 justify-around py-1">
             {weeklySchedule.map(item => {
               const savedForDay = daySavedMap[item.dayName];
               return (
                 <div
                   key={item.dayName}
-                  className={`h-10 px-3.5 rounded-xl border text-xs flex items-center justify-between transition-all duration-200 ease-out cursor-pointer hover:border-[var(--accent)]/40 hover:bg-white/[0.02] ${
-                    item.isToday ? 'shadow-md shadow-indigo-500/20' : ''
-                  }`}
-                  style={{
-                    background: item.isToday
-                      ? 'linear-gradient(135deg, rgba(108,99,255,0.22), rgba(167,139,250,0.12))'
-                      : item.isPast
-                      ? 'var(--bg-elevated)'
-                      : 'var(--bg-surface)',
-                    borderColor: item.isToday ? 'var(--accent)' : 'var(--border-subtle)',
-                    color: item.isToday ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    fontWeight: item.isToday ? 600 : 500
-                  }}>
-                  <div className="flex items-center gap-2 min-w-0 font-medium">
-                    {item.isToday && (
-                      <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: 'var(--accent)' }} />
+                  onClick={() => {
+                    const targetDateStr = getDateForDayOfWeek(item.dayName);
+                    setPostDate(targetDateStr);
+                  }}
+                  className={`h-9 px-3.5 rounded-2xl border text-xs flex items-center justify-between transition-all duration-200 cursor-pointer ${item.isToday
+                    ? 'border-[#c94731] bg-[#c94731]/10 text-[#2c2c2c] shadow-2xs font-bold'
+                    : item.isSelected
+                      ? 'border-[#4f6e7d]/60 bg-white text-[#2c2c2c] shadow-2xs font-semibold'
+                      : 'border-[#4f6e7d]/15 bg-[#f5f1f2] text-[#2c2c2c] hover:border-[#4f6e7d]/30 hover:bg-white'
+                    }`}>
+                  <div className="flex items-center gap-2 min-w-0 font-semibold">
+                    {item.isToday ? (
+                      <span className="w-2 h-2 rounded-full bg-[#c94731] flex-shrink-0 animate-pulse" title="Real-time Today" />
+                    ) : item.isSelected ? (
+                      <span className="w-2 h-2 rounded-full bg-[#4f6e7d] flex-shrink-0" title="Selected Target Date" />
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4f6e7d]/40 flex-shrink-0" />
                     )}
-                    <span className="truncate">{item.dayName}</span>
+                    <span className="truncate text-xs text-[#2c2c2c] font-medium">{item.dayName}</span>
                   </div>
 
                   {savedForDay && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 leading-none h-5 flex items-center"
-                      style={{ background: 'var(--accent)', color: '#fff' }}>
-                      {savedForDay.pillar_name}
+                    <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-[#c94731] text-white flex-shrink-0 leading-none">
+                      {savedForDay.pillar_name.slice(0, 9)}
                     </span>
                   )}
                 </div>
@@ -535,86 +556,172 @@ export default function StudioPage() {
             })}
           </div>
 
-          {/* Main Controls & Raw Notes Area */}
-          <div className="lg:col-span-3 flex flex-col gap-4">
-            
-            {/* Controls Bar */}
-            <div
-              className={`flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 rounded-xl border ${isLoaded ? 'animate-studio-settle' : ''}`}
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', ...getEntranceStyle(120) }}>
-              
+          <div className="pt-2 border-t border-[#4f6e7d]/15 flex items-center justify-between text-[11px] text-[#4f6e7d]">
+            <span>Content Strategy</span>
+            <span className="text-[#2c2c2c] font-semibold">{ruleList.length} Pillars</span>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Hero Creator + Post Configuration (9 cols on desktop) */}
+        <div className="lg:col-span-9 flex flex-col space-y-5">
+
+          {/* CARD 1: Hero Creator Card */}
+          <div
+            className={`mosaic-card p-6 flex flex-col justify-between space-y-5 ${isLoaded ? 'animate-panel-settle' : ''}`}
+            style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f5f1f2 100%)',
+              borderColor: 'rgba(79, 110, 125, 0.20)',
+              ...getEntranceStyle(80)
+            }}
+          >
+            {/* Header Title */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2c2c2c] flex items-center gap-2 flex-wrap">
+                  <span>Automate your posts</span>
+                  <span className="font-serif-italic text-[#c94731] font-normal">with quiet precision</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-[#4f6e7d] mt-1 font-normal">
+                  Minimal AI content workflows that elevate your creator footprint.
+                </p>
+              </div>
+            </div>
+
+            {/* Calendar Context Banner (If active) */}
+            {calendarEntry && calendarEntry.date === postDate && (
+              <div className="p-3.5 rounded-xl border border-[#c94731]/30 bg-[#c94731]/5 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <BookOpen size={14} className="text-[#c94731] flex-shrink-0" />
+                  <div className="truncate">
+                    <span className="font-bold text-[#2c2c2c]">Calendar Plan: </span>
+                    <span className="text-[#4f6e7d] font-medium">{calendarEntry.post_title}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inset Textarea Container (Intellecta soft input box aesthetic) */}
+            <div className="flex flex-col space-y-1.5 flex-1">
+              <div className="flex items-center justify-between text-xs font-semibold text-[#2c2c2c] px-0.5">
+                <span className="text-xs font-bold text-[#2c2c2c]">Raw Notes Input</span>
+                <span className="text-[#4f6e7d] font-mono text-[11px]">{rawNotes.length} chars</span>
+              </div>
+
+              <textarea
+                id="studio-notes-textarea"
+                value={rawNotes}
+                onChange={e => setRawNotes(e.target.value)}
+                placeholder="Hi there! Paste your raw notes, article key points, or framework thoughts here..."
+                rows={4}
+                className="w-full px-3.5 py-3 rounded-2xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-[#2c2c2c] text-xs leading-relaxed placeholder-[#4f6e7d]/50 focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 focus:border-[#c94731] transition-all duration-200 resize-none font-sans"
+              />
+            </div>
+
+            {/* Dual Action Buttons */}
+            <div className={`grid grid-cols-2 gap-3 pt-0.5 ${isLoaded ? 'animate-content-rise' : ''}`} style={getEntranceStyle(200)}>
+              <button
+                id="btn-generate-notes"
+                onClick={() => handleGenerate()}
+                disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
+                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 text-white bg-[#c94731] hover:bg-[#b83d28] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm hover:shadow-md active:scale-[0.985]">
+                {generating && !webSearchStatus ? (
+                  <><Loader2 size={14} className="spinner" /> Generating…</>
+                ) : (
+                  <><Zap size={14} /> From Notes</>
+                )}
+              </button>
+
+              <button
+                id="btn-generate-websearch"
+                onClick={() => handleWebSearchGenerate()}
+                disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
+                className="h-10 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 border border-[#4f6e7d]/30 text-[#2c2c2c] bg-[#f5f1f2] hover:bg-[#4f6e7d]/15 hover:border-[#4f6e7d]/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.985]">
+                {generating && webSearchStatus ? (
+                  <><Loader2 size={14} className="spinner" /> Searching…</>
+                ) : (
+                  <><Search size={14} className="text-[#4f6e7d]" /> Web Search</>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* CARD 2: Post Configuration */}
+          <div
+            className={`bg-white rounded-3xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 border border-[#4f6e7d]/15 shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-300 ${isLoaded ? 'animate-panel-settle' : ''}`}
+            style={getEntranceStyle(140)}
+          >
+            <div className="flex items-center justify-between border-b border-[#4f6e7d]/10 pb-2.5">
+              <h3 className="text-xs font-bold text-[#2c2c2c] uppercase tracking-wider flex items-center gap-2">
+                <Zap size={13} className="text-[#c94731]" /> Post Configuration & Format
+              </h3>
+            </div>
+
+            {/* Controls Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Pillar Dropdown */}
-              <div className="flex-1 flex items-center gap-2">
-                <label className="w-12 text-xs font-semibold shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  Pillar:
-                </label>
-                <div className="relative flex-1">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold text-[#2c2c2c]">Pillar Strategy:</label>
+                <div className="relative">
                   <select
                     value={selectedPostTypeId}
                     onChange={e => setSelectedPostTypeId(e.target.value)}
-                    className="h-9 w-full px-3 py-1.5 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-all duration-200 ease-out bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]">
-                    <option value="">— Select Pillar Option —</option>
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-xs text-[#2c2c2c] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 hover:border-[#4f6e7d]/50 transition-all">
+                    <option value="" className="bg-white text-[#2c2c2c]">— Select Pillar —</option>
                     {ruleList.map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} {r.is_hybrid ? ' (Merged Combo)' : ''} ({r.used_this_week}/{r.target_count})
+                      <option key={r.id} value={r.id} className="bg-white text-[#2c2c2c]">
+                        {r.name} {r.is_hybrid ? ' (Merged)' : ''}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#4f6e7d]" />
                 </div>
               </div>
 
-              {/* Post Format Selector */}
-              <div className="flex-1 flex items-center gap-2">
-                <label className="w-14 text-xs font-semibold shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  Format:
-                </label>
-                <div className="relative flex-1">
+              {/* Format Dropdown */}
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold text-[#2c2c2c]">Output Format:</label>
+                <div className="relative">
                   <select
                     value={postFormat}
                     onChange={e => setPostFormat(e.target.value as any)}
-                    className="h-9 w-full px-3 py-1.5 pr-8 rounded-lg border text-xs appearance-none cursor-pointer font-medium transition-all duration-200 ease-out bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]">
-                    <option value="text_post">Text Post (600–1,200 chars)</option>
-                    <option value="image_post">Image Post (900–1,500 chars)</option>
-                    <option value="carousel">Carousel (1,200–1,500 chars)</option>
-                    <option value="video_post">Video Post (500–800 chars)</option>
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-xs text-[#2c2c2c] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 hover:border-[#4f6e7d]/50 transition-all">
+                    <option value="text_post" className="bg-white text-[#2c2c2c]">Text Post (600–1,200 chars)</option>
+                    <option value="image_post" className="bg-white text-[#2c2c2c]">Image Post (900–1,500 chars)</option>
+                    <option value="carousel" className="bg-white text-[#2c2c2c]">Carousel (1,200–1,500 chars)</option>
+                    <option value="video_post" className="bg-white text-[#2c2c2c]">Video Post (500–800 chars)</option>
                   </select>
-                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#4f6e7d]" />
                 </div>
               </div>
 
-              {/* Scheduled Date Picker */}
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  Target Date:
-                </label>
+              {/* Target Date Picker */}
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] font-bold text-[#2c2c2c]">Target Schedule Date:</label>
                 <input
                   type="date"
                   value={postDate}
                   onChange={e => setPostDate(e.target.value)}
-                  className="h-9 px-3 rounded-lg border text-xs font-mono font-medium cursor-pointer transition-all duration-200 ease-out bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+                  className="h-9 px-3 rounded-xl border border-[#4f6e7d]/20 bg-[#f5f1f2] text-xs text-[#2c2c2c] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#c94731]/40 hover:border-[#4f6e7d]/50 transition-all"
                 />
               </div>
             </div>
 
             {/* Inline Quota Exceeded Confirmation Banner */}
             {inlineQuotaConfirm?.open && selectedQuota && (
-              <div className="p-4 rounded-xl border flex flex-col gap-3 text-xs animate-fade-in"
-                style={{ background: 'rgba(239, 68, 68, 0.12)', borderColor: '#ef4444', color: '#f87171' }}>
-                <div className="flex items-start gap-3">
-                  <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
+              <div className="p-3 rounded-2xl border border-[#c94731]/30 bg-[#c94731]/10 text-[#2c2c2c] text-xs flex flex-col gap-2 animate-fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-[#c94731]" />
                   <div>
-                    <p className="font-bold text-sm">Weekly Goal Reached for &quot;{selectedQuota.name}&quot;</p>
-                    <p className="font-normal text-xs mt-0.5" style={{ color: '#fca5a5' }}>
-                      You have already saved {selectedQuota.used_this_week} of {selectedQuota.target_count} target posts for this pillar this week. Do you still want to generate an extra post?
+                    <p className="font-bold text-[#2c2c2c] text-xs">Weekly Goal Reached for &quot;{selectedQuota.name}&quot;</p>
+                    <p className="text-[11px] text-[#4f6e7d] mt-0.5">
+                      You have already saved {selectedQuota.used_this_week} of {selectedQuota.target_count} target posts. Do you still want to generate an extra post?
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2.5 pt-1 border-t" style={{ borderColor: 'rgba(239, 68, 68, 0.25)' }}>
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#c94731]/20">
                   <button
                     onClick={() => setInlineQuotaConfirm(null)}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-200 hover:bg-white/5 cursor-pointer"
-                    style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}>
+                    className="px-3 py-1 rounded-lg text-[11px] font-semibold border border-[#4f6e7d]/30 text-[#4f6e7d] hover:bg-white cursor-pointer">
                     Cancel
                   </button>
                   <button
@@ -627,135 +734,68 @@ export default function StudioPage() {
                         handleWebSearchGenerate(true);
                       }
                     }}
-                    className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 shadow-md cursor-pointer hover:bg-red-600 active:scale-[0.98]"
-                    style={{ background: '#ef4444', color: '#fff', boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)' }}>
+                    className="px-3 py-1 rounded-lg text-[11px] font-bold bg-[#c94731] text-white shadow-sm hover:bg-[#b83d28] cursor-pointer">
                     Yes, Generate Anyway
                   </button>
                 </div>
               </div>
             )}
-
-            {/* Raw notes input box */}
-            <div className="flex flex-col">
-              <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Raw Notes / Today&apos;s Content
-              </label>
-              <textarea
-                value={rawNotes}
-                onChange={e => setRawNotes(e.target.value)}
-                placeholder="Type or paste everything you built, learned, or studied today here. Articles, code snippets, bug stories, or frameworks — all in this one box."
-                rows={8}
-                className="w-full px-4 py-3.5 rounded-xl border resize-none text-sm leading-relaxed transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)] bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-primary)]"
-                style={{
-                  fontFamily: 'var(--font-inter)',
-                }}
-              />
-              <div className="flex items-center justify-between px-1 mt-1.5 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                <span>{rawNotes.length} chars</span>
-                {anatomy.length > 0 && (
-                  <span>{activeAnatomy.length} sections active</span>
-                )}
-              </div>
-            </div>
-
-            {/* Generate Buttons */}
-            <div
-              className={`grid grid-cols-2 gap-3 pt-1 ${isLoaded ? 'animate-studio-settle' : ''}`}
-              style={getEntranceStyle(240)}>
-              <button
-                id="btn-generate-notes"
-                onClick={() => handleGenerate()}
-                disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="h-11 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ease-out flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:shadow-indigo-500/25 active:scale-[0.99]"
-                style={{
-                  background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
-                  color: 'white',
-                  boxShadow: generating ? 'none' : '0 4px 20px var(--accent-glow)',
-                }}>
-                {generating && !webSearchStatus ? (
-                  <><Loader2 size={14} className="spinner" /> Generating…</>
-                ) : (
-                  <><Zap size={14} /> From Notes</>
-                )}
-              </button>
-
-              <button
-                id="btn-generate-websearch"
-                onClick={() => handleWebSearchGenerate()}
-                disabled={generating || !selectedPostTypeId || !rawNotes.trim()}
-                className="h-11 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ease-out flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:shadow-teal-500/25 active:scale-[0.99]"
-                style={{
-                  background: generating && webSearchStatus
-                    ? 'rgba(20,184,166,0.2)'
-                    : 'linear-gradient(135deg, #0f766e, #14b8a6)',
-                  color: 'white',
-                  boxShadow: generating ? 'none' : '0 4px 16px rgba(20,184,166,0.3)',
-                  border: '1px solid rgba(20,184,166,0.4)',
-                }}>
-                {generating && webSearchStatus ? (
-                  <><Loader2 size={14} className="spinner" /> Searching…</>
-                ) : (
-                  <><Search size={14} /> Web Search</>
-                )}
-              </button>
-            </div>
           </div>
+
         </div>
+
       </div>
 
       {/* Repeat warning */}
       {repeatWarning && (
-        <div className="flex items-start gap-3 p-4 rounded-xl border transition-all duration-200"
-          style={{ background: '#2e1f0d', borderColor: '#f59e0b55' }}>
-          <AlertTriangle size={18} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
+        <div className="flex items-start gap-3 p-3.5 rounded-2xl border border-[#c94731]/30 bg-white text-[#2c2c2c] shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-200">
+          <AlertTriangle size={17} className="text-[#c94731] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs font-bold" style={{ color: 'var(--warning)' }}>Similar topic detected</p>
-            <p className="text-xs mt-0.5" style={{ color: '#d97706' }}>{repeatWarning}</p>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>You can still proceed — this is non-blocking.</p>
+            <p className="text-xs font-bold text-[#c94731]">Similar topic detected</p>
+            <p className="text-xs mt-0.5 text-[#4f6e7d]">{repeatWarning}</p>
+            <p className="text-[11px] mt-1 text-[#4f6e7d]/80">You can still proceed — this is non-blocking.</p>
           </div>
         </div>
       )}
 
-      {/* Bottom Section: 3-Column Generated Output Preview Grid (Below Viewport, Full Width) */}
+      {/* Bottom Section: 3-Column Generated Output Preview Grid (Intellecta Card Style) */}
       {(hasOutput || generating) && (
         <div
-          className={`rounded-2xl border p-6 space-y-6 shadow-xl shadow-black/20 ${isLoaded ? 'animate-studio-settle' : ''}`}
-          style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', ...getEntranceStyle(300) }}>
-          
-          <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--border)' }}>
+          className={`bg-white rounded-3xl p-5 space-y-5 border border-[#4f6e7d]/15 shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-300 ${isLoaded ? 'animate-studio-settle' : ''}`}
+          style={getEntranceStyle(300)}>
+
+          <div className="flex items-center justify-between border-b border-[#4f6e7d]/10 pb-3">
             <div>
-              <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <Sparkles size={18} style={{ color: 'var(--accent)' }} />
-                Generated Post Versions
+              <h2 className="text-base font-bold text-[#2c2c2c] flex items-center gap-2">
+                <Sparkles size={17} className="text-[#c94731]" />
+                Generated Post Angles
               </h2>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Compare all 3 generated angles side-by-side. Edit sections directly or save your preferred version to Drafts.
+              <p className="text-xs text-[#4f6e7d] mt-0.5">
+                Compare all 3 generated options side-by-side. Edit sections directly or save your preferred version to Drafts.
               </p>
             </div>
 
             {versions.length > 0 && (
               <button
                 onClick={() => { setVersions([]); setEditedSectionsMap({}); showToast('Discarded generated posts.', 'info'); }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 hover:bg-red-950/20 active:scale-[0.98] cursor-pointer"
-                style={{ borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}>
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#c94731]/30 text-[#c94731] hover:bg-[#c94731]/10 active:scale-[0.98] cursor-pointer">
                 <Trash2 size={13} /> Discard All
               </button>
             )}
           </div>
 
           {generating ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border py-16"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
-              <Loader2 size={36} className="spinner" style={{ color: 'var(--accent)' }} />
-              <p className="text-sm font-semibold mt-4" style={{ color: 'var(--text-primary)' }}>
-                {webSearchStatus ?? 'Generating 3 versions…'}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-[#4f6e7d]/15 py-12 bg-[#f5f1f2]">
+              <Loader2 size={32} className="spinner text-[#c94731]" />
+              <p className="text-xs font-semibold text-[#2c2c2c] mt-3">
+                {webSearchStatus ?? 'Generating 3 unique post versions…'}
               </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                {webSearchStatus ? 'Tavily → Gemini pipeline running' : 'Gemini is crafting 3 unique angles for your post'}
+              <p className="text-[11px] text-[#4f6e7d] mt-1">
+                {webSearchStatus ? 'Tavily → Gemini pipeline running' : 'Gemini is crafting 3 distinct hooks and structural frameworks'}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
               {versions.map((ver, vIdx) => {
                 const currentVerSections = editedSectionsMap[vIdx] || ver.sections || {};
                 const charCount = Object.values(currentVerSections).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
@@ -763,53 +803,47 @@ export default function StudioPage() {
                 const isSaved = savedVersionIdx === vIdx;
 
                 return (
-                  <div key={vIdx} className="flex flex-col rounded-xl border p-4.5 space-y-4 transition-all duration-200 bg-[var(--bg-elevated)] border-[var(--border)] shadow-md hover:border-[var(--accent)]/30">
-                    
+                  <div key={vIdx} className="flex flex-col rounded-2xl border border-[#4f6e7d]/15 bg-[#f5f1f2] p-4 space-y-3 shadow-2xs hover:border-[#c94731]/40 transition-all duration-200">
+
                     {/* Version Column Header */}
-                    <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex items-center justify-between pb-2.5 border-b border-[#4f6e7d]/15">
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-sm"
-                          style={{ background: 'var(--accent)' }}>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-2xs bg-[#c94731]">
                           Version {ver.version}
                         </span>
-                        <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                        <span className="text-[11px] font-semibold text-[#4f6e7d]">
                           {charCount} chars
                         </span>
                       </div>
 
                       <button
                         onClick={() => handleCopyFullPost(vIdx)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all duration-200 hover:bg-white/5 active:scale-[0.98] cursor-pointer"
-                        style={{
-                          borderColor: isCopied ? '#22c55e' : 'var(--accent)',
-                          color: isCopied ? '#22c55e' : 'var(--accent)',
-                        }}>
+                        className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${isCopied ? 'border-[#4f6e7d] text-[#4f6e7d] bg-white' : 'border-[#c94731] text-[#c94731] hover:bg-[#c94731]/10'
+                          }`}>
                         <Copy size={12} />
                         {isCopied ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
 
                     {/* Version Sections */}
-                    <div className="flex-1 flex flex-col gap-3">
+                    <div className="flex-1 flex flex-col gap-2.5">
                       {activeAnatomy.map(section => {
                         const content = currentVerSections[section.section_name] ?? '';
                         const isRegenKey = `${vIdx}_${section.section_name}`;
                         const isRegen = regeneratingSection === isRegenKey;
 
                         return (
-                          <div key={section.id} className="rounded-lg border bg-[var(--bg-surface)] border-[var(--border)]">
-                            <div className="flex items-center justify-between px-3 py-1.5 border-b rounded-t-lg"
-                              style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'var(--border)' }}>
-                              <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
+                          <div key={section.id} className="rounded-xl border border-[#4f6e7d]/15 bg-white overflow-hidden shadow-2xs">
+                            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#4f6e7d]/10 bg-[#f5f1f2]">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#c94731]">
                                 {section.section_name}
                               </span>
                               <button
                                 onClick={() => handleRegenerateSection(section.id, section.section_name, vIdx)}
                                 disabled={isRegen}
                                 title="Regenerate this section only"
-                                className="p-1 rounded transition-colors duration-200 hover:bg-white/5 disabled:opacity-40 cursor-pointer"
-                                style={{ color: 'var(--text-muted)' }}>
-                                {isRegen ? <Loader2 size={12} className="spinner" /> : <RefreshCw size={12} />}
+                                className="p-1 rounded-full text-[#4f6e7d] hover:text-[#2c2c2c] hover:bg-white transition-colors cursor-pointer">
+                                {isRegen ? <Loader2 size={12} className="spinner text-[#c94731]" /> : <RefreshCw size={12} />}
                               </button>
                             </div>
                             <textarea
@@ -818,10 +852,10 @@ export default function StudioPage() {
                               onChange={e => {
                                 handleSectionEdit(vIdx, section.section_name, e.target.value);
                                 e.target.style.height = 'auto';
-                                e.target.style.height = `${Math.max(60, e.target.scrollHeight)}px`;
+                                e.target.style.height = `${Math.max(50, e.target.scrollHeight)}px`;
                               }}
-                              className="section-textarea w-full px-3 py-2.5 bg-transparent text-xs resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40 leading-relaxed block rounded-b-lg transition-colors"
-                              style={{ color: 'var(--text-primary)', height: 'auto', minHeight: '60px', overflow: 'hidden' }}
+                              className="section-textarea w-full px-3 py-2 bg-white text-xs text-[#2c2c2c] resize-none focus:outline-none focus:ring-1 focus:ring-[#c94731]/40 leading-relaxed block transition-colors font-sans"
+                              style={{ height: 'auto', minHeight: '50px', overflow: 'hidden' }}
                             />
                           </div>
                         );
@@ -829,34 +863,32 @@ export default function StudioPage() {
 
                       {/* Visual suggestion */}
                       {ver.visualSuggestion && (
-                        <div className="px-3 py-2.5 rounded-lg border"
-                          style={{ background: '#0d1a0d', borderColor: '#166534' }}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Image size={13} style={{ color: '#22c55e' }} />
-                            <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>Visual Suggestion</span>
+                        <div className="px-3 py-2 rounded-xl border border-[#4f6e7d]/20 bg-white">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <Image size={12} className="text-[#4f6e7d]" />
+                            <span className="text-[11px] font-semibold text-[#4f6e7d]">Visual Suggestion</span>
                           </div>
-                          <p className="text-[11px] leading-relaxed" style={{ color: '#86efac' }}>{ver.visualSuggestion}</p>
+                          <p className="text-[11px] text-[#2c2c2c] leading-relaxed">{ver.visualSuggestion}</p>
                         </div>
                       )}
 
                       {/* Resources */}
                       {ver.resources && ver.resources.length > 0 && (
-                        <div className="px-3 py-2.5 rounded-lg border"
-                          style={{ background: '#0d1f2e', borderColor: '#1a4a7a' }}>
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <BookOpen size={13} style={{ color: '#60a5fa' }} />
-                            <span className="text-xs font-semibold" style={{ color: '#60a5fa' }}>References</span>
+                        <div className="px-3 py-2 rounded-xl border border-[#4f6e7d]/20 bg-white">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <BookOpen size={12} className="text-[#4f6e7d]" />
+                            <span className="text-[11px] font-semibold text-[#4f6e7d]">References</span>
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-0.5">
                             {ver.resources.map((resItem, idx) => {
                               const urlMatch = resItem.match(/https?:\/\/[^\s\)]+/);
                               const targetUrl = urlMatch ? urlMatch[0] : (resItem.startsWith('http') ? resItem : null);
                               return (
-                                <div key={idx} className="flex items-start gap-1.5 text-[11px]" style={{ color: '#93c5fd' }}>
-                                  <span className="text-[9px] mt-0.5">•</span>
+                                <div key={idx} className="flex items-start gap-1.5 text-[10px] text-[#4f6e7d]">
+                                  <span className="text-[8px] mt-0.5">•</span>
                                   {targetUrl ? (
                                     <a href={targetUrl} target="_blank" rel="noopener noreferrer"
-                                      className="underline hover:text-white transition-colors flex items-center gap-1 break-all">
+                                      className="underline hover:text-[#2c2c2c] transition-colors flex items-center gap-1 break-all">
                                       {resItem}
                                       <ExternalLink size={9} className="inline flex-shrink-0" />
                                     </a>
@@ -872,31 +904,21 @@ export default function StudioPage() {
                     </div>
 
                     {/* Version Save & Format Buttons */}
-                    <div className="pt-2.5 border-t flex items-center gap-2.5" style={{ borderColor: 'var(--border)' }}>
+                    <div className="pt-2 border-t border-[#4f6e7d]/15 flex items-center gap-2">
                       <button
                         onClick={() => handleSaveEdits(vIdx)}
-                        className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                        style={{
-                          background: isSaved ? '#22c55e' : 'var(--accent)',
-                          color: '#fff',
-                          boxShadow: '0 2px 10px rgba(108,99,255,0.3)'
-                        }}>
+                        className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer bg-[#c94731] text-white hover:bg-[#b83d28]">
                         {isSaved ? (
-                          <><CheckCircle size={14} /> Saved!</>
+                          <><CheckCircle size={13} /> Saved!</>
                         ) : (
-                          <><Save size={14} /> Save to Drafts</>
+                          <><Save size={13} /> Save to Drafts</>
                         )}
                       </button>
 
                       <button
                         onClick={() => handleFormatPost(vIdx)}
-                        className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                        style={{
-                          background: 'linear-gradient(135deg, #0284c7, #06b6d4)',
-                          color: '#fff',
-                          boxShadow: '0 2px 10px rgba(2,132,199,0.3)'
-                        }}>
-                        <Type size={14} /> Format Post
+                        className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out shadow-xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer border border-[#4f6e7d]/30 text-[#4f6e7d] hover:bg-[#4f6e7d]/10 bg-white">
+                        <Type size={13} /> Format Post
                       </button>
                     </div>
                   </div>

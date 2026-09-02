@@ -14,19 +14,24 @@ export function Toast({ message, type, onClose }: ToastProps) {
     return () => clearTimeout(t);
   }, [onClose]);
 
-  const colors = {
-    success: { bg: '#0d2e22', border: '#22d3a8', text: '#22d3a8' },
-    error: { bg: '#2e0d0d', border: '#ef4444', text: '#ef4444' },
-    warning: { bg: '#2e200d', border: '#f59e0b', text: '#f59e0b' },
-    info: { bg: '#0d1a2e', border: '#6c63ff', text: '#6c63ff' },
-  }[type];
+  const isAccent = type === 'error' || type === 'warning';
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 animate-fade-in max-w-sm px-4 py-3 rounded-lg border text-sm font-medium"
-      style={{ background: colors.bg, borderColor: colors.border, color: colors.text, boxShadow: `0 4px 24px ${colors.border}33` }}>
-      <div className="flex items-start gap-2">
-        <span className="flex-1">{message}</span>
-        <button onClick={onClose} className="text-lg leading-none opacity-60 hover:opacity-100 ml-2">×</button>
+    <div
+      className={`fixed bottom-6 right-6 z-50 animate-fade-in max-w-sm px-4 py-3 rounded-2xl border text-xs font-semibold shadow-[0_8px_30px_rgba(44,44,44,0.08)] transition-all duration-200 ${
+        isAccent
+          ? 'bg-white border-[#c94731]/40 text-[#c94731]'
+          : 'bg-white border-[#4f6e7d]/30 text-[#2c2c2c]'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex-1 leading-normal">{message}</span>
+        <button
+          onClick={onClose}
+          className="w-5 h-5 rounded-full flex items-center justify-center text-sm leading-none text-[#4f6e7d] hover:text-[#2c2c2c] hover:bg-[#4f6e7d]/10 transition-colors p-1 cursor-pointer"
+        >
+          ×
+        </button>
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
+
+export { DEFAULT_AVOID_WORDS };
 
 const DB_PATH = path.join(process.cwd(), 'linkedin_content.db');
 
@@ -138,6 +141,32 @@ function initSchema(db: Database.Database) {
     db.exec('ALTER TABLE post_types ADD COLUMN core_focus TEXT');
   }
 
+  // Runtime migration — add visual_suggestions column to post_types
+  if (!columns.includes('visual_suggestions')) {
+    db.exec('ALTER TABLE post_types ADD COLUMN visual_suggestions TEXT');
+  }
+
+  // Seed default visual_suggestions for existing pillars if empty
+  const defaultVisuals: Record<string, string[]> = {
+    'Value': ['Architecture diagram, code snippet screenshot, or comparison graphic highlighting key technical steps.'],
+    'Lead Magnet': ['Resource preview mockups, template cheat-sheet screenshot, or a clean checklist infographic.'],
+    'Authority': ['Side-by-side framework diagram, quote graphic from industry research/paper, or data benchmark chart.'],
+    'Personal': ['Behind-the-scenes workspace photo, personal building screenshot, or raw terminal / project milestone photo.'],
+    'Showcase': [
+      'Side-by-side LangGraph / system architecture diagram',
+      'Before/after code comparison',
+      'Real terminal execution log'
+    ]
+  };
+
+  const existingPtsForVisuals = db.prepare('SELECT id, name, visual_suggestions FROM post_types').all() as { id: string; name: string; visual_suggestions: string | null }[];
+  const updateVisualStmt = db.prepare('UPDATE post_types SET visual_suggestions = ? WHERE id = ?');
+  existingPtsForVisuals.forEach(pt => {
+    if (!pt.visual_suggestions && defaultVisuals[pt.name]) {
+      updateVisualStmt.run(JSON.stringify(defaultVisuals[pt.name]), pt.id);
+    }
+  });
+
   // Runtime migration — add visual_suggestion column to calendar_entries
   const calColumns = (db.prepare("PRAGMA table_info(calendar_entries)").all() as { name: string }[]).map(c => c.name);
   if (!calColumns.includes('visual_suggestion')) {
@@ -179,6 +208,26 @@ function initSchema(db: Database.Database) {
   }
   const defaultAboutMe = "I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.";
   db.exec(`UPDATE settings SET about_me = '${defaultAboutMe.replace(/'/g, "''")}' WHERE id = 1 AND (about_me IS NULL OR about_me = '')`);
+
+  // Runtime migration — ensure tone_profile has vocabularyLevel and avoidWords
+  const settingsRow = db.prepare('SELECT tone_profile FROM settings WHERE id = 1').get() as { tone_profile?: string } | undefined;
+  if (settingsRow && settingsRow.tone_profile) {
+    try {
+      const parsed = JSON.parse(settingsRow.tone_profile);
+      let updated = false;
+      if (!parsed.vocabularyLevel) {
+        parsed.vocabularyLevel = 'simple';
+        updated = true;
+      }
+      if (!parsed.avoidWords || !Array.isArray(parsed.avoidWords) || parsed.avoidWords.length === 0) {
+        parsed.avoidWords = DEFAULT_AVOID_WORDS;
+        updated = true;
+      }
+      if (updated) {
+        db.prepare('UPDATE settings SET tone_profile = ? WHERE id = 1').run(JSON.stringify(parsed));
+      }
+    } catch { /* ignore parse error */ }
+  }
 
 
   // Runtime migration — create pillar_quotas table if not exists
@@ -236,7 +285,9 @@ function seedIfEmpty(db: Database.Database) {
         formality: 'mixed',
         sentenceLength: 'short',
         bannedPhrases: ['In today\'s fast-paced world', 'Let\'s dive in', 'Game changer', 'Excited to share'],
-        languageMix: 'Clear, professional English'
+        languageMix: 'Clear, professional English',
+        vocabularyLevel: 'simple',
+        avoidWords: DEFAULT_AVOID_WORDS
       })
     );
 

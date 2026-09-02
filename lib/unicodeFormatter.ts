@@ -283,6 +283,10 @@ export function toggleStrikethrough(text: string): string {
 }
 
 export function applyFontToText(text: string, fontId: string): string {
+  if (fontId === 'strikethrough') {
+    return toggleStrikethrough(text);
+  }
+
   const chars = parseString(text);
   return chars.map(c => {
     let bold = c.bold;

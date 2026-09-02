@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useApp, PostType, AnatomySection } from '@/context/AppContext';
+import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
 import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import TagInput from '@/components/TagInput';
@@ -26,6 +28,18 @@ function PostTypeModal({ existing, onClose, onSaved }: {
   const { show: showToast, ToastEl } = useToast();
   const [name, setName] = useState(existing?.name ?? '');
   const [coreFocus, setCoreFocus] = useState(existing?.core_focus ?? '');
+  const [visualSuggestions, setVisualSuggestions] = useState<string[]>(() => {
+    if (Array.isArray(existing?.visual_suggestions)) return existing.visual_suggestions;
+    if (typeof existing?.visual_suggestions === 'string') {
+      try {
+        const parsed = JSON.parse(existing.visual_suggestions);
+        return Array.isArray(parsed) ? parsed : [existing.visual_suggestions];
+      } catch {
+        return existing.visual_suggestions ? [existing.visual_suggestions] : [];
+      }
+    }
+    return [];
+  });
   const [dos, setDos] = useState<string[]>(existing?.dos ?? []);
   const [donts, setDonts] = useState<string[]>(existing?.donts ?? []);
   const [dosError, setDosError] = useState('');
@@ -52,7 +66,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, core_focus: coreFocus, dos, donts })
+        body: JSON.stringify({ name, core_focus: coreFocus, visual_suggestions: visualSuggestions, dos, donts })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -123,6 +137,14 @@ function PostTypeModal({ existing, onClose, onSaved }: {
         </div>
 
         <TagInput
+          label="Visual Suggestions"
+          tags={visualSuggestions}
+          onChange={setVisualSuggestions}
+          placeholder="Type a rule and press Enter"
+          accentColor="#8b5cf6"
+        />
+
+        <TagInput
           label="DOs - what this post type should always do"
           tags={dos}
           onChange={setDos}
@@ -136,7 +158,7 @@ function PostTypeModal({ existing, onClose, onSaved }: {
           tags={donts}
           onChange={setDonts}
           placeholder="Type a rule and press Enter"
-          accentColor="#ef4444"
+          accentColor="#c94731"
           error={dontsError}
         />
       </div>
@@ -330,8 +352,11 @@ function WritingMechanicsModal({ existing, maxOrder, onClose, onSaved }: {
   );
 }
 
-// ── Main Settings Page ─────────────────────────────────────────────────────
-export default function SettingsPage() {
+// ── Main Settings Page Content ──────────────────────────────────────────────
+function SettingsContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
   const { postTypes, anatomy, settings, refreshPostTypes, refreshAnatomy, refreshSettings } = useApp();
   const { show: showToast, ToastEl } = useToast();
 
@@ -339,7 +364,7 @@ export default function SettingsPage() {
   const [ptModal, setPtModal] = useState<{ open: boolean; existing?: PostType }>({ open: false });
   const [aModal, setAModal] = useState<{ open: boolean; existing?: AnatomySection; targetPostTypeId?: string | null }>({ open: false });
   const [wmModal, setWmModal] = useState<{ open: boolean; existing?: WritingMechanic }>({ open: false });
-  
+
   const [writingMechanics, setWritingMechanics] = useState<WritingMechanic[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedAnatomyTab, setSelectedAnatomyTab] = useState<string>('default');
@@ -350,6 +375,13 @@ export default function SettingsPage() {
   const [aboutMe, setAboutMe] = useState(settings?.about_me ?? '');
   const [savingAboutMe, setSavingAboutMe] = useState(false);
 
+  // Reactive sync of activeTab from URL search param (?tab=...)
+  useEffect(() => {
+    if (tabParam && ['about', 'pillars', 'anatomy', 'tone', 'mechanics'].includes(tabParam)) {
+      setActiveTab(tabParam as 'about' | 'pillars' | 'anatomy' | 'tone' | 'mechanics');
+    }
+  }, [tabParam]);
+
   // Sync settings on load
   useEffect(() => {
     if (settings?.about_me) setAboutMe(settings.about_me);
@@ -359,6 +391,8 @@ export default function SettingsPage() {
       setSentenceLength(settings.tone_profile.sentenceLength ?? 'short');
       setBannedPhrases(settings.tone_profile.bannedPhrases ?? []);
       setLanguageMix(settings.tone_profile.languageMix ?? 'English');
+      setVocabularyLevel(settings.tone_profile.vocabularyLevel ?? 'simple');
+      setAvoidWords(settings.tone_profile.avoidWords && settings.tone_profile.avoidWords.length > 0 ? settings.tone_profile.avoidWords : DEFAULT_AVOID_WORDS);
     }
   }, [settings?.about_me, settings?.anatomy_scope, settings?.tone_profile]);
 
@@ -367,6 +401,8 @@ export default function SettingsPage() {
   const [sentenceLength, setSentenceLength] = useState<'short' | 'medium' | 'long'>(settings?.tone_profile?.sentenceLength ?? 'short');
   const [bannedPhrases, setBannedPhrases] = useState<string[]>(settings?.tone_profile?.bannedPhrases ?? []);
   const [languageMix, setLanguageMix] = useState<string>(settings?.tone_profile?.languageMix ?? 'English');
+  const [vocabularyLevel, setVocabularyLevel] = useState<string>(settings?.tone_profile?.vocabularyLevel ?? 'simple');
+  const [avoidWords, setAvoidWords] = useState<string[]>(settings?.tone_profile?.avoidWords && settings?.tone_profile?.avoidWords.length > 0 ? settings.tone_profile.avoidWords : DEFAULT_AVOID_WORDS);
   const [savingTone, setSavingTone] = useState(false);
   const [anatomyScope, setAnatomyScope] = useState<'global' | 'per_post_type'>(settings?.anatomy_scope ?? 'global');
 
@@ -382,7 +418,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           frequency: settings?.frequency ?? 'daily',
           anatomy_scope: newScope,
-          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix },
+          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix, vocabularyLevel, avoidWords },
           about_me: aboutMe
         })
       });
@@ -471,7 +507,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           frequency: settings?.frequency ?? 'daily',
           anatomy_scope: anatomyScope,
-          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix },
+          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix, vocabularyLevel, avoidWords },
           about_me: aboutMe
         })
       });
@@ -498,7 +534,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           frequency: settings?.frequency ?? 'daily',
           anatomy_scope: anatomyScope,
-          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix },
+          tone_profile: { formality, sentenceLength, bannedPhrases, languageMix, vocabularyLevel, avoidWords },
           about_me: aboutMe
         })
       });
@@ -601,7 +637,7 @@ export default function SettingsPage() {
     { id: 'about' as const, label: 'About Me', icon: 'M' },
     { id: 'pillars' as const, label: 'Post Pillars', icon: 'P' },
     { id: 'anatomy' as const, label: 'Post Anatomy', icon: 'A' },
-    { id: 'tone'    as const, label: 'Tone & Voice', icon: 'T' },
+    { id: 'tone' as const, label: 'Tone & Voice', icon: 'T' },
     { id: 'mechanics' as const, label: 'Writing Mechanics', icon: 'W' },
   ];
 
@@ -638,32 +674,27 @@ export default function SettingsPage() {
       )}
 
       {/* Page Header */}
-      <div className="flex-shrink-0 border-b px-6 py-4"
-        style={{ background: 'rgba(10,10,15,0.9)', borderColor: 'var(--border)', backdropFilter: 'blur(8px)' }}>
+      <div className="shrink-0 border-b border-[#4f6e7d]/15 px-8 py-5 flex items-center justify-between bg-white/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <Settings size={18} style={{ color: 'var(--accent)' }} />
-          <h1 className="font-semibold text-base">Settings</h1>
-        </div>
-      </div>
-
-      {/* Tab Bar */}
-      <div className="flex-shrink-0 border-b px-6" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="flex gap-1 -mb-px">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all border-b-2"
-              style={{
-                borderColor: activeTab === tab.id ? 'var(--accent)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
-                background: 'transparent',
-              }}
-            >
-              <span className="text-xs font-bold">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
+          <div className="w-10 h-10 rounded-2xl bg-[#2c2c2c] text-white shadow-xs flex items-center justify-center">
+            <Settings size={20} className="text-[#c94731]" />
+          </div>
+          <div>
+            <h1 className="font-extrabold text-lg text-[#2c2c2c] tracking-tight">
+              {activeTab === 'about' && 'About Me & Context'}
+              {activeTab === 'pillars' && 'Post Pillars'}
+              {activeTab === 'anatomy' && 'Post Anatomy Builder'}
+              {activeTab === 'tone' && 'Tone & Voice Rules'}
+              {activeTab === 'mechanics' && 'Writing Mechanics'}
+            </h1>
+            <p className="text-xs font-medium text-[#4f6e7d]">
+              {activeTab === 'about' && 'Manage your bio & background context injected into AI generation.'}
+              {activeTab === 'pillars' && 'Configure content pillars, DOs/DON\'Ts, and visual format directives.'}
+              {activeTab === 'anatomy' && 'Define structural sections and instructions for generated post types.'}
+              {activeTab === 'tone' && 'Set formality, sentence rhythm, banned buzzwords, and simplicity parameters.'}
+              {activeTab === 'mechanics' && 'Manage strict writing mechanics and style enforcement directives.'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -743,11 +774,14 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-sm">{pt.name}</span>
-                        <div className="flex gap-3 mt-1">
+                        <div className="flex gap-3 mt-1 flex-wrap">
                           <span className="text-xs" style={{ color: 'var(--success)' }}>+ {pt.dos.length} DOs</span>
                           <span className="text-xs" style={{ color: '#ef4444' }}>x {pt.donts.length} DON&apos;Ts</span>
                           {pt.core_focus && (
                             <span className="text-xs" style={{ color: 'var(--accent)' }}>* Core Focus set</span>
+                          )}
+                          {Array.isArray(pt.visual_suggestions) && pt.visual_suggestions.length > 0 && (
+                            <span className="text-xs" style={{ color: '#8b5cf6' }}>📷 {pt.visual_suggestions.length} Visuals</span>
                           )}
                         </div>
                       </div>
@@ -761,11 +795,26 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     {pt.core_focus && (
-                      <div className="px-4 pb-3">
+                      <div className="px-4 pb-2">
                         <p className="text-xs leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                           <span className="font-medium" style={{ color: 'var(--accent)' }}>Focus: </span>
                           {pt.core_focus}
                         </p>
+                      </div>
+                    )}
+                    {Array.isArray(pt.visual_suggestions) && pt.visual_suggestions.length > 0 && (
+                      <div className="px-4 pb-3">
+                        <div className="pt-2 border-t space-y-1" style={{ borderColor: 'var(--border-subtle)' }}>
+                          <span className="text-xs font-medium" style={{ color: '#8b5cf6' }}>Visual Suggestions:</span>
+                          <ul className="space-y-1">
+                            {pt.visual_suggestions.map((v, i) => (
+                              <li key={i} className="text-xs flex items-start gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                                <span style={{ color: '#8b5cf6' }}>•</span>
+                                <span>{v}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1103,7 +1152,7 @@ export default function SettingsPage() {
               <h2 className="font-semibold text-base mb-1">Tone &amp; Voice Profile</h2>
               <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Applied to every generation call regardless of post type.</p>
 
-              <div className="grid grid-cols-2 gap-4 mb-5">
+              <div className="grid grid-cols-3 gap-4 mb-5">
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Language Mix</label>
                   <div className="relative">
@@ -1133,6 +1182,22 @@ export default function SettingsPage() {
                     <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Vocabulary Level</label>
+                  <div className="relative">
+                    <select
+                      value={vocabularyLevel}
+                      onChange={e => setVocabularyLevel(e.target.value)}
+                      className="w-full appearance-none pr-8"
+                      style={{ ...selectStyle, width: '100%' }}
+                    >
+                      <option value="simple">Simple &amp; Everyday (Default)</option>
+                      <option value="formal">Formal / Academic</option>
+                    </select>
+                    <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                  </div>
+                </div>
               </div>
 
               <div className="mb-5">
@@ -1150,6 +1215,19 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2.5 rounded-lg border text-sm resize-none focus:outline-none"
                   style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                 />
+              </div>
+
+              <div className="mb-5">
+                <TagInput
+                  label="Avoid Words (AI Vocabulary Tells - strictly forbidden words)"
+                  tags={avoidWords}
+                  onChange={setAvoidWords}
+                  placeholder="Type a word to avoid and press Enter"
+                  accentColor="#c94731"
+                />
+                <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Words that sound like formal AI writing (e.g. <em>resilience, leverage, robust, seamless, delve</em>). Generator will strictly avoid them and independent audit will flag them as failures.
+                </p>
               </div>
 
               <div className="mb-6">
@@ -1266,5 +1344,13 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-[#4f6e7d] font-medium">Loading settings...</div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }

@@ -8,6 +8,7 @@ export interface PostType {
   dos: string[];
   donts: string[];
   core_focus: string;
+  visual_suggestions?: string[] | string;
 }
 
 export interface AnatomySection {
@@ -23,6 +24,8 @@ export interface ToneProfile {
   sentenceLength: 'short' | 'medium' | 'long';
   bannedPhrases: string[];
   languageMix: string;
+  vocabularyLevel?: string;
+  avoidWords?: string[];
 }
 
 export interface Settings {

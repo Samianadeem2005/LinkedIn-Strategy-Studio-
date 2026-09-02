@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
 
 const DEFAULT_ABOUT_ME = "I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.";
 
@@ -9,16 +10,21 @@ export async function GET() {
     let row = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Record<string, unknown> | undefined;
     if (!row) {
       db.prepare(`INSERT INTO settings (id, frequency, anatomy_scope, tone_profile, about_me) VALUES (1, 'daily', 'global', ?, ?)`).run(
-        JSON.stringify({ formality: 'mixed', sentenceLength: 'short', bannedPhrases: [], languageMix: '' }),
+        JSON.stringify({ formality: 'mixed', sentenceLength: 'short', bannedPhrases: [], languageMix: '', vocabularyLevel: 'simple', avoidWords: DEFAULT_AVOID_WORDS }),
         DEFAULT_ABOUT_ME
       );
       row = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Record<string, unknown>;
     }
     const aboutMeVal = (row.about_me as string)?.trim() || DEFAULT_ABOUT_ME;
+    const toneProfile = row.tone_profile ? JSON.parse(row.tone_profile as string) : {};
+    if (!toneProfile.vocabularyLevel) toneProfile.vocabularyLevel = 'simple';
+    if (!toneProfile.avoidWords || !Array.isArray(toneProfile.avoidWords) || toneProfile.avoidWords.length === 0) {
+      toneProfile.avoidWords = DEFAULT_AVOID_WORDS;
+    }
     return NextResponse.json({
       ...row,
       about_me: aboutMeVal,
-      tone_profile: row.tone_profile ? JSON.parse(row.tone_profile as string) : {}
+      tone_profile: toneProfile
     });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

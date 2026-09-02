@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { callWithGeminiFallback } from '@/lib/gemini';
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
     const combinedDos: string[] = [];
     const combinedDonts: string[] = [];
     const focusParts: string[] = [];
+    const visualParts: string[] = [];
 
     postTypesList.forEach(pt => {
       try {
@@ -57,6 +59,15 @@ export async function POST(req: NextRequest) {
         combinedDonts.push(...dt);
       } catch {}
       if (pt.core_focus) focusParts.push(`${pt.name}: ${pt.core_focus}`);
+      if (pt.visual_suggestions) {
+        try {
+          const parsed = JSON.parse(pt.visual_suggestions as string);
+          if (Array.isArray(parsed)) visualParts.push(...parsed);
+          else visualParts.push(String(pt.visual_suggestions));
+        } catch {
+          visualParts.push(String(pt.visual_suggestions));
+        }
+      }
     });
 
     const postType = {
@@ -67,6 +78,10 @@ export async function POST(req: NextRequest) {
     const dos = Array.from(new Set(combinedDos));
     const donts = Array.from(new Set(combinedDonts));
     const coreFocus = postType.core_focus;
+    const visualSuggestionsList = Array.from(new Set(visualParts));
+    const visualSuggestionsGuidance = visualSuggestionsList.length > 0
+      ? visualSuggestionsList.map(v => `• ${v}`).join('\n')
+      : '';
 
     // Load anatomy - respect scope
     const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Record<string, unknown> | undefined;
@@ -100,7 +115,9 @@ export async function POST(req: NextRequest) {
       formality: toneRaw.formality ?? 'mixed',
       sentenceLength: toneRaw.sentenceLength ?? 'short',
       bannedPhrases: (toneRaw.bannedPhrases ?? []) as string[],
-      languageMix: toneRaw.languageMix ?? ''
+      languageMix: toneRaw.languageMix ?? '',
+      vocabularyLevel: toneRaw.vocabularyLevel ?? 'simple',
+      avoidWords: (toneRaw.avoidWords && Array.isArray(toneRaw.avoidWords) && toneRaw.avoidWords.length > 0 ? toneRaw.avoidWords : DEFAULT_AVOID_WORDS) as string[]
     };
 
     // Repeat-topic check (Part 7) — 30-day lookback, keyword overlap
@@ -231,6 +248,9 @@ TARGET POST FORMAT: ${activeFormat.name} (Mandatory Length: STRICTLY between ${a
 ACTIVE PILLAR'S CORE FOCUS:
 ${coreFocus || "No core focus defined — rely entirely on DOs/DON'Ts below as your primary guide."}
 
+ACTIVE PILLAR'S VISUAL SUGGESTIONS GUIDANCE:
+${visualSuggestionsGuidance || "Recommend concrete, specific screenshots, diagrams, code snippets, or graphics relevant to the post topic."}
+
 ACTIVE PILLAR'S DOs:
 ${dos.map((d: string) => `✓ ${d}`).join('\n')}
 
@@ -256,6 +276,24 @@ TONE & VOICE PROFILE:
 - Sentence length: ${tone.sentenceLength}
 - Language mix: ${tone.languageMix || 'Not specified'}
 - NEVER use these phrases: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
+
+VOCABULARY RULE: Write using simple, everyday words — the kind a person would actually say out loud to a friend, not words from a formal essay or corporate writing. When you're about to use a longer or more "impressive" word, stop and ask: would I actually say this out loud? If not, use the plain version instead.
+
+Examples of the pattern to avoid (replace formal/literary word → plain word):
+- "resilience" → "holds up" / "doesn't break"
+- "predictable" → "works the way I expect" / "makes sense"
+- "miserably" → "badly" / "completely"
+- "rigid" → "fixed" / "one-way" / "strict"
+- "leverage" (as a verb) → "use"
+- "robust" → "solid" / "strong"
+- "seamless" → "smooth" / "no issues"
+- "myriad" → "a lot of" / "many"
+- "utilize" → "use"
+- "delve into" → "look at" / "dig into"
+
+Never use any word from this list: ${tone.avoidWords.length ? tone.avoidWords.join(', ') : 'none specified'}
+
+This applies to every section of the post, not just the hook.
 
 ---
 
@@ -284,6 +322,7 @@ Respond with ONLY valid JSON — no markdown fences, no commentary before or aft
 }
 
 CRITICAL RULES:
+- **ANTI-EXAGGERATION DIRECTIVE**: Do not upgrade the raw input's language into stronger claims. If the raw notes say a result was "reduced" or "improved," do not restate it as "eliminated," "solved completely," "instantly," or similar absolute terms unless the raw notes themselves use that strength of language.
 - Each version must be genuinely distinct (different angle, opening hook, or framing — not just rephrased).
 - All 3 versions apply the SAME hook type but different angles/wording — never repeat the exact same hook sentence across versions.
 - Never include placeholder text or meta-commentary unless the Showcase/Authority pillar exception applies (thin input with no real project detail).
@@ -323,7 +362,7 @@ CRITICAL RULES:
 async function generateSingleSection(
   rawNotes: string,
   postType: Record<string, unknown>,
-  tone: { formality: string; sentenceLength: string; bannedPhrases: string[]; languageMix: string },
+  tone: { formality: string; sentenceLength: string; bannedPhrases: string[]; languageMix: string; avoidWords?: string[] },
   section: Record<string, unknown>,
   dos: string[],
   donts: string[],
@@ -350,6 +389,7 @@ ${donts.map((d: string) => `✗ ${d}`).join('\n')}
 
 TONE: ${tone.formality} formality, ${tone.sentenceLength} sentences, ${tone.languageMix || 'Professional English'}.
 NEVER use: ${tone.bannedPhrases.join(', ') || 'none'}
+VOCABULARY RULE: Use simple, everyday words. Never use formal/literary AI words like: ${(tone.avoidWords || DEFAULT_AVOID_WORDS).join(', ')}.
 LANGUAGE RULE: Write in clear English. Roman Urdu/Hindi is only acceptable for Personal-pillar posts.
 
 RAW NOTES:

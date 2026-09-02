@@ -19,13 +19,10 @@ export default function Modal({ title, onClose, children, footer, width = 'max-w
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden bg-[#2c2c2c]/40 backdrop-blur-sm animate-fade-in">
       <div
-        className={`w-full ${width} rounded-2xl border animate-fade-in overflow-hidden`}
+        className={`w-full ${width} rounded-3xl border border-[#4f6e7d]/20 bg-[#ffffff] text-[#2c2c2c] shadow-2xl animate-panel-settle overflow-hidden`}
         style={{
-          background: 'var(--bg-elevated)',
-          borderColor: 'var(--border)',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -33,21 +30,24 @@ export default function Modal({ title, onClose, children, footer, width = 'max-w
         }}
       >
         {/* Pinned Header */}
-        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--border)', flexShrink: 0 }}>
-          <h2 className="font-semibold text-base">{title}</h2>
-          <button onClick={onClose} className="p-1 rounded-lg transition-colors hover:bg-white/5">
-            <X size={18} style={{ color: 'var(--text-muted)' }} />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#4f6e7d]/15 bg-[#f5f1f2] flex-shrink-0">
+          <h2 className="font-bold text-base text-[#2c2c2c] tracking-tight">{title}</h2>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full border border-[#4f6e7d]/20 text-[#4f6e7d] hover:text-white hover:bg-[#4f6e7d] hover:border-[#4f6e7d] transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs"
+          >
+            <X size={14} />
           </button>
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="p-5" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto' }}>
+        <div className="p-6 text-sm flex-1 overflow-y-auto min-h-0">
           {children}
         </div>
 
-        {/* Pinned Footer (Optional) */}
+        {/* Pinned Footer */}
         {footer && (
-          <div className="p-4 border-t flex items-center justify-end gap-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)', flexShrink: 0 }}>
+          <div className="px-6 py-4 border-t border-[#4f6e7d]/15 bg-[#f5f1f2] flex items-center justify-end gap-2 flex-shrink-0">
             {footer}
           </div>
         )}

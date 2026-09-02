@@ -162,7 +162,7 @@ export default function CalendarPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceDate, targetDate })
       });
-      
+
       // Silent refetch (showLoading = false) so UI stays completely stable without blinking
       fetchData(false);
     } catch (e) {
@@ -178,7 +178,7 @@ export default function CalendarPage() {
       try {
         const parsed = JSON.parse(topics);
         if (Array.isArray(parsed)) return parsed.join(', ');
-      } catch (_) {}
+      } catch (_) { }
       return topics;
     }
     return '';
@@ -323,36 +323,33 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              {monthYearString}
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#2c2c2c]">
+              <span>{monthYearString}</span> <span className="font-serif-italic text-[#c94731] font-normal">Schedule</span>
             </h1>
             <div className="flex items-center gap-1">
               <button onClick={handlePrevMonth}
-                className="p-1 rounded-lg border transition-colors hover:bg-white/5"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+                className="p-1.5 rounded-xl border border-[#4f6e7d]/20 text-[#4f6e7d] hover:text-[#2c2c2c] hover:bg-white transition-all cursor-pointer"
                 title="Previous month">
                 <ChevronLeft size={14} />
               </button>
               <button onClick={handleNextMonth}
-                className="p-1 rounded-lg border transition-colors hover:bg-white/5"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+                className="p-1.5 rounded-xl border border-[#4f6e7d]/20 text-[#4f6e7d] hover:text-[#2c2c2c] hover:bg-white transition-all cursor-pointer"
                 title="Next month">
                 <ChevronRight size={14} />
               </button>
             </div>
           </div>
-          <p className="text-[11px] mt-0.5 flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[11px] mt-0.5 flex items-center gap-2 text-[#4f6e7d]">
             <span>{totalScheduledCount} {totalScheduledCount === 1 ? 'post scheduled' : 'posts scheduled'}</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full border border-purple-500/30 text-purple-400 bg-purple-500/10">
+            <span className="text-[9px] px-2 py-0.5 rounded-full border border-[#c94731]/30 text-[#c94731] bg-[#c94731]/10 font-medium">
               Drag cards to swap dates
             </span>
           </p>
         </div>
 
         <Link href="/strategy"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-          <Sparkles size={13} style={{ color: 'var(--accent)' }} /> Strategy & Quotas
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-white border border-[#4f6e7d]/20 text-[#2c2c2c] hover:bg-[#f5f1f2]">
+          <Sparkles size={13} className="text-[#c94731]" /> Strategy & Quotas
         </Link>
       </div>
 
@@ -381,6 +378,15 @@ export default function CalendarPage() {
               );
             }
 
+            const todayLocalDateStr = (() => {
+              const now = new Date();
+              const y = now.getFullYear();
+              const m = String(now.getMonth() + 1).padStart(2, '0');
+              const d = String(now.getDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
+            })();
+
+            const isToday = cell.dateStr === todayLocalDateStr;
             const events = eventsByDate[cell.dateStr];
             const hasDraft = !!events?.draft;
             const hasPlan = !!events?.plan;
@@ -389,9 +395,9 @@ export default function CalendarPage() {
             const isDragTarget = dragOverDate === cell.dateStr;
 
             const topicsCoveredText = hasPlan ? formatTopicsCovered(events.plan?.topics_covered) : '';
-            const topicText = topicsCoveredText 
-              || (hasPlan ? events.plan?.post_title : '') 
-              || events?.draft?.topic_summary 
+            const topicText = topicsCoveredText
+              || (hasPlan ? events.plan?.post_title : '')
+              || events?.draft?.topic_summary
               || 'Saved Post';
 
             return (
@@ -445,41 +451,49 @@ export default function CalendarPage() {
                     });
                   }
                 }}
-                className={`w-full rounded-xl flex flex-col justify-between border overflow-hidden transition-all duration-200 select-none box-border ${
-                  isDraggable ? 'cursor-grab active:cursor-grabbing hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/10' : ''
-                } ${
-                  isBeingDragged ? 'opacity-40 scale-95 border-dashed border-purple-500' : ''
-                } ${
-                  isDragTarget ? 'ring-2 ring-purple-500 border-purple-500 bg-purple-500/20 scale-[1.02] shadow-xl shadow-purple-500/20' : ''
-                }`}
+                className={`w-full rounded-xl flex flex-col justify-between border overflow-hidden transition-all duration-200 select-none box-border ${isDraggable ? 'cursor-grab active:cursor-grabbing hover:border-[#c94731]/60 hover:shadow-md' : ''
+                  } ${isBeingDragged ? 'opacity-40 scale-95 border-dashed border-[#c94731]' : ''
+                  } ${isDragTarget ? 'ring-2 ring-[#c94731] border-[#c94731] bg-[#c94731]/10 scale-[1.02] shadow-lg' : ''
+                  }`}
                 style={{
                   aspectRatio: '1 / 1',
                   padding: '8px',
                   boxSizing: 'border-box',
-                  background: isDragTarget ? 'rgba(124, 58, 237, 0.15)' : 'var(--bg-surface)',
+                  background: isDragTarget
+                    ? 'rgba(201, 71, 49, 0.10)'
+                    : isToday
+                      ? 'rgba(201, 71, 49, 0.04)'
+                      : 'var(--bg-surface)',
                   borderColor: isDragTarget
-                    ? '#7c3aed'
-                    : hasDraft
-                    ? 'var(--accent)'
-                    : hasPlan
-                    ? 'rgba(108,99,255,0.3)'
-                    : 'rgba(255,255,255,0.07)',
+                    ? '#c94731'
+                    : isToday
+                      ? '#c94731'
+                      : hasDraft
+                        ? 'rgba(79, 110, 125, 0.35)'
+                        : hasPlan
+                          ? 'rgba(79, 110, 125, 0.2)'
+                          : 'rgba(79, 110, 125, 0.1)',
                 }}
               >
-                {/* Top Row: Day Number */}
+                {/* Top Row: Day Number & Status Dot */}
                 <div className="flex items-center justify-between pointer-events-none w-full shrink-0">
-                  <span className="font-semibold text-[12px] leading-none" style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
+                  <span
+                    className={`leading-none ${isToday ? 'font-bold text-[#c94731]' : 'font-semibold text-[#2c2c2c]'}`}
+                    style={{ fontSize: '12px' }}
+                  >
                     {cell.dayNum}
                   </span>
-                  {hasDraft && (
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--accent)' }} title="Saved Draft" />
-                  )}
+                  {isToday ? (
+                    <span className="w-2 h-2 rounded-full bg-[#c94731] animate-pulse shrink-0" title="Today" />
+                  ) : hasDraft ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#4f6e7d] shrink-0" title="Saved Draft" />
+                  ) : null}
                 </div>
 
                 {/* Event Content Inside Day Box - Vertically Centered */}
                 {hasDraft && (
                   <div className="w-full min-w-0 pointer-events-none overflow-hidden flex flex-col justify-center gap-1 flex-1 my-auto">
-                    <span className="font-bold uppercase tracking-wider rounded-full block opacity-90 self-start"
+                    <span className="font-bold uppercase tracking-wider rounded-full block self-start text-[#c94731] bg-[#c94731]/10 border border-[#c94731]/30"
                       style={{
                         fontSize: '9px',
                         padding: '1.5px 6px',
@@ -488,9 +502,6 @@ export default function CalendarPage() {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        background: 'rgba(124, 58, 237, 0.2)',
-                        color: 'var(--accent)',
-                        border: '1px solid var(--accent)'
                       }}>
                       {events.draft?.post_type_name || 'Draft'}
                     </span>
@@ -510,7 +521,7 @@ export default function CalendarPage() {
 
                 {!hasDraft && hasPlan && (
                   <div className="w-full min-w-0 pointer-events-none overflow-hidden flex flex-col justify-center gap-1 flex-1 my-auto">
-                    <span className="font-bold uppercase tracking-wider rounded-full block opacity-90 self-start"
+                    <span className="font-bold uppercase tracking-wider rounded-full block opacity-90 self-start text-[#4f6e7d] bg-[#4f6e7d]/12 border border-[#4f6e7d]/30"
                       style={{
                         fontSize: '9px',
                         padding: '1.5px 6px',
@@ -519,16 +530,12 @@ export default function CalendarPage() {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        color: '#60a5fa',
-                        border: '1px solid #3b82f6'
                       }}>
                       {events.plan?.post_type_name || 'Planned'}
                     </span>
-                    <p className="font-medium leading-tight opacity-90"
+                    <p className="font-medium leading-tight opacity-90 text-[#2c2c2c]"
                       style={{
                         fontSize: '10px',
-                        color: 'var(--text-primary)',
                         maxWidth: '100%',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -558,7 +565,7 @@ export default function CalendarPage() {
               minHeight: 0,
               overflow: 'hidden'
             }}>
-            
+
             {/* Close Button */}
             <button onClick={() => setSelectedDayEvent(null)}
               className="absolute top-4 right-4 p-1.5 rounded-lg border transition-colors hover:bg-white/5 z-10 shrink-0"

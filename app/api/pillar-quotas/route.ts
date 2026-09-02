@@ -22,20 +22,23 @@ export async function GET() {
     // 2. Fetch custom pillar rules
     const rulesRows = db.prepare('SELECT * FROM custom_pillar_rules ORDER BY created_at ASC, name ASC').all() as CustomPillarRuleRow[];
 
+    const formatLocalDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     // 3. Calculate current week's date bounds (Monday to Sunday)
     const now = new Date();
     const dayOfWeek = now.getDay();
     const distanceToMonday = (dayOfWeek + 6) % 7;
     
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - distanceToMonday);
-    monday.setHours(0, 0, 0, 0);
-    const mondayStr = monday.toISOString().split('T')[0];
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday);
+    const mondayStr = formatLocalDate(monday);
 
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    const sundayStr = sunday.toISOString().split('T')[0];
+    const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+    const sundayStr = formatLocalDate(sunday);
 
     // 4. Fetch saved posts for the current week
     const savedPostsThisWeek = db.prepare(`
@@ -68,13 +71,18 @@ export async function GET() {
     // Map day saved
     const daySavedMap: Record<string, { pillar_name: string; post_id: string; topic: string }> = {};
     savedPostsThisWeek.forEach(p => {
-      const pDate = new Date(p.date + 'T00:00:00');
-      const dayName = pDate.toLocaleDateString('en-US', { weekday: 'long' });
-      daySavedMap[dayName] = {
-        pillar_name: p.pillar_name || 'Draft Post',
-        post_id: p.id,
-        topic: p.topic_summary || 'Saved Post'
-      };
+      if (p.date) {
+        const parts = p.date.split('-');
+        if (parts.length === 3) {
+          const pDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          const dayName = pDate.toLocaleDateString('en-US', { weekday: 'long' });
+          daySavedMap[dayName] = {
+            pillar_name: p.pillar_name || 'Draft Post',
+            post_id: p.id,
+            topic: p.topic_summary || 'Saved Post'
+          };
+        }
+      }
     });
 
     return NextResponse.json({

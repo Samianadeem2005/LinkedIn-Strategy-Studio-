@@ -13,6 +13,8 @@ import {
   Copy,
   Calendar as ScheduleIcon,
   Send,
+  Save,
+  FileText,
   Smartphone,
   Monitor,
   List,
@@ -102,6 +104,7 @@ const FONT_OPTIONS: FontOptionDef[] = [
   { id: 'doublestruck', label: 'Double Struck', sample: '𝔸a' },
   { id: 'monospace', label: 'Monospace', sample: '𝙰a' },
   { id: 'fullwidth', label: 'Fullwidth', sample: 'Ａa' },
+  { id: 'strikethrough', label: 'Strikethrough', sample: 'S̶a̶' },
 ];
 
 export default function FormatterPage() {
@@ -150,7 +153,7 @@ export default function FormatterPage() {
         sessionStorage.removeItem('format_input_text');
         showToast('Loaded post text from Content Studio!', 'success');
       }
-    } catch {}
+    } catch { }
   }, [showToast]);
 
   const updateTextWithHistory = (newVal: string) => {
@@ -192,14 +195,12 @@ export default function FormatterPage() {
     }
 
     const textarea = textareaRef.current;
-    if (!textarea) return;
+    let start = 0;
+    let end = text.length;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    if (start === end) {
-      showToast('Please select/highlight text in the editor to preview & apply font styles.', 'info');
-      return;
+    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+      start = textarea.selectionStart;
+      end = textarea.selectionEnd;
     }
 
     savedSelectionRef.current = { start, end };
@@ -362,34 +363,18 @@ export default function FormatterPage() {
 
   return (
     <div
-      style={{
-        minHeight: '100vh',
-        width: '100%',
-        backgroundColor: '#ffffff',
-        color: '#1a1a2e',
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        padding: '32px 24px',
-        boxSizing: 'border-box'
-      }}
+      className="min-h-screen w-full bg-[#f5f1f2] text-[#2c2c2c] p-6 max-w-7xl mx-auto font-sans"
     >
       {ToastEl}
 
       <div style={{ maxWidth: '1150px', margin: '0 auto' }}>
         {/* Centered Large Title & Subtitle Header */}
         <div style={{ textAlign: 'center', maxWidth: '640px', margin: '0 auto 36px auto' }}>
-          <h1
-            style={{
-              fontSize: '36px',
-              fontWeight: 800,
-              color: '#0f2942',
-              letterSpacing: '-0.02em',
-              margin: '0 0 10px 0'
-            }}
-          >
-            LinkedIn Text Formatter
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#2c2c2c] tracking-tight mb-2">
+            Format & Craft <span className="font-serif-italic text-[#c94731] font-normal">your LinkedIn posts</span>
           </h1>
-          <p style={{ fontSize: '14px', color: '#475569', margin: 0, lineHeight: '1.5' }}>
-            Easily format the text of your LinkedIn post with bold, italic, underlined, custom fonts and multi-styling.
+          <p style={{ fontSize: '14px', color: '#4f6e7d', margin: 0, lineHeight: '1.5' }}>
+            Format your LinkedIn posts with bold, italic, underlined, custom fonts and multi-styling.
           </p>
         </div>
 
@@ -399,11 +384,11 @@ export default function FormatterPage() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             gap: '0',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
+            border: '1px solid rgba(79, 110, 125, 0.20)',
+            borderRadius: '20px',
             overflow: 'hidden',
             backgroundColor: '#ffffff',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            boxShadow: '0 4px 20px rgba(44, 44, 44, 0.04)',
             marginBottom: '48px'
           }}
         >
@@ -413,20 +398,20 @@ export default function FormatterPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              borderRight: '1px solid #e2e8f0',
+              borderRight: '1px solid rgba(79, 110, 125, 0.15)',
               backgroundColor: '#ffffff'
             }}
           >
-            {/* Toolbar Row: Separate, individually visible square icon buttons */}
+            {/* Toolbar Row */}
             <div
               style={{
                 padding: '10px 14px',
-                borderBottom: '1px solid #e2e8f0',
+                borderBottom: '1px solid rgba(79, 110, 125, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 flexWrap: 'wrap',
-                backgroundColor: '#ffffff'
+                backgroundColor: '#f5f1f2'
               }}
             >
               {/* Bold (Supports multi-formatting) */}
@@ -499,29 +484,6 @@ export default function FormatterPage() {
                 U
               </button>
 
-              {/* Strikethrough (Supports multi-formatting) */}
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applyTransformToSelection(toggleStrikethrough)}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '13px',
-                  textDecoration: 'line-through',
-                  color: '#1e293b',
-                  cursor: 'pointer'
-                }}
-                title="Strikethrough (Applies to selection)"
-              >
-                S
-              </button>
-
               {/* Emoji Popover */}
               <div style={{ position: 'relative' }}>
                 <button
@@ -584,46 +546,6 @@ export default function FormatterPage() {
                   </div>
                 )}
               </div>
-
-              {/* Image Icon */}
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#94a3b8',
-                  cursor: 'pointer'
-                }}
-                title="Image Insert"
-              >
-                <ImageIcon size={15} />
-              </button>
-
-              {/* Globe Icon */}
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#94a3b8',
-                  cursor: 'pointer'
-                }}
-                title="Web Link"
-              >
-                <Globe size={15} />
-              </button>
 
               {/* Custom Font Dropdown with Live Hover Preview */}
               <div style={{ position: 'relative' }} ref={fontDropdownRef}>
@@ -772,27 +694,6 @@ export default function FormatterPage() {
               >
                 <ListOrdered size={15} />
               </button>
-
-              {/* Sort / Checklist */}
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applyTransformToSelection(toChecklist)}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#475569',
-                  cursor: 'pointer'
-                }}
-                title="Checklist / Sort"
-              >
-                <ArrowUpDown size={15} />
-              </button>
             </div>
 
             {/* Main Text Area */}
@@ -854,51 +755,13 @@ export default function FormatterPage() {
                 <Copy size={14} /> Copy text
               </button>
 
-              {/* Schedule (Orange Button) */}
+              {/* Draft now (Terracotta Primary Button) */}
               <button
                 onClick={handleSaveToDrafts}
                 disabled={savingDraft}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: 'none',
-                  backgroundColor: '#ff7a00',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 6px rgba(255,122,0,0.2)'
-                }}
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-white bg-[#c94731] hover:bg-[#b83d28] cursor-pointer shadow-sm disabled:opacity-40"
               >
-                <ScheduleIcon size={14} /> {savingDraft ? 'Saving...' : 'Schedule'}
-              </button>
-
-              {/* Post Now (Bright Blue Button) */}
-              <button
-                onClick={() => copyToClipboard(text, 'Formatted Post')}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: 'none',
-                  backgroundColor: '#1b84ff',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 6px rgba(27,132,255,0.2)'
-                }}
-              >
-                <Send size={14} /> Post now
+                <Save size={14} /> {savingDraft ? 'Saving Draft...' : 'Draft now'}
               </button>
             </div>
           </div>
@@ -1094,74 +957,6 @@ export default function FormatterPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* BOTTOM SECTION: 3-COLUMN GRID OF STYLE VARIATIONS */}
-        <div style={{ marginTop: '36px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f2942', marginBottom: '24px' }}>
-            All Unicode Style Variations
-          </h2>
-
-          {/* 3-Column Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: '24px'
-            }}
-          >
-            {ALL_STYLE_CARDS.map(card => {
-              const formatted = card.fn(text);
-              return (
-                <div key={card.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
-                    {card.label}
-                  </label>
-                  
-                  <div
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: '1px solid #e2e8f0',
-                      backgroundColor: '#ffffff',
-                      minHeight: '64px',
-                      fontSize: '13px',
-                      lineHeight: '1.5',
-                      color: '#0f172a',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                    }}
-                  >
-                    {formatted}
-                  </div>
-
-                  <button
-                    onClick={() => copyToClipboard(formatted, card.label)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      border: '1px solid #bae6fd',
-                      backgroundColor: '#e0f2fe',
-                      color: '#0284c7',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Copy size={13} /> Copy text
-                  </button>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>

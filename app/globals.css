@@ -1,60 +1,332 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0a0a0f;
-  --bg-surface: #111118;
-  --bg-elevated: #1a1a24;
-  --bg-hover: #1e1e2a;
-  --border: #2a2a3a;
-  --border-subtle: #1e1e2e;
-  --accent: #6c63ff;
-  --accent-glow: rgba(108, 99, 255, 0.15);
-  --accent-hover: #7c73ff;
-  --success: #22d3a8;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --text-primary: #f0f0f8;
-  --text-secondary: #8888aa;
-  --text-muted: #555570;
+  /* Strict 4-Color System (Intellecta SaaS Palette) */
+  --bg-primary: #f5f1f2;
+  /* Soft off-white / pink-gray page background */
+  --bg-surface: #ffffff;
+  /* Pure white elevated cards */
+  --bg-input: #f5f1f2;
+  /* Background fill inside all input boxes, textareas & form fields */
+  --bg-hover: rgba(79, 110, 125, 0.08);
+
+  --text-primary: #2c2c2c;
+  /* Dark charcoal primary readable text throughout */
+  --text-muted: rgba(44, 44, 44, 0.60);
+
+  --slate: #4f6e7d;
+  /* Primary Accent: Muted teal / blue-gray (secondary buttons, badges, icons, hover) */
+  --slate-glow: rgba(79, 110, 125, 0.15);
+  --slate-tint: rgba(79, 110, 125, 0.10);
+
+  --accent: #c94731;
+  /* Secondary Accent: Terracotta / rust red (primary CTAs, active states, key metrics) */
+  --accent-glow: rgba(201, 71, 49, 0.15);
+  --accent-hover: #b83d28;
+  --accent-tint: rgba(201, 71, 49, 0.10);
+
+  --border-subtle: rgba(79, 110, 125, 0.15);
+  --border-focus: rgba(79, 110, 125, 0.40);
+  --shadow-soft: 0 4px 20px rgba(44, 44, 44, 0.04);
+  --shadow-hover: 0 8px 24px rgba(44, 44, 44, 0.08);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
-  background: var(--bg-primary);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* Base Form Input & Textarea Rule: #f5f1f2 fill, #2c2c2c text, rounded 14px */
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
+textarea,
+select {
+  background-color: #f5f1f2 !important;
+  color: #2c2c2c !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(79, 110, 125, 0.20) !important;
+  transition: all 0.2s ease-in-out !important;
+}
 
-::selection { background: var(--accent-glow); }
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: #4f6e7d !important;
+  box-shadow: 0 0 0 3px rgba(79, 110, 125, 0.20) !important;
+}
 
-/* Animations */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); } 50% { box-shadow: 0 0 16px 4px var(--accent-glow); } }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes studioSettle {
+input::placeholder,
+textarea::placeholder {
+  color: rgba(44, 44, 44, 0.45) !important;
+}
+
+/* Editorial Typography System */
+.font-serif-italic {
+  font-family: var(--font-serif), Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.font-sans-bold {
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 700;
+}
+
+/* Sitewide Smooth Motion & Micro-Interactions */
+button,
+a,
+input,
+select,
+textarea,
+.mosaic-card,
+.mini-card-pill {
+  transition: background-color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out,
+    opacity 0.2s ease-in-out,
+    transform 0.2s ease-in-out;
+}
+
+button:active,
+a:active {
+  transform: scale(0.985);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(79, 110, 125, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--slate);
+}
+
+::selection {
+  background: rgba(201, 71, 49, 0.18);
+  color: var(--text-primary);
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-.animate-fade-in { animation: fadeIn 0.3s ease forwards; }
-.animate-slide-in { animation: slideIn 0.25s ease forwards; }
-.spinner { animation: spin 0.8s linear infinite; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .animate-studio-settle {
-    animation: studioSettle 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
   }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes panelSettle {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes contentRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.animate-panel-settle {
+  animation: panelSettle 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.animate-content-rise {
+  animation: contentRise 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Intellecta Card Surface & Component Utility Classes */
+.mosaic-card {
+  border-radius: 24px;
+  border: 1px solid rgba(79, 110, 125, 0.16);
+  background: #ffffff;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(44, 44, 44, 0.04);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.mosaic-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(79, 110, 125, 0.28);
+  box-shadow: 0 8px 24px rgba(44, 44, 44, 0.07);
+}
+
+.mini-card-pill {
+  border-radius: 16px;
+  background-color: rgba(79, 110, 125, 0.08);
+  border: 1px solid rgba(79, 110, 125, 0.15);
+  color: #2c2c2c;
+  transition: all 0.2s ease-in-out;
+}
+
+.mini-card-pill:hover {
+  background-color: rgba(79, 110, 125, 0.14);
+  transform: translateY(-1px);
+}
+
+.intellecta-badge-accent {
+  border-radius: 9999px;
+  background-color: rgba(201, 71, 49, 0.12);
+  color: #c94731;
+  border: 1px solid rgba(201, 71, 49, 0.25);
+  font-weight: 700;
+}
+
+.intellecta-badge-slate {
+  border-radius: 9999px;
+  background-color: rgba(79, 110, 125, 0.12);
+  color: #4f6e7d;
+  border: 1px solid rgba(79, 110, 125, 0.25);
+  font-weight: 600;
+}
+
+.intellecta-input {
+  background-color: #f5f1f2 !important;
+  color: #2c2c2c !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(79, 110, 125, 0.20) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.intellecta-input:focus {
+  outline: none !important;
+  border-color: #4f6e7d !important;
+  box-shadow: 0 0 0 3px rgba(79, 110, 125, 0.20) !important;
+}
+
+.intellecta-btn-primary {
+  background-color: #c94731;
+  color: #ffffff;
+  border-radius: 14px;
+  font-weight: 700;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 10px rgba(201, 71, 49, 0.20);
+}
+
+.intellecta-btn-primary:hover {
+  background-color: #b83d28;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(201, 71, 49, 0.28);
+}
+
+.intellecta-btn-secondary {
+  background-color: #ffffff;
+  color: #4f6e7d;
+  border: 1px solid rgba(79, 110, 125, 0.25);
+  border-radius: 14px;
+  font-weight: 700;
+  transition: all 0.2s ease-in-out;
+}
+
+.intellecta-btn-secondary:hover {
+  background-color: rgba(79, 110, 125, 0.08);
+  color: #2c2c2c;
+  border-color: rgba(79, 110, 125, 0.40);
+  transform: translateY(-2px);
+}
+
+/* Circular/Rounded Icon Button */
+.intellecta-icon-btn {
+  border-radius: 9999px;
+  background-color: #ffffff;
+  color: #4f6e7d;
+  border: 1px solid rgba(79, 110, 125, 0.20);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.intellecta-icon-btn:hover {
+  background-color: #4f6e7d;
+  color: #ffffff;
+  border-color: #4f6e7d;
+  transform: translateY(-1px);
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Hide Next.js dev indicator symbol & dev portal */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-portal],
+button[aria-label*="Next.js"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

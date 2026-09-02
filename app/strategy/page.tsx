@@ -195,7 +195,7 @@ export default function StrategyPage() {
             return (
               <div key={rule.id} className="flex items-center justify-between px-5 py-4 rounded-xl border transition-all hover:border-purple-500/30"
                 style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-                
+
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0"
                     style={{ background: rule.is_hybrid ? 'rgba(168, 85, 247, 0.2)' : 'rgba(124, 58, 237, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
@@ -276,7 +276,7 @@ export default function StrategyPage() {
           style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}>
           <div className="w-full max-w-lg rounded-2xl border p-6 animate-scale-in relative shadow-2xl"
             style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-            
+
             <button onClick={() => setShowModal(false)}
               className="absolute top-4 right-4 p-1.5 rounded-lg border transition-colors hover:bg-white/5"
               style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
@@ -308,13 +308,11 @@ export default function StrategyPage() {
                   return (
                     <label key={pt.id}
                       onClick={() => handleTogglePillar(pt.id)}
-                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all select-none ${
-                        isChecked ? 'border-purple-500 bg-purple-500/10' : 'border-gray-800 hover:border-gray-700'
-                      }`}>
-                      <input type="checkbox" checked={isChecked} onChange={() => {}} className="hidden" />
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
-                        isChecked ? 'bg-purple-600 border-purple-500' : 'border-gray-600'
-                      }`}>
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all select-none ${isChecked ? 'border-purple-500 bg-purple-500/10' : 'border-gray-800 hover:border-gray-700'
+                        }`}>
+                      <input type="checkbox" checked={isChecked} onChange={() => { }} className="hidden" />
+                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isChecked ? 'bg-purple-600 border-purple-500' : 'border-gray-600'
+                        }`}>
                         {isChecked && <Sparkles size={10} className="text-white" />}
                       </div>
                       <span className="text-xs font-semibold" style={{ color: isChecked ? 'var(--accent)' : 'var(--text-primary)' }}>

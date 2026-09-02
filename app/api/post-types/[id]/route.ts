@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
-function validatePostType(body: { dos?: unknown; donts?: unknown; name?: unknown; core_focus?: unknown }) {
+function validatePostType(body: { dos?: unknown; donts?: unknown; name?: unknown; core_focus?: unknown; visual_suggestions?: unknown }) {
   const dos = Array.isArray(body.dos) ? body.dos.filter((d: unknown) => typeof d === 'string' && d.trim()) : [];
   const donts = Array.isArray(body.donts) ? body.donts.filter((d: unknown) => typeof d === 'string' && d.trim()) : [];
+  const visual_suggestions = Array.isArray(body.visual_suggestions)
+    ? body.visual_suggestions.filter((v: unknown) => typeof v === 'string' && v.trim())
+    : typeof body.visual_suggestions === 'string' && body.visual_suggestions.trim()
+    ? [body.visual_suggestions.trim()]
+    : [];
+
   if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
     return { valid: false, error: 'Post type name is required.' };
   }
@@ -16,7 +22,7 @@ function validatePostType(body: { dos?: unknown; donts?: unknown; name?: unknown
   if (!body.core_focus || typeof body.core_focus !== 'string' || !body.core_focus.trim()) {
     return { valid: false, error: 'Core Focus is mandatory — describe what this post type is actually for.' };
   }
-  return { valid: true, dos, donts, core_focus: (body.core_focus as string).trim() };
+  return { valid: true, dos, donts, core_focus: (body.core_focus as string).trim(), visual_suggestions };
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,15 +36,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const db = getDb();
     const existing = db.prepare('SELECT id FROM post_types WHERE id = ?').get(id);
     if (!existing) return NextResponse.json({ error: 'Post type not found.' }, { status: 404 });
-    db.prepare('UPDATE post_types SET name = ?, dos = ?, donts = ?, core_focus = ? WHERE id = ?').run(
+    db.prepare('UPDATE post_types SET name = ?, dos = ?, donts = ?, core_focus = ?, visual_suggestions = ? WHERE id = ?').run(
       (body.name as string).trim(),
       JSON.stringify(validation.dos),
       JSON.stringify(validation.donts),
       validation.core_focus,
+      JSON.stringify(validation.visual_suggestions),
       id
     );
     const row = db.prepare('SELECT * FROM post_types WHERE id = ?').get(id) as Record<string, unknown>;
-    return NextResponse.json({ ...row, dos: JSON.parse(row.dos as string), donts: JSON.parse(row.donts as string) });
+    let visual_suggestions: string[] = [];
+    if (row.visual_suggestions) {
+      try {
+        const parsed = JSON.parse(row.visual_suggestions as string);
+        visual_suggestions = Array.isArray(parsed) ? parsed : [String(row.visual_suggestions)];
+      } catch {
+        visual_suggestions = typeof row.visual_suggestions === 'string' ? [row.visual_suggestions] : [];
+      }
+    }
+    return NextResponse.json({
+      ...row,
+      dos: JSON.parse(row.dos as string),
+      donts: JSON.parse(row.donts as string),
+      visual_suggestions
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
