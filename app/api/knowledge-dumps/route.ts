@@ -28,3 +28,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
+
+export async function GET() {
+  try {
+    const db = getDb();
+    const dump = db.prepare(
+      "SELECT id, raw_text, clean_summary, created_at FROM knowledge_dumps WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1"
+    ).get() as { id: string; raw_text: string; clean_summary?: string; created_at: string } | undefined;
+
+    if (!dump) {
+      return NextResponse.json({ dump: null });
+    }
+
+    return NextResponse.json({ dump });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const dumpId = searchParams.get('dumpId');
+    const db = getDb();
+    if (dumpId) {
+      db.prepare("UPDATE knowledge_dumps SET status = 'discarded' WHERE id = ?").run(dumpId);
+      db.prepare("DELETE FROM extraction_review WHERE dump_id = ?").run(dumpId);
+    } else {
+      db.prepare("UPDATE knowledge_dumps SET status = 'discarded' WHERE status = 'pending'").run();
+    }
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}

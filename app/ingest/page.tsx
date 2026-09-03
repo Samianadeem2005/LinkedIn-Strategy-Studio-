@@ -32,6 +32,67 @@ export default function IngestPage() {
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
 
+  useEffect(() => {
+    checkActiveDump();
+  }, []);
+
+  async function checkActiveDump() {
+    try {
+      const res = await fetch('/api/knowledge-dumps');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.dump?.id) {
+        setDumpId(data.dump.id);
+        if (data.dump.raw_text) setRawText(data.dump.raw_text);
+        await loadReviewQueue(data.dump.id);
+      }
+    } catch (_) {}
+  }
+
+  async function loadReviewQueue(targetDumpId: string) {
+    try {
+      const reviewRes = await fetch(`/api/knowledge-dumps/${targetDumpId}/review`);
+      if (reviewRes.ok) {
+        const reviewData = await reviewRes.json();
+        setCleanSummary(reviewData.clean_summary || null);
+
+        const initializedNew = (reviewData.newItems || []).map((item: ReviewItem) => ({
+          ...item,
+          user_decision: (item.user_decision as ReviewItem['user_decision']) || 'keep'
+        }));
+
+        const initializedUpdates = (reviewData.updates || []).map((item: ReviewItem) => ({
+          ...item,
+          apply_mode: (item.apply_mode as 'merge' | 'replace') || 'merge',
+          user_decision: (item.user_decision as ReviewItem['user_decision']) || 'keep_previous'
+        }));
+
+        const initializedErrorItems = (reviewData.errorItems || []).map((item: ReviewItem) => ({
+          ...item,
+          user_decision: 'error' as const
+        }));
+
+        setNewItems(initializedNew);
+        setUpdates(initializedUpdates);
+        setErrorItems(initializedErrorItems);
+      }
+    } catch (_) {}
+  }
+
+  const discardActiveDump = async () => {
+    if (dumpId) {
+      await fetch(`/api/knowledge-dumps?dumpId=${dumpId}`, { method: 'DELETE' });
+    }
+    setRawText('');
+    setDumpId(null);
+    setCleanSummary(null);
+    setNewItems([]);
+    setUpdates([]);
+    setErrorItems([]);
+    setCompleted(false);
+    showToast('Active extraction pipeline discarded.', 'info');
+  };
+
   const extractStrategy = async () => {
     if (!rawText.trim()) {
       showToast('Please paste strategy notes or text first.', 'error');
@@ -56,35 +117,8 @@ export default function IngestPage() {
       }
 
       setDumpId(data.dumpId);
-
-      // Load review queue
-      const reviewRes = await fetch(`/api/knowledge-dumps/${data.dumpId}/review`);
-      if (reviewRes.ok) {
-        const reviewData = await reviewRes.json();
-        setCleanSummary(reviewData.clean_summary || null);
-
-        const initializedNew = (reviewData.newItems || []).map((item: ReviewItem) => ({
-          ...item,
-          user_decision: 'keep' as const
-        }));
-
-        // Default Section 3 (updates) to 'keep_previous'
-        const initializedUpdates = (reviewData.updates || []).map((item: ReviewItem) => ({
-          ...item,
-          apply_mode: (item.apply_mode as 'merge' | 'replace') || 'merge',
-          user_decision: (item.user_decision as ReviewItem['user_decision']) || 'keep_previous'
-        }));
-
-        const initializedErrorItems = (reviewData.errorItems || []).map((item: ReviewItem) => ({
-          ...item,
-          user_decision: 'error' as const
-        }));
-
-        setNewItems(initializedNew);
-        setUpdates(initializedUpdates);
-        setErrorItems(initializedErrorItems);
-        showToast(`Extraction complete! ${reviewData.total} items extracted.`, 'success');
-      }
+      await loadReviewQueue(data.dumpId);
+      showToast('Extraction complete!', 'success');
     } catch (e) {
       showToast(String(e), 'error');
     } finally {
@@ -514,23 +548,32 @@ export default function IngestPage() {
                   </span>
                 </div>
 
-                <button
-                  onClick={confirmAll}
-                  disabled={saving || totalKeptCount === 0}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#A78BE0] hover:bg-[#9070CC] transition-all cursor-pointer shadow-md disabled:opacity-40"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 size={15} className="spinner" />
-                      Applying Updates &amp; Merging AI...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={15} />
-                      Confirm All Kept Items
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={discardActiveDump}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#A78BE0] border border-[#A78BE0]/30 hover:bg-[#A78BE0]/10 transition-all cursor-pointer"
+                  >
+                    Discard Pipeline
+                  </button>
+
+                  <button
+                    onClick={confirmAll}
+                    disabled={saving || totalKeptCount === 0}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#A78BE0] hover:bg-[#9070CC] transition-all cursor-pointer shadow-md disabled:opacity-40"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 size={15} className="spinner" />
+                        Applying Updates &amp; Merging AI...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={15} />
+                        Confirm All Kept Items
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
             </div>

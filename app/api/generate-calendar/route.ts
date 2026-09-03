@@ -181,7 +181,7 @@ Step 3: Output the calendar table with EXACT columns:
 
 - "Topic(s) Covered": ONE topic normally; exactly TWO topics on each family's mandatory synthesis day (Rule 6); never three+.
 - "Bridge Logic": REQUIRED every row, referencing the Rule 4/5 dependency.
-- "Visual": Value → diagrams, Lead Magnet → checklist/cheat-sheet cards, Showcase → code/architecture screenshots, Personal → candid photos.
+- "Visual": Value → diagrams, Lead Magnet → checklist/cheat-sheet cards, Showcase → code/architecture screenshots, Personal → candid photos, Authority → "[Visual type + description] — Source: [exact URL of original post/tweet/article/headline]" (e.g. Screenshot of the LinkedIn post being referenced — Source: https://www.linkedin.com/posts/example-123456).
 
 Before finalizing, verify: every family has exactly one 2-topic synthesis day, no family is split/interleaved, every extracted topic appears at least once, and pillar quota (total + per-week) is exact.
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Bookmark, Plus, Edit2, Trash2, Check, X } from 'lucide-react';
 import TagInput from '@/components/TagInput';
+import Modal from '@/components/Modal';
 
 interface HookType {
   id: string;
@@ -27,6 +28,9 @@ export default function HookTypesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Filter state
+  const [selectedPillarFilter, setSelectedPillarFilter] = useState<string>('All');
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,6 +50,11 @@ export default function HookTypesPage() {
   useEffect(() => {
     fetchHookTypes();
   }, []);
+
+  const filteredHookTypes = hookTypes.filter(ht => {
+    if (selectedPillarFilter === 'All') return true;
+    return (ht.best_fit_pillars || []).includes(selectedPillarFilter);
+  });
 
   async function fetchHookTypes() {
     try {
@@ -160,6 +169,34 @@ export default function HookTypesPage() {
         </button>
       </div>
 
+      {/* Pillar Filter Bar */}
+      <div className="flex flex-wrap items-center gap-2 mb-6 p-3 rounded-2xl bg-white/70 border border-[#8B8A93]/15 backdrop-blur-xs shadow-xs">
+        <span className="text-xs font-bold text-[#8B8A93] mr-1 px-1">
+          Filter by Pillar:
+        </span>
+        {['All', ...AVAILABLE_PILLARS].map(pillar => {
+          const isSelected = selectedPillarFilter === pillar;
+          const count = pillar === 'All'
+            ? hookTypes.length
+            : hookTypes.filter(h => (h.best_fit_pillars || []).includes(pillar)).length;
+          return (
+            <button
+              key={pillar}
+              onClick={() => setSelectedPillarFilter(pillar)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
+                ? 'bg-[#A78BE0] text-white shadow-xs'
+                : 'bg-[#EEECF1] text-[#8B8A93] hover:bg-[#8B8A93]/15 hover:text-[#1C1C1E]'
+                }`}
+            >
+              <span>{pillar}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-[#8B8A93]/15 text-[#8B8A93]'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
         <div className="text-center py-20 text-sm font-medium text-[#8B8A93]">
           Loading Hook Types...
@@ -168,9 +205,13 @@ export default function HookTypesPage() {
         <div className="p-4 rounded-2xl bg-[#A78BE0]/10 border border-[#A78BE0]/30 text-[#A78BE0] text-sm font-semibold">
           {error}
         </div>
+      ) : filteredHookTypes.length === 0 ? (
+        <div className="text-center py-16 text-xs text-[#8B8A93] font-medium bg-white/40 rounded-2xl border border-dashed border-[#8B8A93]/20">
+          No hook types found for "{selectedPillarFilter}" pillar.
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {hookTypes.map(ht => (
+          {filteredHookTypes.map(ht => (
             <div
               key={ht.id}
               className="mosaic-card p-6 flex flex-col justify-between"
@@ -247,75 +288,11 @@ export default function HookTypesPage() {
 
       {/* Add / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-[#1C1C1E]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white border border-[#8B8A93]/20 rounded-3xl w-full max-w-lg p-6 shadow-[0_8px_30px_rgba(44,44,44,0.08)]">
-            <div className="flex justify-between items-center mb-5 pb-3 border-b border-[#8B8A93]/15">
-              <h2 className="text-lg font-bold text-[#1C1C1E]">
-                {editingId ? 'Edit Hook Type' : 'Add New Hook Type'}
-              </h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="w-7 h-7 rounded-full border border-[#8B8A93]/20 text-[#8B8A93] hover:bg-[#8B8A93] hover:text-white transition-all duration-200 flex items-center justify-center cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-semibold text-[#1C1C1E] mb-1.5">
-                  Hook Type Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Misconception"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B8A93]/20 focus:border-[#8B8A93] transition-all"
-                />
-              </div>
-
-              {/* Angles Tag Box */}
-              <div>
-                <TagInput
-                  label="Directional Angles"
-                  tags={formData.angles}
-                  onChange={angles => setFormData(prev => ({ ...prev, angles }))}
-                  placeholder="Type an angle and press Enter"
-                  accentColor="#A78BE0"
-                />
-              </div>
-
-              {/* Best-Fit Pillars */}
-              <div>
-                <label className="block text-xs font-semibold text-[#1C1C1E] mb-2">
-                  Best-Fit Pillars (Select all that apply)
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {AVAILABLE_PILLARS.map(p => {
-                    const isSelected = formData.best_fit_pillars.includes(p);
-                    return (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => togglePillar(p)}
-                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
-                          ? 'bg-[#A78BE0] text-white border-[#A78BE0] shadow-xs'
-                          : 'bg-[#EEECF1] text-[#8B8A93] border-[#8B8A93]/20 hover:border-[#8B8A93]/40'
-                          }`}
-                      >
-                        {isSelected && <Check size={13} />}
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#8B8A93]/15">
+        <Modal
+          title={editingId ? 'Edit Hook Type' : 'Add New Hook Type'}
+          onClose={() => setIsModalOpen(false)}
+          footer={
+            <>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="px-4 py-2 rounded-xl border border-[#8B8A93]/25 text-[#8B8A93] bg-white hover:bg-[#8B8A93]/10 text-xs font-bold transition-all cursor-pointer"
@@ -329,22 +306,72 @@ export default function HookTypesPage() {
               >
                 {saving ? 'Saving...' : 'Save Hook Type'}
               </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            {/* Name */}
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1C1E] mb-1.5">
+                Hook Type Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Misconception"
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#8B8A93]/20 bg-[#EEECF1] text-[#1C1C1E] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B8A93]/20 focus:border-[#8B8A93] transition-all"
+              />
+            </div>
+
+            {/* Angles Tag Box */}
+            <div>
+              <TagInput
+                label="Directional Angles"
+                tags={formData.angles}
+                onChange={angles => setFormData(prev => ({ ...prev, angles }))}
+                placeholder="Type an angle and press Enter"
+                accentColor="#A78BE0"
+              />
+            </div>
+
+            {/* Best-Fit Pillars */}
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1C1E] mb-2">
+                Best-Fit Pillars (Select all that apply)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {AVAILABLE_PILLARS.map(p => {
+                  const isSelected = formData.best_fit_pillars.includes(p);
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => togglePillar(p)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
+                        ? 'bg-[#A78BE0] text-white border-[#A78BE0] shadow-xs'
+                        : 'bg-[#EEECF1] text-[#8B8A93] border-[#8B8A93]/20 hover:border-[#8B8A93]/40'
+                        }`}
+                    >
+                      {isSelected && <Check size={13} />}
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Delete Confirmation Modal */}
       {deleteId && (
-        <div className="fixed inset-0 bg-[#1C1C1E]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white border border-[#8B8A93]/20 rounded-3xl w-full max-w-sm p-6 text-center shadow-[0_8px_30px_rgba(44,44,44,0.08)]">
-            <h3 className="text-base font-bold text-[#1C1C1E] mb-2">
-              Delete Hook Type?
-            </h3>
-            <p className="text-xs text-[#8B8A93] mb-6">
-              Are you sure you want to remove this hook type? This cannot be undone.
-            </p>
-            <div className="flex justify-center gap-3">
+        <Modal
+          title="Delete Hook Type?"
+          onClose={() => setDeleteId(null)}
+          width="max-w-sm"
+          footer={
+            <>
               <button
                 onClick={() => setDeleteId(null)}
                 className="px-4 py-2 rounded-xl border border-[#8B8A93]/25 text-[#8B8A93] bg-white hover:bg-[#8B8A93]/10 text-xs font-bold transition-all cursor-pointer"
@@ -357,9 +384,13 @@ export default function HookTypesPage() {
               >
                 Delete
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-xs text-[#8B8A93] py-2">
+            Are you sure you want to remove this hook type? This cannot be undone.
+          </p>
+        </Modal>
       )}
     </div>
   );

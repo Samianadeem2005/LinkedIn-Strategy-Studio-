@@ -146,11 +146,11 @@ function initSchema(db: Database.Database) {
     db.exec('ALTER TABLE post_types ADD COLUMN visual_suggestions TEXT');
   }
 
-  // Seed default visual_suggestions for existing pillars if empty
+  // Seed default visual_suggestions for existing pillars
   const defaultVisuals: Record<string, string[]> = {
     'Value': ['Architecture diagram, code snippet screenshot, or comparison graphic highlighting key technical steps.'],
     'Lead Magnet': ['Resource preview mockups, template cheat-sheet screenshot, or a clean checklist infographic.'],
-    'Authority': ['Side-by-side framework diagram, quote graphic from industry research/paper, or data benchmark chart.'],
+    'Authority': ['[Visual type + description] — Source: [exact URL of the original post/tweet/article/headline] (e.g. Screenshot of the LinkedIn post being referenced — Source: https://www.linkedin.com/posts/example-123456)'],
     'Personal': ['Behind-the-scenes workspace photo, personal building screenshot, or raw terminal / project milestone photo.'],
     'Showcase': [
       'Side-by-side LangGraph / system architecture diagram',
@@ -162,8 +162,10 @@ function initSchema(db: Database.Database) {
   const existingPtsForVisuals = db.prepare('SELECT id, name, visual_suggestions FROM post_types').all() as { id: string; name: string; visual_suggestions: string | null }[];
   const updateVisualStmt = db.prepare('UPDATE post_types SET visual_suggestions = ? WHERE id = ?');
   existingPtsForVisuals.forEach(pt => {
-    if (!pt.visual_suggestions && defaultVisuals[pt.name]) {
-      updateVisualStmt.run(JSON.stringify(defaultVisuals[pt.name]), pt.id);
+    if (pt.name === 'Authority' || !pt.visual_suggestions) {
+      if (defaultVisuals[pt.name]) {
+        updateVisualStmt.run(JSON.stringify(defaultVisuals[pt.name]), pt.id);
+      }
     }
   });
 

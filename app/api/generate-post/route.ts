@@ -278,6 +278,9 @@ ${coreFocus || "No core focus defined — rely entirely on DOs/DON'Ts below as y
 
 ACTIVE PILLAR'S VISUAL SUGGESTIONS GUIDANCE:
 ${visualSuggestionsGuidance || "Recommend concrete, specific screenshots, diagrams, code snippets, or graphics relevant to the post topic."}
+- MANDATORY FOR AUTHORITY / INDUSTRY COMMENTARY POSTS: The visualSuggestion field MUST include the exact URL of the original post, tweet, article, or research paper being referenced. Strictly follow this format:
+  "[Visual type + description] — Source: [exact URL of the original post/tweet/article/headline]"
+  Example: "Screenshot of the LinkedIn post being referenced — Source: https://www.linkedin.com/posts/example-123456"
 
 ACTIVE PILLAR'S DOs:
 ${dos.map((d: string) => `✓ ${d}`).join('\n')}
@@ -303,7 +306,24 @@ TONE & VOICE PROFILE:
 - Formality: ${tone.formality}
 - Sentence length: ${tone.sentenceLength}
 - Language mix: ${tone.languageMix || 'Not specified'}
-- NEVER use these phrases: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
+- NEVER use these phrases or tropes: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
+
+STRICT WRITING BANS (ABSOLUTELY FORBIDDEN ACROSS ALL POSTS):
+- Reversal framing (e.g. "You think X, but actually Y")
+- A common belief followed by a dramatic correction
+- Rhetorical questions
+- Repeated sentence openings used to create rhythm
+- Stacked sentence fragments
+- "Most people", "Most developers", "Many engineers"
+- Abstract comparisons without a concrete effect
+- Corporate buzzwords & LinkedIn guru clichés
+- Cliche openings
+- Unnecessary adverbs
+- Artificial symmetry
+- Dramatic cadence
+- Forced summaries
+- Forced CTAs
+- Em dashes (—)
 
 VOCABULARY RULE: Write using simple, everyday words — the kind a person would actually say out loud to a friend, not words from a formal essay or corporate writing. When you're about to use a longer or more "impressive" word, stop and ask: would I actually say this out loud? If not, use the plain version instead.
 

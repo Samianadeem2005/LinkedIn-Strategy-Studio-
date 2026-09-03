@@ -17,6 +17,7 @@ interface CalendarEntry {
   id: string;
   date: string;
   post_type_id: string;
+  post_type_name?: string;
   post_title: string;
   topics_covered: string[];
   bridge_logic: string;
@@ -578,15 +579,12 @@ export default function StudioPage() {
             }}
           >
             {/* Header Title */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1C1C1E] flex items-center gap-2 flex-wrap">
                   <span>Automate your posts</span>
                   <span className="font-serif-italic font-normal" style={{ color: '#776497' }}>with quiet precision</span>
                 </h2>
-                <p className="text-xs sm:text-sm text-[#8B8A93] mt-1 font-normal">
-                  Minimal AI content workflows that elevate your creator footprint.
-                </p>
               </div>
             </div>
 
@@ -600,6 +598,11 @@ export default function StudioPage() {
                     <span className="text-[#8B8A93] font-medium">{calendarEntry.post_title}</span>
                   </div>
                 </div>
+                {(calendarEntry.post_type_name || postTypes.find(pt => pt.id === calendarEntry.post_type_id)?.name || ruleList.find(r => r.id === calendarEntry.post_type_id)?.name) && (
+                  <span className="text-[10px] px-2.5 py-1 rounded-full font-bold bg-[#776497] text-white flex-shrink-0 leading-none shadow-xs">
+                    {calendarEntry.post_type_name || postTypes.find(pt => pt.id === calendarEntry.post_type_id)?.name || ruleList.find(r => r.id === calendarEntry.post_type_id)?.name}
+                  </span>
+                )}
               </div>
             )}
 
@@ -614,7 +617,7 @@ export default function StudioPage() {
                 id="studio-notes-textarea"
                 value={rawNotes}
                 onChange={e => setRawNotes(e.target.value)}
-                placeholder="Hi there! Paste your raw notes, article key points, or framework thoughts here..."
+                placeholder="List the facts, stories, examples, and context required for the post...."
                 rows={4}
                 className="w-full px-3.5 py-3 rounded-2xl border border-[#8B8A93]/20 bg-white text-[#1C1C1E] text-xs leading-relaxed placeholder-[#8B8A93]/50 focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 focus:border-[#A78BE0] transition-all duration-200 resize-none font-sans shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
               />
