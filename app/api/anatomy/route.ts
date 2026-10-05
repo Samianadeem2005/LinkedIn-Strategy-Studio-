@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       SELECT pa.*, pt.name as post_type_name
       FROM post_anatomy pa
       LEFT JOIN post_types pt ON (pa.post_type_id = pt.id OR pa.applies_to_post_type_id = pt.id)
-      WHERE 1=1
+      WHERE pa.entity_type = 'anatomy'
     `;
     const params: unknown[] = [];
 
@@ -40,13 +40,17 @@ export async function GET(req: NextRequest) {
 
     const result = rows.map(row => {
       const intents = mappingStmt.all(row.id) as { id: string; name: string; display_name: string }[];
-      let parsedFlow: string[] = [];
+      let parsedFlow: unknown[] = [];
       if (row.thinking_flow) {
         try {
           const parsed = JSON.parse(row.thinking_flow);
-          parsedFlow = Array.isArray(parsed) ? parsed : [String(row.thinking_flow)];
+          parsedFlow = Array.isArray(parsed)
+            ? parsed.map((step: unknown, index: number) => typeof step === 'string'
+              ? { name: `Step ${index + 1}`, instruction: step, purpose: '' }
+              : step)
+            : [String(row.thinking_flow)];
         } catch {
-          parsedFlow = [String(row.thinking_flow)];
+          parsedFlow = [{ name: 'Step 1', instruction: String(row.thinking_flow), purpose: '' }];
         }
       }
 
@@ -105,8 +109,8 @@ export async function POST(req: NextRequest) {
 
     const insertAnatomy = db.prepare(`
       INSERT INTO post_anatomy (
-        id, name, section_name, rule_description, purpose, thinking_flow, writing_style, constraints, order_index, post_type_id, applies_to_post_type_id, last_used_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        id, name, section_name, rule_description, purpose, thinking_flow, writing_style, constraints, order_index, post_type_id, applies_to_post_type_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertMapping = db.prepare(`

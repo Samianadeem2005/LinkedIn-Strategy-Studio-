@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, getEligibleAnatomiesForIntent, selectAnatomyLRU, updateAnatomyLastUsed } from '@/lib/db';
+import { getDb, getComponentsForAnatomy, getEligibleAnatomiesForIntent } from '@/lib/db';
 import { resolveContentIntent } from '@/lib/intentResolver';
 import { validatePostGeneration } from '@/lib/validation';
 import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
     const requestedIntent = contentIntentId || explicitIntent || null;
     const resolvedIntent = resolveContentIntent(rawNotes, postTypeId, postType.name, requestedIntent);
 
-    // ── Step 2: Eligible Anatomies & LRU Rotation ─────────────────
+    // ── Step 2: Resolve a configured Anatomy deterministically ────
     const eligibleAnatomies = getEligibleAnatomiesForIntent(postTypeId, resolvedIntent.intentId);
     if (eligibleAnatomies.length === 0) {
       return NextResponse.json({
@@ -165,17 +165,18 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const selectedAnatomy = selectAnatomyLRU(eligibleAnatomies);
-    if (!selectedAnatomy) {
-      return NextResponse.json({ error: 'Failed to select an anatomy via LRU rotation.' }, { status: 500 });
-    }
+    const selectedAnatomy = eligibleAnatomies[0];
 
     // Parse Thinking Flow into clean numbered steps
     let thinkingFlowSteps: string[] = [];
     if (selectedAnatomy.thinking_flow) {
       try {
         const parsed = JSON.parse(selectedAnatomy.thinking_flow);
-        thinkingFlowSteps = Array.isArray(parsed) ? parsed : [String(selectedAnatomy.thinking_flow)];
+        thinkingFlowSteps = Array.isArray(parsed)
+          ? parsed.map((step: unknown) => typeof step === 'string'
+            ? step
+            : `${(step as { name?: string }).name || 'Step'}: ${(step as { instruction?: string }).instruction || ''}`.trim())
+          : [String(selectedAnatomy.thinking_flow)];
       } catch {
         thinkingFlowSteps = selectedAnatomy.thinking_flow.split('\n').map(s => s.trim()).filter(Boolean);
       }
@@ -184,10 +185,12 @@ export async function POST(req: NextRequest) {
       thinkingFlowSteps = [selectedAnatomy.purpose];
     }
 
-    // ── Step 3: Hook Pool & Hook LRU (Keep Existing System) ───────
+    const postComponents = getComponentsForAnatomy(selectedAnatomy.id);
+
+    // ── Step 3: Hook Pool (deterministic configured order) ───────
     const allHookTypes = db.prepare(
-      'SELECT id, name, description, angles, best_fit_pillars, last_used_at FROM hook_types'
-    ).all() as { id: string; name: string; description?: string; angles: string; best_fit_pillars: string; last_used_at?: string | null }[];
+      'SELECT id, name, description, angles, best_fit_pillars FROM hook_types ORDER BY name ASC'
+    ).all() as { id: string; name: string; description?: string; angles: string; best_fit_pillars: string }[];
 
     const activePillarNames = postTypesList.map(pt => pt.name as string);
     let matchingHookTypes = allHookTypes.filter(ht => {
@@ -203,15 +206,7 @@ export async function POST(req: NextRequest) {
       matchingHookTypes = allHookTypes;
     }
 
-    // Sort by LRU (nulls first, then oldest timestamp)
-    matchingHookTypes.sort((a, b) => {
-      if (!a.last_used_at && !b.last_used_at) return 0;
-      if (!a.last_used_at) return -1;
-      if (!b.last_used_at) return 1;
-      return new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime();
-    });
-
-    // Top 5 candidate hooks
+    // Keep the configured deterministic order and cap the candidate pool.
     const selectedHookTypes = matchingHookTypes.slice(0, 5);
 
     const hookBankList = selectedHookTypes.map((ht, idx) => {
@@ -227,65 +222,67 @@ export async function POST(req: NextRequest) {
     const webResults: string | undefined = body.webResults;
     const mode: 'A' | 'B' = webResults?.trim() ? 'B' : 'A';
 
-    // Load enabled writing mechanics directives
     const writingMechanics = db.prepare(
-      'SELECT prompt_directive, description FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
+      `SELECT prompt_directive, description
+       FROM writing_mechanics
+       WHERE enabled = 1
+       ORDER BY order_index ASC`
     ).all() as { prompt_directive?: string; description?: string }[];
 
-    // ── Prompt Assembly (Strict Order from Architecture Spec) ────
+    // ── Dynamic Prompt Assembly ──────────────────────────────────
     const prompt = `You are an expert LinkedIn content strategist and ghostwriter writing on behalf of:
 ${userAboutMe}
 
 ==================================================
-2. GENERATION MODE
+GENERATION MODE
 ==================================================
 ACTIVE MODE: ${mode === 'A' ? 'Mode A — Generate directly from Notes' : 'Mode B — Research & Generate via Web Search Results'}
 
 ==================================================
-3. ACTIVE PILLAR
+ACTIVE PILLAR
 ==================================================
 ${postType.name}
 
 ==================================================
-4. CONTENT INTENT
+CONTENT INTENT
 ==================================================
 INTENT: ${resolvedIntent.intentName} ("${resolvedIntent.displayName}")
 INTENT PURPOSE: ${resolvedIntent.reason}
 What the reader should get from this post: Clear, substantive value tailored specifically to this intent.
 
 ==================================================
-5. POST FORMAT + CHARACTER LIMIT
+POST FORMAT + CHARACTER LIMIT
 ==================================================
 TARGET FORMAT: ${activeFormat.name}
 MANDATORY LENGTH: STRICTLY between ${activeFormat.min} and ${activeFormat.max} characters (approximately ${Math.round(activeFormat.min / 6)}–${Math.round(activeFormat.max / 6)} words).
 
 ==================================================
-6. PILLAR CORE FOCUS
+PILLAR CORE FOCUS
 ==================================================
 ${coreFocus || "Educate and engage with authentic, grounded engineering depth."}
 
 ==================================================
-7. PILLAR DOs
+PILLAR DOs
 ==================================================
 ${dos.map((d: string) => `✓ ${d}`).join('\n')}
 
 ==================================================
-8. PILLAR DON'Ts
+PILLAR DON'Ts
 ==================================================
 ${donts.map((d: string) => `✗ ${d}`).join('\n')}
 
 ==================================================
-9. ACTIVE ANATOMY
+ACTIVE ANATOMY
 ==================================================
 ANATOMY NAME: ${selectedAnatomy.name}
 
 ==================================================
-10. ANATOMY PURPOSE
+ANATOMY PURPOSE
 ==================================================
 ${selectedAnatomy.purpose}
 
 ==================================================
-11. ANATOMY THINKING FLOW (HOW THE IDEA DEVELOPS)
+ANATOMY THINKING FLOW (HOW THE IDEA DEVELOPS)
 ==================================================
 ${thinkingFlowSteps.map((step, idx) => `${idx + 1}. ${step}`).join('\n')}
 
@@ -296,24 +293,32 @@ CRITICAL INSTRUCTION ON THINKING FLOW:
 - Write natural paragraphs that smoothly carry the reader through these ideas.
 
 ==================================================
-12. ANATOMY WRITING STYLE
+ANATOMY WRITING STYLE
 ==================================================
 ${selectedAnatomy.writing_style || 'Paragraph-led, natural cadence, clear line breaks.'}
 ${selectedAnatomy.constraints ? `ADDITIONAL CONSTRAINTS: ${selectedAnatomy.constraints}` : ''}
 
 ==================================================
-13. VISUAL GUIDANCE
+POST COMPONENTS (CONFIGURED COMPOSITION)
+==================================================
+${postComponents.length > 0
+    ? postComponents.map(component => `• ${component.name} (${component.component_type}): ${component.instructions}`).join('\n')
+    : 'No post components are configured for this Anatomy. Do not add component-specific structure by default.'}
+Components are reusable composition guidance, not thinking-journey headings. Use only the configured components and keep them natural.
+
+==================================================
+VISUAL GUIDANCE
 ==================================================
 ${visualSuggestionsGuidance || "Recommend a concrete, specific diagram, code snippet, terminal log, or graphic."}
 - FOR AUTHORITY / INDUSTRY COMMENTARY: The visualSuggestion field MUST reference a specific post, article, chart, or screenshot source if relevant.
 
 ==================================================
-14. AVAILABLE HOOK TYPES (CANDIDATE POOL)
+AVAILABLE HOOK TYPES (CANDIDATE POOL)
 ==================================================
 ${hookBankList || 'No hook types configured.'}
 
 ==================================================
-15. HOOK SELECTION & VERSION DIVERSITY RULES
+HOOK SELECTION & VERSION DIVERSITY RULES
 ==================================================
 - Generate exactly 3 distinct versions.
 - ALL 3 VERSIONS MUST USE THE SAME SELECTED ANATOMY ("${selectedAnatomy.name}"), but each version MUST use a DIFFERENT entry point / hook angle:
@@ -323,12 +328,12 @@ ${hookBankList || 'No hook types configured.'}
 - Do NOT make the 3 versions just synonym-swapped rewrites. Give each a distinct voice, framing, and pacing while honoring the anatomy's thinking flow.
 
 ==================================================
-16. WRITING MECHANICS
+GLOBAL WRITING PREFERENCES
 ==================================================
 ${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive || m.description}`).join('\n') : '• Keep lines short and scannable. Avoid dense blocks of text.'}
 
 ==================================================
-17. TONE & VOICE PROFILE
+TONE & VOICE PROFILE
 ==================================================
 - Formality: ${tone.formality}
 - Sentence length: ${tone.sentenceLength}
@@ -336,7 +341,7 @@ ${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_direct
 - Sound like a real technical builder sharing what they actually built, observed, or learned.
 
 ==================================================
-18. STRICT WRITING BANS (ABSOLUTELY FORBIDDEN)
+STRICT WRITING BANS (ABSOLUTELY FORBIDDEN)
 ==================================================
 - Reversal framing (e.g. "You think X, but actually Y" or "Everyone thinks X. They are wrong.")
 - A common belief followed by a dramatic theatrical correction
@@ -357,7 +362,7 @@ VOCABULARY RULE: Use plain, everyday words. Never use formal essay words:
 ${tone.avoidWords.length ? tone.avoidWords.join(', ') : DEFAULT_AVOID_WORDS.join(', ')}
 
 ==================================================
-19. NATURAL-FLOW & PILLAR SPECIFIC RULES
+NATURAL-FLOW & PILLAR SPECIFIC RULES
 ==================================================
 - Natural Flow > Mechanical Compliance.
 - Do NOT force a rehook, a CTA, or a numbered list unless genuinely appropriate.
@@ -369,7 +374,7 @@ ${tone.avoidWords.length ? tone.avoidWords.join(', ') : DEFAULT_AVOID_WORDS.join
 - ANTI-FABRICATION DIRECTIVE: Do NOT invent fake metrics, fake founder quotes, or imaginary results. Stay strictly grounded in the notes and context provided.
 
 ==================================================
-20. RAW NOTES / INPUT
+RAW NOTES / INPUT
 ==================================================
 ${mode === 'A' ? `RAW NOTES:
 ${rawNotes}` : `RESEARCH TOPIC:
@@ -379,7 +384,7 @@ WEB SEARCH / DOCUMENTATION RESULTS:
 ${webResults}`}
 
 ==================================================
-21. OUTPUT JSON SCHEMA
+OUTPUT JSON SCHEMA
 ==================================================
 Respond with ONLY valid JSON — no markdown fences, no text before or after:
 {
@@ -434,19 +439,6 @@ Respond with ONLY valid JSON — no markdown fences, no text before or after:
     if (!validationReport.isValid || validationReport.versions.length === 0) {
       console.error('Validation errors:', validationReport.errors);
       throw new Error(`Generation failed validation: ${validationReport.errors.join('; ')}`);
-    }
-
-    // ── Update LRU Timestamps ─────────────────────────────────────
-    // 1. Update Anatomy LRU
-    updateAnatomyLastUsed(selectedAnatomy.id);
-
-    // 2. Update Hook LRU
-    if (selectedHookTypes.length > 0) {
-      const nowIso = new Date().toISOString();
-      const updateHookStmt = db.prepare('UPDATE hook_types SET last_used_at = ? WHERE id = ?');
-      for (const ht of selectedHookTypes) {
-        updateHookStmt.run(nowIso, ht.id);
-      }
     }
 
     // Auto-extract topic summary from raw notes (first 200 chars)

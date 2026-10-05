@@ -30,15 +30,20 @@ export interface AnatomySection {
   purpose: string;
   rule_description?: string;
   thinking_flow?: string;
-  thinkingFlowList?: string[];
+  thinkingFlowList?: ThinkingFlowStep[];
   writing_style?: string;
   constraints?: string | null;
   order_index: number;
   post_type_id: string | null;
   applies_to_post_type_id?: string | null;
-  last_used_at?: string | null;
   intent_ids?: string[];
   intents?: { id: string; name: string; display_name: string }[];
+}
+
+export interface ThinkingFlowStep {
+  name: string;
+  instruction: string;
+  purpose: string;
 }
 
 export interface ToneProfile {

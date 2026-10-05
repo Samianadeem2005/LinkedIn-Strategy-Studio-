@@ -15,13 +15,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       WHERE ai.anatomy_id = ?
     `).all(id) as { id: string; name: string; display_name: string }[];
 
-    let parsedFlow: string[] = [];
+    let parsedFlow: unknown[] = [];
     if (row.thinking_flow) {
       try {
         const parsed = JSON.parse(row.thinking_flow);
-        parsedFlow = Array.isArray(parsed) ? parsed : [String(row.thinking_flow)];
+        parsedFlow = Array.isArray(parsed)
+          ? parsed.map((step: unknown, index: number) => typeof step === 'string'
+            ? { name: `Step ${index + 1}`, instruction: step, purpose: '' }
+            : step)
+          : [{ name: 'Step 1', instruction: String(row.thinking_flow), purpose: '' }];
       } catch {
-        parsedFlow = [String(row.thinking_flow)];
+        parsedFlow = [{ name: 'Step 1', instruction: String(row.thinking_flow), purpose: '' }];
       }
     }
 
@@ -68,11 +72,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const intentIds: string[] | undefined = Array.isArray(body.intent_ids) ? body.intent_ids : undefined;
 
-    const lastUsedAt = body.last_used_at !== undefined ? body.last_used_at : existing.last_used_at;
-
     const updateAnatomy = db.prepare(`
       UPDATE post_anatomy
-      SET name = ?, section_name = ?, purpose = ?, rule_description = ?, thinking_flow = ?, writing_style = ?, constraints = ?, order_index = ?, post_type_id = ?, applies_to_post_type_id = ?, last_used_at = ?
+      SET name = ?, section_name = ?, purpose = ?, rule_description = ?, thinking_flow = ?, writing_style = ?, constraints = ?, order_index = ?, post_type_id = ?, applies_to_post_type_id = ?
       WHERE id = ?
     `);
 
@@ -88,7 +90,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         orderIndex,
         postTypeId,
         postTypeId,
-        lastUsedAt,
         id
       );
 

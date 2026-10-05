@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useApp, PostType, AnatomySection, ContentIntent } from '@/context/AppContext';
+import { useApp, PostType, AnatomySection, ContentIntent, ThinkingFlowStep } from '@/context/AppContext';
 import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
 import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
@@ -17,7 +17,6 @@ import {
   ChevronDown,
   Save,
   Loader2,
-  RotateCcw,
   Sparkles,
   Layers,
   Compass,
@@ -362,21 +361,29 @@ function AnatomyModal({ existing, postTypes, contentIntents, targetPostTypeId, o
     existing?.writing_style || 'Paragraph-led. Natural prose. Do not force numbered lists. Let ideas flow naturally.'
   );
   const [constraints, setConstraints] = useState(existing?.constraints ?? '');
-  const [thinkingFlowSteps, setThinkingFlowSteps] = useState<string[]>(() => {
-    if (existing?.thinkingFlowList && existing.thinkingFlowList.length > 0) return existing.thinkingFlowList;
+  const [thinkingFlowSteps, setThinkingFlowSteps] = useState<ThinkingFlowStep[]>(() => {
+    if (existing?.thinkingFlowList && existing.thinkingFlowList.length > 0) {
+      return existing.thinkingFlowList.map((step, index) => typeof step === 'string'
+        ? { name: `Step ${index + 1}`, instruction: step, purpose: '' }
+        : step);
+    }
     if (existing?.thinking_flow) {
       try {
         const parsed = JSON.parse(existing.thinking_flow);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((step, index) => typeof step === 'string'
+            ? { name: `Step ${index + 1}`, instruction: step, purpose: '' }
+            : { name: step.name || `Step ${index + 1}`, instruction: step.instruction || '', purpose: step.purpose || '' });
+        }
       } catch {}
       const lines = existing.thinking_flow.split('\n').map(s => s.trim()).filter(Boolean);
-      if (lines.length > 0) return lines;
+      if (lines.length > 0) return lines.map((instruction, index) => ({ name: `Step ${index + 1}`, instruction, purpose: '' }));
     }
     return [
-      'Open with the core observation or moment.',
-      'Provide concrete evidence or context.',
-      'Explain the mechanism or why it matters.',
-      'Deliver the practical takeaway or implication.'
+      { name: 'Opening thought', instruction: 'Open with the core observation or moment.', purpose: '' },
+      { name: 'Evidence', instruction: 'Provide concrete evidence or context.', purpose: '' },
+      { name: 'Meaning', instruction: 'Explain the mechanism or why it matters.', purpose: '' },
+      { name: 'Implication', instruction: 'Deliver the practical takeaway or implication.', purpose: '' }
     ];
   });
 
@@ -388,16 +395,16 @@ function AnatomyModal({ existing, postTypes, contentIntents, targetPostTypeId, o
   // Eligible intents for the currently selected pillar
   const pillarIntents = contentIntents.filter(ci => ci.post_type_id === postTypeId);
 
-  const handleStepChange = (index: number, val: string) => {
+  const handleStepChange = (index: number, field: keyof ThinkingFlowStep, val: string) => {
     setThinkingFlowSteps(prev => {
       const next = [...prev];
-      next[index] = val;
+      next[index] = { ...next[index], [field]: val };
       return next;
     });
   };
 
   const handleAddStep = () => {
-    setThinkingFlowSteps(prev => [...prev, '']);
+    setThinkingFlowSteps(prev => [...prev, { name: `Step ${prev.length + 1}`, instruction: '', purpose: '' }]);
   };
 
   const handleRemoveStep = (index: number) => {
@@ -414,7 +421,11 @@ function AnatomyModal({ existing, postTypes, contentIntents, targetPostTypeId, o
     let ok = true;
     if (!name.trim()) { setNameError('Anatomy name is required.'); ok = false; } else setNameError('');
     if (!purpose.trim()) { setPurposeError('Purpose is required.'); ok = false; } else setPurposeError('');
-    const validSteps = thinkingFlowSteps.map(s => s.trim()).filter(Boolean);
+    const validSteps = thinkingFlowSteps.filter(s => s.instruction.trim()).map(s => ({
+      name: s.name.trim() || 'Step',
+      instruction: s.instruction.trim(),
+      purpose: s.purpose.trim()
+    }));
     if (validSteps.length === 0) {
       showToast('Add at least one thinking flow step.', 'error');
       ok = false;
@@ -539,10 +550,24 @@ function AnatomyModal({ existing, postTypes, contentIntents, targetPostTypeId, o
               <div key={idx} className="flex items-center gap-2">
                 <span className="w-5 text-center text-xs font-mono font-bold text-[#A78BE0]">{idx + 1}.</span>
                 <input
-                  value={step}
-                  onChange={e => handleStepChange(idx, e.target.value)}
+                  value={step.name}
+                  onChange={e => handleStepChange(idx, 'name', e.target.value)}
+                  placeholder={`Step ${idx + 1} name...`}
+                  className="w-32 px-3 py-1.5 rounded-lg border text-xs focus:outline-none"
+                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                />
+                <input
+                  value={step.instruction}
+                  onChange={e => handleStepChange(idx, 'instruction', e.target.value)}
                   placeholder={`Step ${idx + 1} thought...`}
                   className="flex-1 px-3 py-1.5 rounded-lg border text-xs focus:outline-none"
+                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                />
+                <input
+                  value={step.purpose}
+                  onChange={e => handleStepChange(idx, 'purpose', e.target.value)}
+                  placeholder="Purpose"
+                  className="w-28 px-3 py-1.5 rounded-lg border text-xs focus:outline-none"
                   style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                 />
                 {thinkingFlowSteps.length > 1 && (
@@ -876,24 +901,6 @@ function SettingsContent() {
       showToast('Anatomy deleted.', 'success');
     } else {
       showToast('Delete failed.', 'error');
-    }
-  };
-
-  const handleResetLRU = async (anatomyId: string) => {
-    try {
-      const res = await fetch(`/api/anatomy/${anatomyId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ last_used_at: null })
-      });
-      if (res.ok) {
-        await refreshAnatomy();
-        showToast('LRU timestamp reset — this anatomy is now fresh!', 'success');
-      } else {
-        showToast('Failed to reset LRU.', 'error');
-      }
-    } catch (e) {
-      showToast(String(e), 'error');
     }
   };
 
@@ -1316,7 +1323,7 @@ function SettingsContent() {
                             {steps.map((step, sIdx) => (
                               <div key={sIdx} className="p-2.5 rounded-xl border border-stone-100 bg-[#FBFBFC] text-xs text-stone-700 leading-snug">
                                 <span className="font-bold text-[#A78BE0] mr-1.5">{sIdx + 1}.</span>
-                                {step}
+                                {typeof step === 'string' ? step : `${step.name}: ${step.instruction}`}
                               </div>
                             ))}
                           </div>

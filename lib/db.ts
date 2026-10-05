@@ -16,6 +16,11 @@ export function getDb(): Database.Database {
     db.pragma('foreign_keys = ON');
     initSchema(db);
     seedIfEmpty(db);
+    applyWritingStyleMigration(db);
+    migrateAnatomyComponentsAndRemoveLru(db);
+    deduplicatePostComponents(db);
+    consolidateNamedPostComponents(db);
+    migrateUniversalPostComponentsAndAnatomyJourneys(db);
   }
   return db;
 }
@@ -42,7 +47,27 @@ function initSchema(db: Database.Database) {
       section_name TEXT NOT NULL,
       rule_description TEXT NOT NULL,
       order_index INTEGER NOT NULL,
-      applies_to_post_type_id TEXT REFERENCES post_types(id)
+      applies_to_post_type_id TEXT REFERENCES post_types(id),
+      entity_type TEXT NOT NULL DEFAULT 'anatomy'
+    );
+
+    CREATE TABLE IF NOT EXISTS post_components (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      component_type TEXT NOT NULL,
+      purpose TEXT,
+      instructions TEXT NOT NULL,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      post_type_id TEXT REFERENCES post_types(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS anatomy_components (
+      anatomy_id TEXT NOT NULL REFERENCES post_anatomy(id) ON DELETE CASCADE,
+      component_id TEXT NOT NULL REFERENCES post_components(id) ON DELETE CASCADE,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (anatomy_id, component_id)
     );
 
     CREATE TABLE IF NOT EXISTS weekly_mapping (
@@ -203,11 +228,6 @@ function initSchema(db: Database.Database) {
     db.exec("ALTER TABLE settings ADD COLUMN about_me TEXT DEFAULT NULL");
   }
 
-  // Runtime migration — add last_used_at column to hook_types table
-  const hookColumns = (db.prepare("PRAGMA table_info(hook_types)").all() as { name: string }[]).map(c => c.name);
-  if (!hookColumns.includes('last_used_at')) {
-    db.exec("ALTER TABLE hook_types ADD COLUMN last_used_at TEXT DEFAULT NULL");
-  }
   const defaultAboutMe = "I am an AI Engineer (Software Engineering student, class of 2027) building in public, working with LLMs, multi-agent systems, RAG architectures, vector databases, and full-stack AI apps. I share my authentic learning and building journey on LinkedIn, using my real project (a company chatbot built with LangGraph, RAG, Text-to-SQL, and persistent memory) as my primary proof-of-work example.";
   db.exec(`UPDATE settings SET about_me = '${defaultAboutMe.replace(/'/g, "''")}' WHERE id = 1 AND (about_me IS NULL OR about_me = '')`);
 
@@ -309,8 +329,8 @@ function initSchema(db: Database.Database) {
   if (!anatomyCols.includes('constraints')) {
     db.exec("ALTER TABLE post_anatomy ADD COLUMN constraints TEXT");
   }
-  if (!anatomyCols.includes('last_used_at')) {
-    db.exec("ALTER TABLE post_anatomy ADD COLUMN last_used_at TEXT DEFAULT NULL");
+  if (!anatomyCols.includes('entity_type')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'anatomy'");
   }
   if (!anatomyCols.includes('post_type_id')) {
     db.exec("ALTER TABLE post_anatomy ADD COLUMN post_type_id TEXT REFERENCES post_types(id)");
@@ -371,6 +391,7 @@ function seedContentIntentsAndAnatomies(db: Database.Database) {
         );
         intentMap.set(`${pillarId}:${item.name}`, intentId);
       }
+
     })();
   } else {
     // Populate intentMap from existing DB
@@ -379,11 +400,11 @@ function seedContentIntentsAndAnatomies(db: Database.Database) {
   }
 
   // 2. Seed rich anatomies if none exist with purpose
-  const richAnatomyCount = (db.prepare('SELECT COUNT(*) as c FROM post_anatomy WHERE purpose IS NOT NULL').get() as { c: number }).c;
+  const richAnatomyCount = (db.prepare("SELECT COUNT(*) as c FROM post_anatomy WHERE entity_type = 'anatomy' AND purpose IS NOT NULL").get() as { c: number }).c;
   if (richAnatomyCount === 0) {
     const insertAnatomy = db.prepare(`
-      INSERT INTO post_anatomy (id, name, section_name, rule_description, purpose, thinking_flow, writing_style, constraints, order_index, post_type_id, applies_to_post_type_id, last_used_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      INSERT INTO post_anatomy (id, name, section_name, rule_description, purpose, thinking_flow, writing_style, constraints, order_index, post_type_id, applies_to_post_type_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertAnatomyIntent = db.prepare(`
@@ -424,6 +445,254 @@ function seedContentIntentsAndAnatomies(db: Database.Database) {
   }
 }
 
+function applyWritingStyleMigration(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS system_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    )
+  `);
+
+  const migrationId = '2026-10-05-anatomy-writing-styles-and-global-mechanics';
+  if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+
+  const universalMechanics = new Map([
+    ['One-Sentence Paragraph Rule', 'Format content using 1-2 sentence paragraphs and aggressive whitespace to eliminate dense text blocks, keeping sections light and effortlessly skimmable for mobile readers.'],
+    ['Short Sentences & Value Density', 'Prefer short, clear sentences and frequent line breaks for mobile readability. Longer sentences are allowed when needed for natural flow or technical clarity.'],
+    ['No vague claims', 'Concrete numbers/timeframes over vague claims.'],
+    ['No Buzzwords', 'The draft contains no corporate buzzwords or filler.'],
+    ['Promise', 'The body fully pays off the promise made in the hook.'],
+    ['NO AI feel', 'The draft contains no generic AI phrases.\nThe post is free of spelling, grammar, and punctuation mistakes.'],
+    ['Make Every Sentence Flow', 'Make Every Sentence Flow. Read each sentence and check how it connects to the next one. Add a clear connection. Do not use repeated openings, stacked fragments, or dramatic cadence to fake momentum.']
+  ]);
+  const updateMechanic = db.prepare('UPDATE writing_mechanics SET description = ?, prompt_directive = ? WHERE rule_name = ?');
+  const disableRemoved = db.prepare('UPDATE writing_mechanics SET enabled = 0 WHERE rule_name IN (?, ?, ?, ?, ?, ?)');
+  const updateAnatomy = db.prepare('UPDATE post_anatomy SET writing_style = ? WHERE name = ?');
+
+  db.transaction(() => {
+    for (const [name, text] of universalMechanics) updateMechanic.run(text, text, name);
+    disableRemoved.run('Bold Contrast Framing', 'Actionable Takeaway Ending', 'Wave Line Structure', 'Groups of 3', 'No Orphan Words', 'Topic Chunking & Transition Connectors');
+    for (const anatomy of INITIAL_ANATOMIES) updateAnatomy.run(anatomy.writingStyle, anatomy.name);
+    db.prepare('INSERT INTO system_migrations (id, applied_at) VALUES (?, ?)').run(migrationId, new Date().toISOString());
+  })();
+}
+
+function migrateAnatomyComponentsAndRemoveLru(db: Database.Database) {
+  const migrationId = '2026-10-06-separate-post-components-remove-lru';
+  if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+
+  const componentNames = ['Hook', 'Rehook', 'Context', 'Breakdown', 'CTA', 'Lesson', 'Nudge', 'Pivot', 'Visual Suggestion'];
+  const placeholders = componentNames.map(() => '?').join(', ');
+  const legacyRows = db.prepare(`
+    SELECT id, name, section_name, rule_description, order_index, post_type_id, applies_to_post_type_id
+    FROM post_anatomy
+    WHERE name IN (${placeholders}) OR section_name IN (${placeholders})
+  `).all(...componentNames, ...componentNames) as {
+    id: string; name: string | null; section_name: string; rule_description: string;
+    order_index: number; post_type_id: string | null; applies_to_post_type_id: string | null;
+  }[];
+  const componentIds = new Map<string, string>();
+
+  db.transaction(() => {
+    for (const row of legacyRows) {
+      const name = row.name || row.section_name;
+      const pillarId = row.post_type_id || row.applies_to_post_type_id || null;
+      const key = `${pillarId || 'global'}:${name}`;
+      if (componentIds.has(key)) continue;
+      const id = uuidv4();
+      db.prepare(`
+        INSERT INTO post_components
+          (id, name, description, component_type, purpose, instructions, order_index, enabled, post_type_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).run(id, name, row.rule_description, name.toLowerCase().replace(/\s+/g, '_'), row.rule_description, row.rule_description, row.order_index, pillarId);
+      componentIds.set(key, id);
+    }
+
+        const anatomies = db.prepare("SELECT id, post_type_id, applies_to_post_type_id FROM post_anatomy WHERE entity_type = 'anatomy'")
+      .all() as { id: string; post_type_id: string | null; applies_to_post_type_id: string | null }[];
+    const mapComponent = db.prepare('INSERT OR IGNORE INTO anatomy_components (anatomy_id, component_id, order_index) VALUES (?, ?, ?)');
+    for (const anatomy of anatomies) {
+      const pillarId = anatomy.post_type_id || anatomy.applies_to_post_type_id;
+      for (const row of legacyRows) {
+        const componentPillar = row.post_type_id || row.applies_to_post_type_id;
+        if (componentPillar && componentPillar !== pillarId) continue;
+        const name = row.name || row.section_name;
+        const id = componentIds.get(`${componentPillar || 'global'}:${name}`);
+        if (id) mapComponent.run(anatomy.id, id, row.order_index);
+      }
+    }
+
+    const richRows = db.prepare("SELECT id, thinking_flow FROM post_anatomy WHERE entity_type = 'anatomy' AND thinking_flow IS NOT NULL")
+      .all() as { id: string; thinking_flow: string }[];
+    const updateFlow = db.prepare('UPDATE post_anatomy SET thinking_flow = ? WHERE id = ?');
+    for (const row of richRows) {
+      try {
+        const parsed = JSON.parse(row.thinking_flow);
+        if (!Array.isArray(parsed) || parsed.some(step => typeof step !== 'string')) continue;
+        updateFlow.run(JSON.stringify(parsed.map((instruction: string, index: number) => ({
+          name: `Step ${index + 1}`,
+          instruction,
+          purpose: ''
+        }))), row.id);
+      } catch {
+        // Keep malformed legacy data unchanged so it can still be edited from the UI.
+      }
+    }
+
+    db.prepare(`
+      DELETE FROM post_anatomy
+      WHERE name IN (${placeholders}) OR section_name IN (${placeholders})
+    `).run(...componentNames, ...componentNames);
+
+    const anatomyColumns = (db.prepare('PRAGMA table_info(post_anatomy)').all() as { name: string }[]).map(c => c.name);
+    if (anatomyColumns.includes('last_used_at')) db.exec('ALTER TABLE post_anatomy DROP COLUMN last_used_at');
+    const hookColumns = (db.prepare('PRAGMA table_info(hook_types)').all() as { name: string }[]).map(c => c.name);
+    if (hookColumns.includes('last_used_at')) db.exec('ALTER TABLE hook_types DROP COLUMN last_used_at');
+    db.prepare('INSERT INTO system_migrations (id, applied_at) VALUES (?, ?)').run(migrationId, new Date().toISOString());
+  })();
+}
+
+function deduplicatePostComponents(db: Database.Database) {
+  const migrationId = '2026-10-06-deduplicate-post-components';
+  if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+
+  db.transaction(() => {
+    const duplicates = db.prepare(`
+      SELECT name, component_type, instructions, MIN(id) AS canonical_id
+      FROM post_components
+      GROUP BY name, component_type, instructions
+      HAVING COUNT(*) > 1
+    `).all() as { name: string; component_type: string; instructions: string; canonical_id: string }[];
+    const findIds = db.prepare('SELECT id FROM post_components WHERE name = ? AND component_type = ? AND instructions = ?');
+    const mappings = db.prepare('SELECT anatomy_id, order_index FROM anatomy_components WHERE component_id = ?');
+    const addMapping = db.prepare('INSERT OR IGNORE INTO anatomy_components (anatomy_id, component_id, order_index) VALUES (?, ?, ?)');
+    const removeMappings = db.prepare('DELETE FROM anatomy_components WHERE component_id = ?');
+    const removeComponent = db.prepare('DELETE FROM post_components WHERE id = ?');
+
+    for (const duplicate of duplicates) {
+      const ids = (findIds.all(duplicate.name, duplicate.component_type, duplicate.instructions) as { id: string }[])
+        .map(row => row.id);
+      for (const id of ids) {
+        if (id === duplicate.canonical_id) continue;
+        for (const mapping of mappings.all(id) as { anatomy_id: string; order_index: number }[]) {
+          addMapping.run(mapping.anatomy_id, duplicate.canonical_id, mapping.order_index);
+        }
+        removeMappings.run(id);
+        removeComponent.run(id);
+      }
+    }
+    db.prepare('INSERT INTO system_migrations (id, applied_at) VALUES (?, ?)').run(migrationId, new Date().toISOString());
+  })();
+}
+
+function consolidateNamedPostComponents(db: Database.Database) {
+  const migrationId = '2026-10-06-consolidate-named-post-components';
+  if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+
+  db.transaction(() => {
+    const groups = db.prepare(`
+      SELECT name, component_type
+      FROM post_components
+      GROUP BY name, component_type
+      HAVING COUNT(*) > 1
+    `).all() as { name: string; component_type: string }[];
+    const find = db.prepare(`
+      SELECT id, post_type_id
+      FROM post_components
+      WHERE name = ? AND component_type = ?
+      ORDER BY CASE WHEN post_type_id IS NULL THEN 0 ELSE 1 END, id
+    `);
+    const mappings = db.prepare('SELECT anatomy_id, order_index FROM anatomy_components WHERE component_id = ?');
+    const addMapping = db.prepare('INSERT OR IGNORE INTO anatomy_components (anatomy_id, component_id, order_index) VALUES (?, ?, ?)');
+    const removeMappings = db.prepare('DELETE FROM anatomy_components WHERE component_id = ?');
+    const removeComponent = db.prepare('DELETE FROM post_components WHERE id = ?');
+
+    for (const group of groups) {
+      const rows = find.all(group.name, group.component_type) as { id: string; post_type_id: string | null }[];
+      const canonicalId = rows[0].id;
+      for (const row of rows.slice(1)) {
+        for (const mapping of mappings.all(row.id) as { anatomy_id: string; order_index: number }[]) {
+          addMapping.run(mapping.anatomy_id, canonicalId, mapping.order_index);
+        }
+        removeMappings.run(row.id);
+        removeComponent.run(row.id);
+      }
+    }
+    db.prepare('INSERT INTO system_migrations (id, applied_at) VALUES (?, ?)').run(migrationId, new Date().toISOString());
+  })();
+}
+
+function migrateUniversalPostComponentsAndAnatomyJourneys(db: Database.Database) {
+  const migrationId = '2026-10-06-universal-post-components-anatomy-journeys';
+  if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+
+  const removedNames = ['Rehook', 'Pivot', 'Lesson', 'Nudge'];
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE post_components
+      SET name = 'Body', component_type = 'body'
+      WHERE name = 'Breakdown'
+    `).run();
+    const removedPlaceholders = removedNames.map(() => '?').join(', ');
+    db.prepare(`
+      DELETE FROM anatomy_components
+      WHERE component_id IN (
+        SELECT id FROM post_components WHERE name IN (${removedPlaceholders})
+      )
+    `).run(...removedNames);
+    db.prepare(`DELETE FROM post_components WHERE name IN (${removedPlaceholders})`).run(...removedNames);
+
+    const anatomyRows = db.prepare(`
+      SELECT id, name, thinking_flow
+      FROM post_anatomy
+      WHERE entity_type = 'anatomy'
+        AND name IN ('Turning Point', 'Failure Story', 'Before / After', 'Contrarian Opinion',
+                     'Problem → Why → Fix', 'Architecture Reveal', 'Comparison', 'Cheat Sheet',
+                     'Checklist', 'Industry Observation', 'Build Story', 'Build Failure')
+    `).all() as { id: string; name: string; thinking_flow: string | null }[];
+    const updateFlow = db.prepare('UPDATE post_anatomy SET thinking_flow = ? WHERE id = ?');
+
+    const additions: Record<string, string> = {
+      'Turning Point': 'Reconnect the realization and changed approach to the reader’s situation so the insight leads to useful action.',
+      'Failure Story': 'State the hard-won lesson and the changed behavior another builder can reuse.',
+      'Before / After': 'Turn the reflection into a practical implication for someone facing the same friction.',
+      'Contrarian Opinion': 'State the practical behavior or decision that should change because of this strategic shift.',
+      'Problem → Why → Fix': 'Clarify the decision rule for applying the fix in a similar situation.',
+      'Architecture Reveal': 'Explain the operational behavior or implementation decision this architecture should change.',
+      'Comparison': 'End with the decision heuristic and the action it implies for the reader’s context.',
+      'Cheat Sheet': 'Make the reference rules actionable by stating what behavior each rule should change.',
+      'Checklist': 'Close by stating the action the reader should take after completing the checklist.',
+      'Industry Observation': 'Explain what behavior or decision should change because of this broader implication.',
+      'Build Story': 'State when another builder should reuse the technical lesson from this build.',
+      'Build Failure': 'State the changed engineering behavior the hard-won rule should produce.'
+    };
+
+    for (const anatomy of anatomyRows) {
+      if (!anatomy.thinking_flow) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(anatomy.thinking_flow);
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(parsed)) continue;
+      const steps = parsed.map((step, index) => typeof step === 'string'
+        ? { name: `Step ${index + 1}`, instruction: step, purpose: '' }
+        : step as { name?: string; instruction?: string; purpose?: string });
+      const addition = additions[anatomy.name];
+      if (addition && !steps.some(step => step.instruction === addition)) {
+        const last = steps[steps.length - 1];
+        steps[steps.length - 1] = {
+          ...last,
+          instruction: `${last.instruction || ''} ${addition}`.trim()
+        };
+      }
+      updateFlow.run(JSON.stringify(steps), anatomy.id);
+    }
+    db.prepare('INSERT INTO system_migrations (id, applied_at) VALUES (?, ?)').run(migrationId, new Date().toISOString());
+  })();
+}
+
 // ── Anatomy & Intent Queries ───────────────────────────────────────────────
 
 export interface RichAnatomy {
@@ -437,7 +706,6 @@ export interface RichAnatomy {
   order_index: number;
   post_type_id: string;
   applies_to_post_type_id?: string | null;
-  last_used_at: string | null;
   intent_ids?: string[];
   intents?: { id: string; name: string; display_name: string }[];
 }
@@ -473,71 +741,39 @@ export function getContentIntents(postTypeId?: string): ContentIntentRow[] {
 
 export function getEligibleAnatomiesForIntent(postTypeId: string, intentId?: string | null): RichAnatomy[] {
   const db = getDb();
-
-  // 1. Try to find anatomies specifically mapped to this intent
-  if (intentId) {
-    const mapped = db.prepare(`
-      SELECT DISTINCT pa.*
-      FROM post_anatomy pa
-      JOIN anatomy_intents ai ON pa.id = ai.anatomy_id
-      WHERE ai.intent_id = ? AND pa.purpose IS NOT NULL
-      ORDER BY
-        CASE WHEN pa.last_used_at IS NULL THEN 0 ELSE 1 END ASC,
-        pa.last_used_at ASC,
-        pa.order_index ASC
-    `).all(intentId) as RichAnatomy[];
-
-    if (mapped.length > 0) return mapped;
-  }
-
-  // 2. Fallback: all rich anatomies for this post_type_id
-  const pillarAnatomies = db.prepare(`
-    SELECT pa.*
-    FROM post_anatomy pa
-    WHERE (pa.post_type_id = ? OR pa.applies_to_post_type_id = ?)
-      AND pa.purpose IS NOT NULL
-    ORDER BY
-      CASE WHEN pa.last_used_at IS NULL THEN 0 ELSE 1 END ASC,
-      pa.last_used_at ASC,
-      pa.order_index ASC
-  `).all(postTypeId, postTypeId) as RichAnatomy[];
-
-  if (pillarAnatomies.length > 0) return pillarAnatomies;
-
-  // 3. Ultimate fallback: legacy anatomy sections if no rich ones exist
+  if (!intentId) return [];
   return db.prepare(`
-    SELECT * FROM post_anatomy
-    WHERE applies_to_post_type_id = ? OR applies_to_post_type_id IS NULL
-    ORDER BY
-      CASE WHEN last_used_at IS NULL THEN 0 ELSE 1 END ASC,
-      last_used_at ASC,
-      order_index ASC
-  `).all(postTypeId) as RichAnatomy[];
+    SELECT DISTINCT pa.*
+    FROM post_anatomy pa
+    JOIN anatomy_intents ai ON pa.id = ai.anatomy_id
+    WHERE ai.intent_id = ?
+      AND (pa.post_type_id = ? OR pa.applies_to_post_type_id = ?)
+      AND pa.entity_type = 'anatomy'
+    ORDER BY pa.order_index ASC, pa.name ASC
+  `).all(intentId, postTypeId, postTypeId) as RichAnatomy[];
 }
 
-export function selectAnatomyLRU(eligible: RichAnatomy[]): RichAnatomy | null {
-  if (!eligible || eligible.length === 0) return null;
-
-  // Filter to the freshest: either those with last_used_at IS NULL, or the oldest timestamp
-  const nulls = eligible.filter(a => !a.last_used_at);
-  if (nulls.length > 0) {
-    // Pick the first among fresh anatomies
-    return nulls[0];
-  }
-
-  // Otherwise, sort by oldest timestamp
-  const sorted = [...eligible].sort((a, b) => {
-    const timeA = new Date(a.last_used_at!).getTime();
-    const timeB = new Date(b.last_used_at!).getTime();
-    return timeA - timeB;
-  });
-
-  return sorted[0];
+export interface PostComponent {
+  id: string;
+  name: string;
+  description: string | null;
+  component_type: string;
+  purpose: string | null;
+  instructions: string;
+  order_index: number;
+  enabled: number;
+  post_type_id: string | null;
 }
 
-export function updateAnatomyLastUsed(anatomyId: string): void {
+export function getComponentsForAnatomy(anatomyId: string): PostComponent[] {
   const db = getDb();
-  db.prepare('UPDATE post_anatomy SET last_used_at = ? WHERE id = ?').run(new Date().toISOString(), anatomyId);
+  return db.prepare(`
+    SELECT pc.*
+    FROM post_components pc
+    JOIN anatomy_components ac ON ac.component_id = pc.id
+    WHERE ac.anatomy_id = ? AND pc.enabled = 1
+    ORDER BY ac.order_index ASC, pc.order_index ASC, pc.name ASC
+  `).all(anatomyId) as PostComponent[];
 }
 
 function seedIfEmpty(db: Database.Database) {
@@ -717,4 +953,3 @@ function seedIfEmpty(db: Database.Database) {
     }
   }
 }
-

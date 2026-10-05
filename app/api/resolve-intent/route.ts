@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, getEligibleAnatomiesForIntent, selectAnatomyLRU } from '@/lib/db';
+import { getDb, getEligibleAnatomiesForIntent } from '@/lib/db';
 import { resolveContentIntent } from '@/lib/intentResolver';
 
 export async function POST(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     const resolution = resolveContentIntent(rawNotes || '', pt.id, pt.name, explicitIntentId);
     const eligibleAnatomies = getEligibleAnatomiesForIntent(pt.id, resolution.intentId);
-    const selectedAnatomy = selectAnatomyLRU(eligibleAnatomies);
+    const selectedAnatomy = eligibleAnatomies[0] || null;
 
     return NextResponse.json({
       resolution,

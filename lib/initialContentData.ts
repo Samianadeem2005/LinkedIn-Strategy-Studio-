@@ -232,9 +232,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Explain what you initially thought or assumed before that moment.',
       'Describe what actually happened or went unexpectedly.',
       'Reveal the realization that clicked.',
-      'Show what permanently changed in your approach or mindset.'
+      'Show what permanently changed in your approach or mindset, then reconnect that change to the reader’s situation.'
     ],
-    writingStyle: 'Story-driven and conversational. Natural paragraphs. Grounded in lived experience, emotionally honest, no corporate fluff or artificial motivational lessons.',
+    writingStyle: 'Story-driven and conversational. Use short, natural sentences and frequent line breaks. Let the moment, realization, and changed approach flow chronologically without forced lessons.',
     intents: ['turning_point', 'learning_reflection', 'growth_story']
   },
   {
@@ -246,9 +246,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Detail the friction or recurring struggle that forced a reassessment.',
       'Describe the small but pivotal change made in thinking or technique.',
       'Show the after state and the concrete difference it produced.',
-      'End on an earned personal reflection on craftsmanship or discipline.'
+      'End on an earned personal reflection on craftsmanship or discipline, with a practical implication for someone facing the same friction.'
     ],
-    writingStyle: 'Grounded contrast, natural storytelling flow. Avoids dramatic before/after exaggeration; focuses on authentic professional maturation.',
+    writingStyle: 'Grounded narrative with contrast only where it clarifies the change. Use natural line breaks and concrete details; avoid dramatic before/after exaggeration.',
     intents: ['growth_story', 'learning_reflection']
   },
   {
@@ -260,9 +260,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Describe the failure or breakdown candidly.',
       'Unpack why it failed and the specific assumption you had wrong.',
       'Explain what you fundamentally misunderstood at the time.',
-      'Share the new approach you adopted to ensure it never happens again.'
+      'Share the new approach you adopted to ensure it never happens again, and state the hard-won lesson another builder can reuse.'
     ],
-    writingStyle: 'Humble, candid, and self-aware. Zero melodrama. The takeaway feels earned through real grit, not textbook wisdom.',
+    writingStyle: 'Humble, candid, and self-aware. Use short, natural sentences and frequent line breaks. Let the story flow chronologically and end with the realization or changed approach, not a forced list of lessons.',
     intents: ['failure_reflection', 'learning_reflection']
   },
   {
@@ -274,7 +274,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'State the one sharp realization it created in your mind.',
       'Close on one practical takeaway for the reader.'
     ],
-    writingStyle: 'Crisp, minimalist, 1-2 sentence beats. Do not pad with unnecessary backstory or force a list of 3 lessons.',
+    writingStyle: 'Crisp and minimalist, with frequent line breaks and only the context needed for one realization. Do not pad the story or force a list of lessons.',
     intents: ['learning_reflection', 'turning_point']
   },
 
@@ -289,7 +289,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Explain the underlying technical mechanism that causes the difference.',
       'Conclude with the practical implication for building or designing systems.'
     ],
-    writingStyle: 'Crisp contrast, educational and authoritative yet accessible. Uses concrete technical examples rather than abstract theories.',
+    writingStyle: 'Educational and authoritative yet accessible. Use contrast between misconception and reality only when it clarifies the mechanism, then explain it with concrete technical examples.',
     intents: ['correct_misconception', 'teach_concept']
   },
   {
@@ -300,9 +300,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Highlight a concrete problem, symptom, or failure mode engineers encounter.',
       'Explain why it happens under the hood (the root cause mechanism).',
       'Walk through what actually fixes it reliably.',
-      'Provide a practical example or snippet demonstrating the resolution.'
+      'Provide a practical example or snippet demonstrating the resolution, then clarify the decision rule for applying the fix.'
     ],
-    writingStyle: 'Diagnostic, actionable, and structured. Clear transitions from problem statement to root-cause explanation to solution.',
+    writingStyle: 'Diagnostic and actionable. Use clear transitions from symptom to root cause to fix, with short readable paragraphs and a practical example where it improves clarity.',
     intents: ['explain_problem', 'teach_concept']
   },
   {
@@ -316,7 +316,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Clarify where the analogy breaks down to avoid false mental models.',
       'Deliver a practical takeaway for how to think about it when building.'
     ],
-    writingStyle: 'Visual, engaging, intuitive. Bridges abstract terminology into tangible, everyday understanding without condescension.',
+    writingStyle: 'Visual, engaging, and intuitive. Move naturally from the familiar analogy to the technical mapping, using line breaks to keep the explanation easy to scan without condescension.',
     intents: ['technical_analogy', 'teach_concept']
   },
   {
@@ -331,7 +331,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Clarify the exact scenarios where Approach B makes sense.',
       'Provide a definitive decision heuristic or takeaway.'
     ],
-    writingStyle: 'Balanced, objective, and nuanced. Avoids generic "A vs B" superficial lists; focuses on real production trade-offs.',
+    writingStyle: 'Balanced, objective, and nuanced. Use clear contrast where helpful; a simple A vs B structure is appropriate when it genuinely improves clarity. Focus on real production trade-offs, not superficial lists.',
     intents: ['compare']
   },
 
@@ -346,7 +346,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Introduce the complete cheat sheet / reference resource.',
       'Close with a clear, direct, non-salesy engagement CTA to get it.'
     ],
-    writingStyle: 'High-density, punchy, scannable. Teases immediate practical value upfront so the reader knows the resource is worth having.',
+    writingStyle: 'High-density, punchy, and scannable. Use short lines and compact grouped points when they help the reader preview the resource, without forcing a fixed count.',
     intents: ['resource_stack', 'checklist', 'template']
   },
   {
@@ -360,7 +360,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Present the complete checklist resource/doc.',
       'Close with a frictionless CTA to claim the checklist.'
     ],
-    writingStyle: 'Resource-first, organized, and rigorous. Clear bulleted checklist format followed by a clean action prompt.',
+    writingStyle: 'Resource-first, organized, and rigorous. Use short lines and numbered items where useful. Groups of three can be used when natural, but do not force exactly three items.',
     intents: ['checklist']
   },
   {
@@ -375,7 +375,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Describe the final destination and capability unlocked.',
       'Offer the comprehensive roadmap guide via a natural CTA.'
     ],
-    writingStyle: 'Structured progression, aspirational yet grounded in practical engineering stages.',
+    writingStyle: 'Sequential and practical. Numbered stages are appropriate when they clarify progression; keep each stage concise and grounded in real engineering prerequisites.',
     intents: ['roadmap']
   },
   {
@@ -389,7 +389,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Share a concrete snippet or configuration preview.',
       'Close with a clear CTA to get access to the template.'
     ],
-    writingStyle: 'Pragmatic, utility-focused. Emphasizes saved hours and clean design patterns.',
+    writingStyle: 'Pragmatic and utility-focused. Use concise steps, a concrete preview, and clear setup guidance; keep the emphasis on saved effort and clean design patterns.',
     intents: ['template']
   },
   {
@@ -404,7 +404,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Deliver the final recommended path.',
       'Offer the full visual decision tree diagram via CTA.'
     ],
-    writingStyle: 'Logic-driven, branching clarity. High utility for developers facing architectural choices.',
+    writingStyle: 'Logic-driven and branching. Use a clear decision path or numbered branches when useful, with concise criteria for each choice and no forced symmetry.',
     intents: ['framework', 'checklist']
   },
   {
@@ -418,7 +418,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Explain how they combine into a powerful stack.',
       'Offer the complete curated stack list and repository links via CTA.'
     ],
-    writingStyle: 'Resource-first, naming real specific tools and repos, actionable synergy.',
+    writingStyle: 'Resource-first and action-oriented. Name specific tools and repos, group them by workflow role, and use short readable lines to show how they work together.',
     intents: ['resource_stack']
   },
 
@@ -432,9 +432,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Provide concrete evidence, company examples, startup data, or ecosystem signals.',
       'Explain why this pattern is happening right now (underlying economic, tech, or behavioral drivers).',
       'Deliver your original interpretation and synthesis of the situation.',
-      'Conclude with the broader implication for practitioners, founders, or the industry.'
+      'Conclude with the broader implication for practitioners, founders, or the industry, including what behavior or decision should change.'
     ],
-    writingStyle: 'Paragraph-led, analytical, and natural. Do NOT use numbered listicles or mechanical section headings. Let ideas flow in thoughtful prose.',
+    writingStyle: 'Paragraph-led but highly scannable. Prefer short sentences and frequent line breaks. Use contrast framing only when it naturally clarifies the observation. Do not force numbered lists or groups of three. End with an implication rather than a generic takeaway.',
     intents: ['industry_observation', 'trend_analysis']
   },
   {
@@ -448,7 +448,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Review the outcome or market effect of the decision.',
       'Synthesize what builders and technical teams can learn from their move.'
     ],
-    writingStyle: 'Analytical, respectful critique, domain synthesis. Do NOT merely summarize company press releases; inject sharp, original engineering/business interpretation.',
+    writingStyle: 'Analytical and respectful. Develop the company decision through connected paragraphs, using contrast only for genuine trade-offs. Do not turn the analysis into a generic list of lessons.',
     intents: ['company_analysis']
   },
   {
@@ -462,7 +462,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Review the result or operational milestone achieved.',
       'Extract the strategic lesson for engineering and product leaders.'
     ],
-    writingStyle: 'Insightful narrative analysis grounded in public record. Focuses on decision logic and strategic courage rather than biography.',
+    writingStyle: 'Insightful narrative analysis grounded in public record. Follow the founder’s decision logic chronologically, with readable line breaks and focus on strategy rather than biography.',
     intents: ['founder_lens', 'company_analysis']
   },
   {
@@ -474,9 +474,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Present your counter-thesis grounded in engineering experience or data.',
       'Lay out concrete evidence and deductive reasoning supporting your stance.',
       'Add nuance: acknowledge where the common wisdom still holds true.',
-      'Conclude with the strategic shift in thinking you recommend.'
+      'Conclude with the strategic shift in thinking you recommend and the practical behavior it should change.'
     ],
-    writingStyle: 'Measured, rational, and nuanced. Strictly avoid dramatic reversal framing ("Everyone thinks X, but they are wrong"). Make the disagreement natural, polite, and deeply reasoned.',
+    writingStyle: 'Measured, rational, and nuanced. Build the disagreement through evidence and qualification, not dramatic reversal framing. End with a considered strategic implication rather than a slogan.',
     intents: ['contrarian_view']
   },
   {
@@ -490,7 +490,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Explain the technological catalyst or bottleneck that provoked the shift.',
       'Discuss the strategic implications for teams building in this space over the next 12-24 months.'
     ],
-    writingStyle: 'Forward-looking, analytical, balanced, paragraph-led. Avoids hype words; focuses on technical mechanics and adoption signals.',
+    writingStyle: 'Forward-looking, analytical, and paragraph-led. Use short readable paragraphs to connect adoption signals, technical mechanics, and second-order effects. Avoid hype and forced list structures.',
     intents: ['trend_analysis', 'industry_observation']
   },
 
@@ -504,9 +504,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Explain the key architectural or implementation decision made.',
       'Walk through how the system was built and connected together.',
       'Share the concrete result, latency metric, accuracy benchmark, or operational outcome.',
-      'Reflect on the technical lesson or principle learned from the build.'
+      'Reflect on the technical lesson or principle learned from the build, including when another builder should reuse it.'
     ],
-    writingStyle: 'Engineering-grounded, candid, and authentic. Focuses on reasoning, real stack decisions (naming LangGraph, Postgres, etc.), and hard-won results without bragging.',
+    writingStyle: 'Engineering-grounded, candid, and authentic. Tell the build chronologically with frequent line breaks, naming real stack decisions and results without bragging or forcing a list of lessons.',
     intents: ['build_story', 'case_study']
   },
   {
@@ -520,7 +520,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Detail the major technical trade-off accepted to achieve the goals.',
       'Summarize the resulting stability, latency, or throughput achieved.'
     ],
-    writingStyle: 'High technical precision. Naming frameworks, state handling, and database schemas. Clear design rationale with zero fluff.',
+    writingStyle: 'High technical precision and structured explanation. Use compact paragraphs or numbered components when they clarify topology, state handling, schemas, and trade-offs; avoid decorative prose.',
     intents: ['architecture_explanation', 'technical_decision']
   },
   {
@@ -534,7 +534,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Highlight the measurable improvements (e.g. latency reduced by 40%, memory usage slashed).',
       'Extract the fundamental design lesson proven by the migration.'
     ],
-    writingStyle: 'Stark engineering contrast, backed by measurable numbers and real operational impact.',
+    writingStyle: 'Use clear before/after contrast backed by measurable numbers and operational impact. A side-by-side structure is appropriate when it makes the engineering change easier to scan, without exaggeration.',
     intents: ['before_after', 'case_study']
   },
   {
@@ -546,9 +546,9 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Detail how the system broke, failed to scale, or threw unexpected edge cases.',
       'Diagnose the root cause discovered after debugging deep into the stack.',
       'Explain the fix, refactor, or architectural pivot that permanently solved it.',
-      'Conclude with the hard-won engineering rule or mental model gained.'
+      'Conclude with the hard-won engineering rule or mental model gained, and state the changed behavior it should produce.'
     ],
-    writingStyle: 'Transparent, analytical post-mortem tone. Humble, educational, and showcasing deep debugging competence.',
+    writingStyle: 'Transparent, analytical post-mortem tone. Use short, natural sentences and frequent line breaks. Let the failure flow chronologically and end with the changed approach or mental model, not a forced list.',
     intents: ['technical_decision', 'build_story']
   },
   {
@@ -562,7 +562,7 @@ export const INITIAL_ANATOMIES: InitialAnatomy[] = [
       'Show the final accurate result returned to the user.',
       'Summarize the engineering principle that makes the seamless experience possible.'
     ],
-    writingStyle: 'Engaging workflow narrative. Illustrates complex backend orchestration through an intuitive, observable scenario.',
+    writingStyle: 'Engaging workflow narrative. Follow the user interaction in sequence, using short readable paragraphs to reveal backend orchestration without turning the experience into a checklist.',
     intents: ['build_story', 'case_study']
   }
 ];

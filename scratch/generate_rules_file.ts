@@ -6,8 +6,10 @@ const db = getDb();
 
 const postTypes = db.prepare('SELECT * FROM post_types ORDER BY name ASC').all() as any[];
 const contentIntents = db.prepare('SELECT * FROM content_intents ORDER BY priority ASC, name ASC').all() as any[];
-const postAnatomy = db.prepare('SELECT * FROM post_anatomy ORDER BY order_index ASC').all() as any[];
+const postAnatomy = db.prepare("SELECT * FROM post_anatomy WHERE entity_type = 'anatomy' ORDER BY order_index ASC").all() as any[];
 const anatomyIntents = db.prepare('SELECT * FROM anatomy_intents').all() as any[];
+const postComponents = db.prepare('SELECT * FROM post_components ORDER BY order_index ASC, name ASC').all() as any[];
+const anatomyComponents = db.prepare('SELECT * FROM anatomy_components ORDER BY order_index ASC').all() as any[];
 const writingMechanics = db.prepare('SELECT * FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC').all() as any[];
 const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as any;
 const hookTypes = db.prepare('SELECT * FROM hook_types ORDER BY name ASC').all() as any[];
@@ -63,7 +65,7 @@ postTypes.forEach(pt => {
   markdown += `## 6. Thinking Flow Anatomies (${anatomiesForPillar.length})\n\n`;
 
   anatomiesForPillar.forEach(anat => {
-    let steps: string[] = [];
+    let steps: unknown[] = [];
     try {
       steps = JSON.parse(anat.thinking_flow || '[]');
     } catch {
@@ -81,13 +83,25 @@ postTypes.forEach(pt => {
     }
     markdown += `- **Thinking Flow (Mental Model Steps)**:\n`;
     steps.forEach((step, idx) => {
-      markdown += `  ${idx + 1}. ${step}\n`;
+      const stepObject = step as { name?: string; instruction?: string; purpose?: string };
+      const rendered = typeof step === 'string' ? step : `${stepObject.name || 'Step'}: ${stepObject.instruction || ''}${stepObject.purpose ? ` (${stepObject.purpose})` : ''}`;
+      markdown += `  ${idx + 1}. ${rendered}\n`;
     });
     if (anat.writing_style) {
       markdown += `- **Writing Style Directives**: ${anat.writing_style}\n`;
     }
     if (anat.constraints) {
       markdown += `- **Constraints**: ${anat.constraints}\n`;
+    }
+    const mappedComponents = anatomyComponents
+      .filter(ac => ac.anatomy_id === anat.id)
+      .map(ac => postComponents.find(pc => pc.id === ac.component_id))
+      .filter(Boolean);
+    if (mappedComponents.length > 0) {
+      markdown += `- **Post Components**:\n`;
+      mappedComponents.forEach((component: any) => {
+        markdown += `  - ${component.name}: ${component.instructions}\n`;
+      });
     }
     markdown += `\n`;
   });
@@ -173,11 +187,11 @@ markdown += `  CONTENT INTENT (Deterministically resolved from semantic notes si
 markdown += `        ↓\n`;
 markdown += `ELIGIBLE ANATOMIES (Filtered by Pillar + Intent via anatomy_intents)\n`;
 markdown += `        ↓\n`;
-markdown += `  ANATOMY LRU (Backend selects least recently used eligible anatomy)\n`;
+markdown += `  ANATOMY (First configured anatomy by deterministic order)\n`;
 markdown += `        ↓\n`;
-markdown += `    HOOK POOL (Top 5 least recently used hook formulas matching pillar)\n`;
+markdown += `    HOOK TYPE POOL (Top 5 configured hook formulas matching pillar)\n`;
 markdown += `        ↓\n`;
-markdown += ` PROMPT ASSEMBLY (Strict 21-step dynamic prompt structure)\n`;
+markdown += ` DYNAMIC PROMPT ASSEMBLY (backend combines selected context and universal writing preferences)\n`;
 markdown += `        ↓\n`;
 markdown += `      GEMINI (gemini-3.6-flash generates 3 versions with shared thinking flow & distinct angles/hooks)\n`;
 markdown += `        ↓\n`;

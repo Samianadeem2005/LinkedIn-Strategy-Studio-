@@ -65,7 +65,6 @@ CREATE TABLE IF NOT EXISTS post_anatomy (
   order_index INTEGER NOT NULL,
   post_type_id TEXT REFERENCES post_types(id),
   applies_to_post_type_id TEXT REFERENCES post_types(id),
-  last_used_at TEXT,                          -- Timestamp for backend LRU rotation
   section_name TEXT,                          -- Legacy compatibility column
   rule_description TEXT                       -- Legacy compatibility column
 );
@@ -98,17 +97,36 @@ CREATE TABLE IF NOT EXISTS custom_pillar_rules (
   created_at TEXT
 );
 
--- 5. Hook Formulas & Bank
+-- 5. Reusable Post Components
+CREATE TABLE IF NOT EXISTS post_components (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  component_type TEXT NOT NULL,
+  purpose TEXT,
+  instructions TEXT NOT NULL,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  post_type_id TEXT REFERENCES post_types(id)
+);
+
+CREATE TABLE IF NOT EXISTS anatomy_components (
+  anatomy_id TEXT NOT NULL REFERENCES post_anatomy(id) ON DELETE CASCADE,
+  component_id TEXT NOT NULL REFERENCES post_components(id) ON DELETE CASCADE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (anatomy_id, component_id)
+);
+
+-- 6. Hook Formulas & Bank
 CREATE TABLE IF NOT EXISTS hook_types (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL,
   angles TEXT NOT NULL,            -- JSON array of angle formulas
   best_fit_pillars TEXT NOT NULL,  -- JSON array of pillar names
-  last_used_at TEXT                -- Timestamp of last usage for LRU rotation
 );
 
--- 6. Writing Mechanics Directives
+-- 7. Writing Mechanics Directives
 CREATE TABLE IF NOT EXISTS writing_mechanics (
   id TEXT PRIMARY KEY,
   rule_name TEXT NOT NULL,
@@ -234,11 +252,11 @@ RAW NOTES / USER IDEA
         ↓
 ELIGIBLE ANATOMIES (Filtered by Pillar + Intent via anatomy_intents junction table)
         ↓
-  ANATOMY LRU (Backend selects least recently used eligible anatomy to prevent repetitive patterns)
+  ANATOMY (First configured anatomy matching the selected Pillar and Intent)
         ↓
     HOOK POOL (Top 5 least recently used hook formulas matching active pillar)
         ↓
- PROMPT ASSEMBLY (Strict 21-step dynamic prompt structure)
+ DYNAMIC PROMPT ASSEMBLY (backend combines selected context and universal writing preferences)
         ↓
       GEMINI (gemini-3.6-flash generates 3 versions with shared anatomy but distinct angles/hooks)
         ↓
@@ -275,7 +293,7 @@ The system prompt is assembled dynamically in strict conceptual order:
 11. **ANATOMY THINKING FLOW**: Step-by-step reasoning progression.
 12. **ANATOMY WRITING STYLE**: Paragraph-led, scannable, density rules.
 13. **VISUAL GUIDANCE**: Image/screenshot specifications.
-14. **AVAILABLE HOOK TYPES**: Top 5 candidate pool from Hook LRU.
+14. **AVAILABLE HOOK TYPES**: Top 5 candidate pool in configured deterministic order.
 15. **HOOK SELECTION & DIVERSITY RULES**: Each version must use a different hook angle.
 16. **WRITING MECHANICS**: Short scannable lines, natural paragraphs, plain vocabulary.
 17. **TONE & VOICE**: Casual, authentic, sharp, professional, human.
@@ -284,8 +302,8 @@ The system prompt is assembled dynamically in strict conceptual order:
 20. **RAW NOTES / INPUT**: User raw notes or Tavily web search results.
 21. **OUTPUT JSON SCHEMA**: Valid 3-version output format.
 - Injects Active Pillar DOs/DON'Ts/Core Focus.
-- Loads Writing Mechanics Directives from DB.
-- Filters Hook Formulas matching active pillar, sorted by least recently used (`last_used_at`), passing top 5 formulas into prompt.
+- Loads only universal writing-quality preferences from the Writing Mechanics configuration.
+- Filters Hook Types matching the active pillar in deterministic configured order, passing the top 5 formulas into the prompt.
 - Enforces Hook Diversity: Mandatory assignment of DIFFERENT hook formulas across Version 1, Version 2, and Version 3.
 - Enforces Simple Vocabulary Rule (`vocabularyLevel: 'simple'`, avoiding `DEFAULT_AVOID_WORDS`).
 
@@ -321,7 +339,7 @@ The system prompt is assembled dynamically in strict conceptual order:
 | `/api/anatomy` | GET / POST / PUT | Manage post anatomy thinking flows & intent mappings | Name, purpose, thinking_flow, style, intent_ids | Rich anatomy array |
 | `/api/hook-types` | GET / POST / PUT | Manage hook bank formulas | Name, angles, best_fit_pillars | Hook types list |
 | `/api/web-search` | POST | Web search research query | `{ query }` | `{ resultsText, resultCount }` |
-| `/api/generate-post` | POST | Generate 3 post versions with LRU anatomy + hook rotation | `{ rawNotes, postTypeId, postFormat, contentIntentId }` | `{ versions, resolvedIntent, selectedAnatomy }` |
+| `/api/generate-post` | POST | Generate 3 post versions with deterministic Anatomy and Hook Type selection | `{ rawNotes, postTypeId, postFormat, contentIntentId }` | `{ versions, resolvedIntent, selectedAnatomy }` |
 | `/api/generate-calendar` | POST / PUT | Two-phase calendar generator & saver | `{ rawDump, durationDays, startDate }` | `{ entries, validationWarnings }` |
 | `/api/calendar-today` | GET | Resolve today's planned calendar post | `?date=YYYY-MM-DD` | Entry record or null |
 | `/api/knowledge-dumps` | GET / POST | Manage knowledge dumps for ingestion | Raw text dump | Dump record |
@@ -342,7 +360,7 @@ linkedin-content-os/
 │   │   ├── calendar-today/
 │   │   ├── content-intents/       # Content intent CRUD
 │   │   ├── generate-calendar/
-│   │   ├── generate-post/         # 21-step dynamic prompt, LRU anatomy & hook rotation
+│   │   ├── generate-post/         # Dynamic prompt assembly and deterministic selection
 │   │   ├── history/
 │   │   ├── hook-types/
 │   │   ├── ingest/
@@ -372,7 +390,7 @@ linkedin-content-os/
 ├── context/
 │   └── AppContext.tsx     # React context for global state, content intents & web search caching
 ├── lib/
-│   ├── db.ts              # SQLite singleton, WAL mode, schema migrations & LRU query helpers
+│   ├── db.ts              # SQLite singleton, WAL mode, schema migrations & selection helpers
 │   ├── initialContentData.ts # Initial seed data for 24 intents and 24 rich anatomies
 │   ├── intentResolver.ts  # Deterministic semantic regex intent resolution engine
 │   ├── validation.ts      # Post generation validator & visible anatomy heading stripper
