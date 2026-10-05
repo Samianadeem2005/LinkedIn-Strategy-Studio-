@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
 import { Loader2, CheckCircle2, XCircle, FileText, Database, BookOpen, GitMerge, Replace, ShieldCheck, Check, AlertTriangle } from 'lucide-react';
 

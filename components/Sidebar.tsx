@@ -14,7 +14,8 @@ import {
   Sparkles,
   Bookmark,
   FileText,
-  Type
+  Type,
+  Compass
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
@@ -62,6 +63,7 @@ const navGroups: NavGroupItem[] = [
     subpages: [
       { href: '/strategy', label: 'Weekly Pillars', icon: LayoutGrid },
       { href: '/settings?tab=pillars', label: 'Post Pillars', icon: LayoutGrid },
+      { href: '/settings?tab=intents', label: 'Content Intents', icon: Compass },
       { href: '/settings?tab=anatomy', label: 'Post Anatomy', icon: Layers },
       { href: '/hook-types', label: 'Hook Bank', icon: Bookmark },
       { href: '/ingest', label: 'Strategy Ingest', icon: Layers },

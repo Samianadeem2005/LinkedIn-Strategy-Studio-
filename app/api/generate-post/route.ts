@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, getEligibleAnatomiesForIntent, selectAnatomyLRU, updateAnatomyLastUsed } from '@/lib/db';
+import { resolveContentIntent } from '@/lib/intentResolver';
+import { validatePostGeneration } from '@/lib/validation';
 import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
-import { v4 as uuidv4 } from 'uuid';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { callWithGeminiFallback } from '@/lib/gemini';
 
 function safeParseJSON(rawText: string): any {
@@ -36,7 +36,7 @@ function safeParseJSON(rawText: string): any {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { rawNotes, postTypeId, date, sectionId, postFormat } = body;
+    const { rawNotes, postTypeId, date, sectionId, postFormat, contentIntentId, explicitIntent } = body;
 
     const format = postFormat || 'text_post';
     const formatConstraints: Record<string, { name: string; min: number; max: number }> = {
@@ -111,33 +111,10 @@ export async function POST(req: NextRequest) {
       ? visualSuggestionsList.map(v => `• ${v}`).join('\n')
       : '';
 
-    // Load anatomy - respect scope
+    // Load settings & tone profile
     const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Record<string, unknown> | undefined;
-    const scope = (settings?.anatomy_scope as string) ?? 'global';
-    let anatomySections: Record<string, unknown>[] = [];
-    if (scope === 'per_post_type') {
-      const typeSpecific = db.prepare(
-        'SELECT * FROM post_anatomy WHERE applies_to_post_type_id = ? ORDER BY order_index ASC'
-      ).all(postTypeId) as Record<string, unknown>[];
+    const userAboutMe = (settings?.about_me as string)?.trim() || "I am an AI Engineer building in public on LinkedIn.";
 
-      if (typeSpecific.length > 0) {
-        anatomySections = typeSpecific;
-      } else {
-        anatomySections = db.prepare(
-          'SELECT * FROM post_anatomy WHERE applies_to_post_type_id IS NULL ORDER BY order_index ASC'
-        ).all() as Record<string, unknown>[];
-      }
-    } else {
-      anatomySections = db.prepare(
-        'SELECT * FROM post_anatomy WHERE applies_to_post_type_id IS NULL ORDER BY order_index ASC'
-      ).all() as Record<string, unknown>[];
-    }
-
-    if (anatomySections.length === 0) {
-      return NextResponse.json({ error: 'No anatomy sections defined. Go to Settings and add at least one section.' }, { status: 400 });
-    }
-
-    // Load tone profile
     const toneRaw = settings?.tone_profile ? JSON.parse(settings.tone_profile as string) : {};
     const tone = {
       formality: toneRaw.formality ?? 'mixed',
@@ -148,7 +125,7 @@ export async function POST(req: NextRequest) {
       avoidWords: (toneRaw.avoidWords && Array.isArray(toneRaw.avoidWords) && toneRaw.avoidWords.length > 0 ? toneRaw.avoidWords : DEFAULT_AVOID_WORDS) as string[]
     };
 
-    // Repeat-topic check (Part 7) — 30-day lookback, keyword overlap
+    // Repeat-topic check — 30-day lookback, keyword overlap
     const lookbackDate = new Date(date ?? new Date().toISOString().split('T')[0]);
     lookbackDate.setDate(lookbackDate.getDate() - 30);
     const recentPosts = db.prepare(
@@ -168,34 +145,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Single-section regeneration (early return) ─────────────────
+    // ── Single-section legacy regeneration handler ─────────────────
     if (sectionId) {
-      const section = anatomySections.find(s => s.id === sectionId);
+      const section = db.prepare('SELECT * FROM post_anatomy WHERE id = ?').get(sectionId) as Record<string, unknown> | undefined;
       if (!section) return NextResponse.json({ error: 'Section not found.' }, { status: 404 });
       const sectionContent = await generateSingleSection(rawNotes, postType, tone, section, dos, donts, coreFocus);
       return NextResponse.json({ sectionContent, repeatWarning });
     }
 
-    // ── Determine generation mode ─────────────────────────────────
-    // Mode A: generate from raw notes (default, always present)
-    // Mode B: research & generate via web search results (future / optional)
-    const webResults: string | undefined = body.webResults;
-    const mode: 'A' | 'B' = webResults?.trim() ? 'B' : 'A';
+    // ── Step 1: Content Intent Resolution (Deterministic) ─────────
+    const requestedIntent = contentIntentId || explicitIntent || null;
+    const resolvedIntent = resolveContentIntent(rawNotes, postTypeId, postType.name, requestedIntent);
 
-    // Build the prompt for 3 versions
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY is not configured in .env.local.' }, { status: 500 });
+    // ── Step 2: Eligible Anatomies & LRU Rotation ─────────────────
+    const eligibleAnatomies = getEligibleAnatomiesForIntent(postTypeId, resolvedIntent.intentId);
+    if (eligibleAnatomies.length === 0) {
+      return NextResponse.json({
+        error: `No anatomies found for pillar "${postType.name}" and intent "${resolvedIntent.displayName}". Please check Settings.`
+      }, { status: 400 });
+    }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const selectedAnatomy = selectAnatomyLRU(eligibleAnatomies);
+    if (!selectedAnatomy) {
+      return NextResponse.json({ error: 'Failed to select an anatomy via LRU rotation.' }, { status: 500 });
+    }
 
-    // Load enabled writing mechanics directives
-    const writingMechanics = db.prepare(
-      'SELECT prompt_directive, description FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
-    ).all() as { prompt_directive?: string; description?: string }[];
+    // Parse Thinking Flow into clean numbered steps
+    let thinkingFlowSteps: string[] = [];
+    if (selectedAnatomy.thinking_flow) {
+      try {
+        const parsed = JSON.parse(selectedAnatomy.thinking_flow);
+        thinkingFlowSteps = Array.isArray(parsed) ? parsed : [String(selectedAnatomy.thinking_flow)];
+      } catch {
+        thinkingFlowSteps = selectedAnatomy.thinking_flow.split('\n').map(s => s.trim()).filter(Boolean);
+      }
+    }
+    if (thinkingFlowSteps.length === 0 && selectedAnatomy.purpose) {
+      thinkingFlowSteps = [selectedAnatomy.purpose];
+    }
 
-    // Load active hook types live from DB - filtered by today's pillar & prioritized by least recently used (max 5)
+    // ── Step 3: Hook Pool & Hook LRU (Keep Existing System) ───────
     const allHookTypes = db.prepare(
       'SELECT id, name, description, angles, best_fit_pillars, last_used_at FROM hook_types'
     ).all() as { id: string; name: string; description?: string; angles: string; best_fit_pillars: string; last_used_at?: string | null }[];
@@ -210,12 +199,11 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Fall back to all hook types if zero match current pillar
     if (matchingHookTypes.length === 0) {
       matchingHookTypes = allHookTypes;
     }
 
-    // Sort by least recently used (nulls first, then oldest timestamp)
+    // Sort by LRU (nulls first, then oldest timestamp)
     matchingHookTypes.sort((a, b) => {
       if (!a.last_used_at && !b.last_used_at) return 0;
       if (!a.last_used_at) return -1;
@@ -223,159 +211,209 @@ export async function POST(req: NextRequest) {
       return new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime();
     });
 
-    // Take top 5
+    // Top 5 candidate hooks
     const selectedHookTypes = matchingHookTypes.slice(0, 5);
 
-    // Update last_used_at for selected hook types
-    if (selectedHookTypes.length > 0) {
-      const nowIso = new Date().toISOString();
-      const updateStmt = db.prepare('UPDATE hook_types SET last_used_at = ? WHERE id = ?');
-      for (const ht of selectedHookTypes) {
-        updateStmt.run(nowIso, ht.id);
-      }
-    }
-
-    const hookBankList = selectedHookTypes.map(ht => {
+    const hookBankList = selectedHookTypes.map((ht, idx) => {
       let parsedAngles: string[] = [];
       try { parsedAngles = JSON.parse(ht.angles); } catch {}
       const angleStr = parsedAngles.join(' / ');
       return ht.description?.trim()
-        ? `${ht.name} — ${ht.description} (angles: ${angleStr})`
-        : `${ht.name} (angles: ${angleStr})`;
+        ? `[Option ${idx + 1}] ${ht.name} — ${ht.description} (angles: ${angleStr})`
+        : `[Option ${idx + 1}] ${ht.name} (angles: ${angleStr})`;
     }).join('\n');
 
-    const anatomyPrompt = anatomySections.map((s, i) =>
-      `${i + 1}. **${s.section_name}**: ${s.rule_description}`
-    ).join('\n');
+    // ── Determine generation mode ─────────────────────────────────
+    const webResults: string | undefined = body.webResults;
+    const mode: 'A' | 'B' = webResults?.trim() ? 'B' : 'A';
 
-    const userAboutMe = (settings?.about_me as string)?.trim() || "I am an AI Engineer building in public on LinkedIn.";
+    // Load enabled writing mechanics directives
+    const writingMechanics = db.prepare(
+      'SELECT prompt_directive, description FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC'
+    ).all() as { prompt_directive?: string; description?: string }[];
 
-    // ── Mode-specific instruction block ───────────────────────────
-    const modeInstructions = mode === 'A'
-      ? `## MODE A — Generate from Notes
-RAW NOTES / INPUT: ${rawNotes}
-- **Detailed Input**: Use code, specs & real project details directly as backbone.
-- **Thin / Keyword Input** (e.g. "RAG", "pgvector"): Break down the complete end-to-end architecture & all subcomponents (e.g. chunking → embeddings → vector indexing → similarity search → context synthesis). Never write superficial generic text.`
-      : `## MODE B — Research & Generate via Web Search & Official Docs
-TOPIC: ${rawNotes}
-SEARCH RESULTS:
-${webResults}
-- **Extract Technical Specs**: Pull official framework docs, API specs, architecture patterns, subcomponents (e.g. chunking, vector indexing, retrieval pipelines, state graphs), benchmarks & best practices.
-- **Synthesize**: Re-explain the full concept end-to-end in your own engineering voice with practical workflow steps & trade-offs.`;
-
-    // ── Full assembled prompt ──────────────────────────────────────
-    const prompt = `You are an expert LinkedIn content strategist writing on behalf of:
+    // ── Prompt Assembly (Strict Order from Architecture Spec) ────
+    const prompt = `You are an expert LinkedIn content strategist and ghostwriter writing on behalf of:
 ${userAboutMe}
 
-ACTIVE MODE: ${mode === 'A' ? 'Mode A — Generate from Notes' : 'Mode B — Research & Generate via Web Search & Official Docs'}
+==================================================
+2. GENERATION MODE
+==================================================
+ACTIVE MODE: ${mode === 'A' ? 'Mode A — Generate directly from Notes' : 'Mode B — Research & Generate via Web Search Results'}
 
-TODAY'S PILLAR: ${postType.name}
+==================================================
+3. ACTIVE PILLAR
+==================================================
+${postType.name}
 
-TARGET POST FORMAT: ${activeFormat.name} (Mandatory Length: STRICTLY between ${activeFormat.min} and ${activeFormat.max} characters across all sections combined)
+==================================================
+4. CONTENT INTENT
+==================================================
+INTENT: ${resolvedIntent.intentName} ("${resolvedIntent.displayName}")
+INTENT PURPOSE: ${resolvedIntent.reason}
+What the reader should get from this post: Clear, substantive value tailored specifically to this intent.
 
-ACTIVE PILLAR'S CORE FOCUS:
-${coreFocus || "No core focus defined — rely entirely on DOs/DON'Ts below as your primary guide."}
+==================================================
+5. POST FORMAT + CHARACTER LIMIT
+==================================================
+TARGET FORMAT: ${activeFormat.name}
+MANDATORY LENGTH: STRICTLY between ${activeFormat.min} and ${activeFormat.max} characters (approximately ${Math.round(activeFormat.min / 6)}–${Math.round(activeFormat.max / 6)} words).
 
-ACTIVE PILLAR'S VISUAL SUGGESTIONS GUIDANCE:
-${visualSuggestionsGuidance || "Recommend concrete, specific screenshots, diagrams, code snippets, or graphics relevant to the post topic."}
-- MANDATORY FOR AUTHORITY / INDUSTRY COMMENTARY POSTS: The visualSuggestion field MUST include the exact URL of the original post, tweet, article, or research paper being referenced. Strictly follow this format:
-  "[Visual type + description] — Source: [exact URL of the original post/tweet/article/headline]"
-  Example: "Screenshot of the LinkedIn post being referenced — Source: https://www.linkedin.com/posts/example-123456"
+==================================================
+6. PILLAR CORE FOCUS
+==================================================
+${coreFocus || "Educate and engage with authentic, grounded engineering depth."}
 
-ACTIVE PILLAR'S DOs:
+==================================================
+7. PILLAR DOs
+==================================================
 ${dos.map((d: string) => `✓ ${d}`).join('\n')}
 
-ACTIVE PILLAR'S DON'Ts:
+==================================================
+8. PILLAR DON'Ts
+==================================================
 ${donts.map((d: string) => `✗ ${d}`).join('\n')}
 
-ACTIVE POST ANATOMY (output every section in this exact order for EVERY version):
-${anatomyPrompt}
+==================================================
+9. ACTIVE ANATOMY
+==================================================
+ANATOMY NAME: ${selectedAnatomy.name}
 
-WRITING MECHANICS DIRECTIVES (mandatory formatting & structural constraints):
-${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive || m.description}`).join('\n') : '• Keep lines short and scannable. Avoid wall of text blocks.'}
+==================================================
+10. ANATOMY PURPOSE
+==================================================
+${selectedAnatomy.purpose}
 
-AVAILABLE HOOK TYPES (structural formulas, not literal text):
+==================================================
+11. ANATOMY THINKING FLOW (HOW THE IDEA DEVELOPS)
+==================================================
+${thinkingFlowSteps.map((step, idx) => `${idx + 1}. ${step}`).join('\n')}
+
+CRITICAL INSTRUCTION ON THINKING FLOW:
+- The Thinking Flow is your MENTAL ROADMAP for how the post's reasoning progresses.
+- It is NOT a set of visible section titles or headings!
+- DO NOT write headings or labels like "Observation:", "Evidence:", "Why:", "Interpretation:", "Thinking Flow:", "Hook:", or "Breakdown:" anywhere in the post text.
+- Write natural paragraphs that smoothly carry the reader through these ideas.
+
+==================================================
+12. ANATOMY WRITING STYLE
+==================================================
+${selectedAnatomy.writing_style || 'Paragraph-led, natural cadence, clear line breaks.'}
+${selectedAnatomy.constraints ? `ADDITIONAL CONSTRAINTS: ${selectedAnatomy.constraints}` : ''}
+
+==================================================
+13. VISUAL GUIDANCE
+==================================================
+${visualSuggestionsGuidance || "Recommend a concrete, specific diagram, code snippet, terminal log, or graphic."}
+- FOR AUTHORITY / INDUSTRY COMMENTARY: The visualSuggestion field MUST reference a specific post, article, chart, or screenshot source if relevant.
+
+==================================================
+14. AVAILABLE HOOK TYPES (CANDIDATE POOL)
+==================================================
 ${hookBankList || 'No hook types configured.'}
 
-HOOK SELECTION & DIVERSITY RULES (MANDATORY):
-- DO NOT use the same hook type across all 3 versions.
-- Assign DIFFERENT hook types or distinct hook angles from the list above across Version 1, Version 2, and Version 3.
-  - E.g., Version 1 MUST use Hook Type #1 (or Angle #1), Version 2 MUST use Hook Type #2 (or Angle #2), and Version 3 MUST use Hook Type #3 (or Angle #3).
+==================================================
+15. HOOK SELECTION & VERSION DIVERSITY RULES
+==================================================
+- Generate exactly 3 distinct versions.
+- ALL 3 VERSIONS MUST USE THE SAME SELECTED ANATOMY ("${selectedAnatomy.name}"), but each version MUST use a DIFFERENT entry point / hook angle:
+  * Version 1: Direct educational or analytical angle (using Hook Option A from the list above)
+  * Version 2: Personal observation or narrative angle (using Hook Option B from the list above)
+  * Version 3: Practical example or counter-intuitive angle (using Hook Option C from the list above)
+- Do NOT make the 3 versions just synonym-swapped rewrites. Give each a distinct voice, framing, and pacing while honoring the anatomy's thinking flow.
 
-TONE & VOICE PROFILE:
+==================================================
+16. WRITING MECHANICS
+==================================================
+${writingMechanics.length > 0 ? writingMechanics.map(m => `• ${m.prompt_directive || m.description}`).join('\n') : '• Keep lines short and scannable. Avoid dense blocks of text.'}
+
+==================================================
+17. TONE & VOICE PROFILE
+==================================================
 - Formality: ${tone.formality}
 - Sentence length: ${tone.sentenceLength}
-- Language mix: ${tone.languageMix || 'Not specified'}
-- NEVER use these phrases or tropes: ${tone.bannedPhrases.length ? tone.bannedPhrases.join(', ') : 'none specified'}
+- Language: Clear, authentic English.
+- Sound like a real technical builder sharing what they actually built, observed, or learned.
 
-STRICT WRITING BANS (ABSOLUTELY FORBIDDEN ACROSS ALL POSTS):
-- Reversal framing (e.g. "You think X, but actually Y")
-- A common belief followed by a dramatic correction
-- Rhetorical questions
-- Repeated sentence openings used to create rhythm
+==================================================
+18. STRICT WRITING BANS (ABSOLUTELY FORBIDDEN)
+==================================================
+- Reversal framing (e.g. "You think X, but actually Y" or "Everyone thinks X. They are wrong.")
+- A common belief followed by a dramatic theatrical correction
+- Rhetorical questions (e.g. "Ever wondered why...?")
+- Repeated sentence openings used to create artificial cadence
 - Stacked sentence fragments
 - "Most people", "Most developers", "Many engineers"
-- Abstract comparisons without a concrete effect
 - Corporate buzzwords & LinkedIn guru clichés
 - Cliche openings
 - Unnecessary adverbs
 - Artificial symmetry
 - Dramatic cadence
 - Forced summaries
-- Forced CTAs
+- Forced CTAs (omit or keep subtle if not natural for the pillar/anatomy)
 - Em dashes (—)
 
-VOCABULARY RULE: Write using simple, everyday words — the kind a person would actually say out loud to a friend, not words from a formal essay or corporate writing. When you're about to use a longer or more "impressive" word, stop and ask: would I actually say this out loud? If not, use the plain version instead.
+VOCABULARY RULE: Use plain, everyday words. Never use formal essay words:
+${tone.avoidWords.length ? tone.avoidWords.join(', ') : DEFAULT_AVOID_WORDS.join(', ')}
 
-Examples of the pattern to avoid (replace formal/literary word → plain word):
-- "resilience" → "holds up" / "doesn't break"
-- "predictable" → "works the way I expect" / "makes sense"
-- "miserably" → "badly" / "completely"
-- "rigid" → "fixed" / "one-way" / "strict"
-- "leverage" (as a verb) → "use"
-- "robust" → "solid" / "strong"
-- "seamless" → "smooth" / "no issues"
-- "myriad" → "a lot of" / "many"
-- "utilize" → "use"
-- "delve into" → "look at" / "dig into"
+==================================================
+19. NATURAL-FLOW & PILLAR SPECIFIC RULES
+==================================================
+- Natural Flow > Mechanical Compliance.
+- Do NOT force a rehook, a CTA, or a numbered list unless genuinely appropriate.
+- AUTHORITY PILLAR: Must be paragraph-led, analytical, and original. Capable of analyzing startups, founders, tech decisions, or ecosystem patterns. Sound like: "I have been observing an interesting pattern. Here is the evidence. Here is what I think is happening. Here is why it matters." NOT "5 lessons I learned from X."
+- PERSONAL PILLAR: Must feel like a lived experience. Moment -> thought -> event -> realization -> change.
+- SHOWCASE PILLAR: Focus on Problem -> Decision -> Build -> Result -> Lesson. Focus on reasons behind decisions rather than feature dumping.
+- VALUE PILLAR: Practical, deep, and actionable. Teach the real mechanism.
+- LEAD MAGNET PILLAR: Resource-first. Introduce the value of the checklist/template/roadmap early.
+- ANTI-FABRICATION DIRECTIVE: Do NOT invent fake metrics, fake founder quotes, or imaginary results. Stay strictly grounded in the notes and context provided.
 
-Never use any word from this list: ${tone.avoidWords.length ? tone.avoidWords.join(', ') : 'none specified'}
+==================================================
+20. RAW NOTES / INPUT
+==================================================
+${mode === 'A' ? `RAW NOTES:
+${rawNotes}` : `RESEARCH TOPIC:
+${rawNotes}
 
-This applies to every section of the post, not just the hook.
+WEB SEARCH / DOCUMENTATION RESULTS:
+${webResults}`}
 
----
-
-${modeInstructions}
-
----
-
-## Output Format
-Return exactly 3 versions. For each version, output every section defined in the active Post Anatomy above (in order), plus a Visual suggestion and a Resources array.
-Respond with ONLY valid JSON — no markdown fences, no commentary before or after:
+==================================================
+21. OUTPUT JSON SCHEMA
+==================================================
+Respond with ONLY valid JSON — no markdown fences, no text before or after:
 {
   "versions": [
     {
       "version": 1,
-      "sections": {
-        "${anatomySections.map(s => s.section_name).join('": "...",\n        "')}: "..."
-      },
-      "visualSuggestion": "Specific, concrete one-line description of the image/graphic to pair with this version",
+      "hookType": "Name of hook type used from candidate pool",
+      "angle": "Brief description of this version's angle (e.g. Direct analytical angle)",
+      "content": "Full flowing LinkedIn post text with natural line breaks. Natural paragraphs. No visible section headers.",
+      "visualSuggestion": "Concrete description of the image/diagram to pair with this post",
       "resources": [
-        "Official Documentation / Resource Title (https://example.com/url)"
+        "Relevant Resource Title or Official Documentation URL"
       ]
     },
-    { "version": 2, "sections": { ... }, "visualSuggestion": "...", "resources": [ "..." ] },
-    { "version": 3, "sections": { ... }, "visualSuggestion": "...", "resources": [ "..." ] }
+    {
+      "version": 2,
+      "hookType": "Different hook type from candidate pool",
+      "angle": "Different angle (e.g. Personal observation angle)",
+      "content": "Full flowing LinkedIn post text...",
+      "visualSuggestion": "...",
+      "resources": [ "..." ]
+    },
+    {
+      "version": 3,
+      "hookType": "Third different hook type from candidate pool",
+      "angle": "Third angle (e.g. Practical case angle)",
+      "content": "Full flowing LinkedIn post text...",
+      "visualSuggestion": "...",
+      "resources": [ "..." ]
+    }
   ]
-}
+}`;
 
-CRITICAL RULES:
-- **ANTI-EXAGGERATION DIRECTIVE**: Do not upgrade the raw input's language into stronger claims. If the raw notes say a result was "reduced" or "improved," do not restate it as "eliminated," "solved completely," "instantly," or similar absolute terms unless the raw notes themselves use that strength of language.
-- Each version must be genuinely distinct (different angle, opening hook, or framing — not just rephrased).
-- Each version MUST use a DIFFERENT hook type or distinct hook angle from the available list across versions.
-- **RESOURCES ARRAY**: In every version, include 1-4 specific URLs or official doc references in the "resources" array. In Mode B (Web Search), extract the exact source URLs/titles from the provided search results. In Mode A, list official framework doc URLs, GitHub repos, or technical specs relevant to the topic (e.g. LangChain Docs (https://python.langchain.com), PostgreSQL pgvector (https://github.com/pgvector/pgvector)).
-- The post must be ready to copy-paste to LinkedIn as-is.`;
-
+    // ── Call Gemini AI ────────────────────────────────────────────
     const rawResponseText = await callWithGeminiFallback(async (genAI) => {
       const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
       const model = genAI.getGenerativeModel({ model: modelName });
@@ -384,20 +422,61 @@ CRITICAL RULES:
     });
 
     const parsed = safeParseJSON(rawResponseText);
-    const sanitizedVersions = (parsed.versions || []).map((v: Record<string, unknown>) => ({
-      ...v,
-      resources: Array.isArray(v.resources) ? v.resources.map((r: unknown) => String(r)) : []
-    }));
+
+    // ── Validate Post Generation ──────────────────────────────────
+    const validationReport = validatePostGeneration(
+      parsed,
+      activeFormat,
+      tone.bannedPhrases,
+      tone.avoidWords
+    );
+
+    if (!validationReport.isValid || validationReport.versions.length === 0) {
+      console.error('Validation errors:', validationReport.errors);
+      throw new Error(`Generation failed validation: ${validationReport.errors.join('; ')}`);
+    }
+
+    // ── Update LRU Timestamps ─────────────────────────────────────
+    // 1. Update Anatomy LRU
+    updateAnatomyLastUsed(selectedAnatomy.id);
+
+    // 2. Update Hook LRU
+    if (selectedHookTypes.length > 0) {
+      const nowIso = new Date().toISOString();
+      const updateHookStmt = db.prepare('UPDATE hook_types SET last_used_at = ? WHERE id = ?');
+      for (const ht of selectedHookTypes) {
+        updateHookStmt.run(nowIso, ht.id);
+      }
+    }
 
     // Auto-extract topic summary from raw notes (first 200 chars)
     const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim();
+    const firstVersionCharCount = validationReport.versions[0]?.characterCount || 0;
 
-    // Calculate total character count for first version
-    const firstVersionSections = sanitizedVersions[0]?.sections || {};
-    const totalCharCount = Object.values(firstVersionSections).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
-
-    // Do NOT automatically persist to posts DB — only persist when user clicks "Save to Drafts"
-    return NextResponse.json({ postId: null, versions: sanitizedVersions, repeatWarning, postFormat: format, characterCount: totalCharCount, topicSummary });
+    return NextResponse.json({
+      postId: null,
+      versions: validationReport.versions,
+      repeatWarning,
+      postFormat: format,
+      characterCount: firstVersionCharCount,
+      topicSummary,
+      contentIntent: {
+        id: resolvedIntent.intentId,
+        name: resolvedIntent.intentName,
+        displayName: resolvedIntent.displayName,
+        confidence: resolvedIntent.confidence,
+        source: resolvedIntent.source,
+        reason: resolvedIntent.reason
+      },
+      selectedAnatomy: {
+        id: selectedAnatomy.id,
+        name: selectedAnatomy.name,
+        purpose: selectedAnatomy.purpose,
+        writingStyle: selectedAnatomy.writing_style,
+        thinkingFlow: thinkingFlowSteps
+      },
+      validationWarnings: validationReport.warnings
+    });
   } catch (e) {
     console.error('generate-post error:', e);
     return NextResponse.json({ error: String(e) }, { status: 500 });
@@ -413,9 +492,12 @@ async function generateSingleSection(
   donts: string[],
   coreFocus: string
 ): Promise<string> {
-  const prompt = `You are an expert LinkedIn content strategist. Rewrite ONLY the "${section.section_name}" section of a LinkedIn post for an AI Engineer building in public.
+  const sectionName = (section.name || section.section_name || 'Section') as string;
+  const sectionRule = (section.purpose || section.rule_description || '') as string;
 
-SECTION RULE: ${section.rule_description}
+  const prompt = `You are an expert LinkedIn content strategist. Rewrite ONLY the "${sectionName}" thought/section of a LinkedIn post for an AI Engineer building in public.
+
+SECTION FOCUS: ${sectionRule}
 
 PILLAR: ${postType.name}
 CORE FOCUS: ${coreFocus || "Rely on DOs/DON'Ts below as your primary guide."}
@@ -429,14 +511,11 @@ ${donts.map((d: string) => `✗ ${d}`).join('\n')}
 TONE: ${tone.formality} formality, ${tone.sentenceLength} sentences, ${tone.languageMix || 'Professional English'}.
 NEVER use: ${tone.bannedPhrases.join(', ') || 'none'}
 VOCABULARY RULE: Use simple, everyday words. Never use formal/literary AI words like: ${(tone.avoidWords || DEFAULT_AVOID_WORDS).join(', ')}.
-LANGUAGE RULE: Write in clear English. Roman Urdu/Hindi is only acceptable for Personal-pillar posts.
 
 RAW NOTES:
 ${rawNotes}
 
-INSTRUCTION: Apply intent analysis first — if the notes are detailed, use them directly. If they are thin/keyword-only, draw on foundational knowledge to write real, substantive content rather than generic filler. Showcase/Authority pillar exception: if notes are too thin to contain real project detail, use [placeholder] markers instead of fabricating specifics.
-
-Respond with ONLY the section content text. No labels, no quotes, no extra formatting.`;
+Respond with ONLY the natural prose for this thought. No labels, no quotes, no headings.`;
 
   return await callWithGeminiFallback(async (genAI) => {
     const modelName = process.env.GEMINI_MODEL || 'gemini-3.6-flash';

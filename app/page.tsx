@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/components/Toast';
-import { ChevronDown, AlertTriangle, Save, CheckCircle, RefreshCw, Image, Loader2, BookOpen, Search, Trash2, ExternalLink, Copy, Type } from 'lucide-react';
+import { ChevronDown, AlertTriangle, Save, CheckCircle, RefreshCw, Image, Loader2, BookOpen, Search, Trash2, ExternalLink, Copy, Type, Compass, Sparkles, ChevronRight } from 'lucide-react';
 
 interface PostVersion {
   version: number;
+  hookType?: string;
+  angle?: string;
+  content?: string;
   sections: Record<string, string>;
   visualSuggestion: string;
   resources?: string[];
@@ -27,6 +30,7 @@ export default function StudioPage() {
   const router = useRouter();
   const {
     postTypes,
+    contentIntents,
     anatomy,
     settings,
     generating,
@@ -98,6 +102,11 @@ export default function StudioPage() {
     fetchQuotas();
   }, []);
 
+  const [selectedIntentId, setSelectedIntentId] = useState<string>('auto');
+  const [activeIntentInfo, setActiveIntentInfo] = useState<{ id: string; name: string; displayName?: string; confidence?: string; source?: string } | null>(null);
+  const [activeAnatomyInfo, setActiveAnatomyInfo] = useState<{ id: string; name: string; purpose?: string; thinkingFlow?: string[]; writingStyle?: string } | null>(null);
+  const [showAnatomyDetails, setShowAnatomyDetails] = useState(false);
+
   const [versions, setVersions] = useState<PostVersion[]>([]);
   const [editedSectionsMap, setEditedSectionsMap] = useState<Record<number, Record<string, string>>>({});
   const [repeatWarning, setRepeatWarning] = useState<string | null>(null);
@@ -119,6 +128,24 @@ export default function StudioPage() {
       setPostId(generationResult.postId);
       setPostStatus('draft');
       if (generationResult.repeatWarning) setRepeatWarning(generationResult.repeatWarning);
+      if (generationResult.contentIntent) {
+        setActiveIntentInfo({
+          id: generationResult.contentIntent.id,
+          name: generationResult.contentIntent.name,
+          displayName: generationResult.contentIntent.displayName,
+          confidence: generationResult.contentIntent.confidence,
+          source: generationResult.contentIntent.source
+        });
+      }
+      if (generationResult.selectedAnatomy) {
+        setActiveAnatomyInfo({
+          id: generationResult.selectedAnatomy.id,
+          name: generationResult.selectedAnatomy.name,
+          purpose: generationResult.selectedAnatomy.purpose,
+          thinkingFlow: generationResult.selectedAnatomy.thinkingFlow,
+          writingStyle: generationResult.selectedAnatomy.writingStyle
+        });
+      }
       fetchQuotas();
     }
   }, [generationResult]);
@@ -176,6 +203,9 @@ export default function StudioPage() {
         if (parsed.postDate && parsed.postDate >= todayStr) {
           setPostDate(parsed.postDate);
         }
+        if (parsed.selectedIntentId) setSelectedIntentId(parsed.selectedIntentId);
+        if (parsed.activeIntentInfo) setActiveIntentInfo(parsed.activeIntentInfo);
+        if (parsed.activeAnatomyInfo) setActiveAnatomyInfo(parsed.activeAnatomyInfo);
         if (parsed.versions && parsed.versions.length > 0) {
           setVersions(parsed.versions);
           if (parsed.editedSectionsMap) setEditedSectionsMap(parsed.editedSectionsMap);
@@ -193,13 +223,16 @@ export default function StudioPage() {
           editedSectionsMap,
           rawNotes,
           selectedPostTypeId,
+          selectedIntentId,
+          activeIntentInfo,
+          activeAnatomyInfo,
           postId,
           postFormat,
           postDate
         }));
       } catch { }
     }
-  }, [versions, editedSectionsMap, rawNotes, selectedPostTypeId, postId, postFormat, postDate]);
+  }, [versions, editedSectionsMap, rawNotes, selectedPostTypeId, selectedIntentId, activeIntentInfo, activeAnatomyInfo, postId, postFormat, postDate]);
 
   const [weeklySchedule, setWeeklySchedule] = useState<{
     dayName: string;
@@ -277,15 +310,17 @@ export default function StudioPage() {
       setCalendarEntry(null);
 
       // Fall back to weekly mapping
-      if (mappingMap[selectedDayName]) {
-        const matched = postTypes.find(pt => pt.name.toLowerCase() === mappingMap[selectedDayName].toLowerCase());
+      const mappedPillarName = mappingMap[selectedDayName] || defaultMix[selectedDayName];
+      if (mappedPillarName) {
+        const matched = postTypes.find(pt => pt.name.toLowerCase() === mappedPillarName.toLowerCase());
         if (matched) {
-          setSelectedPostTypeId(matched.id);
+          const matchingRule = ruleList.find(r => r.name.toLowerCase() === matched.name.toLowerCase());
+          setSelectedPostTypeId(matchingRule ? matchingRule.id : matched.id);
         }
       }
     }
     resolveToday();
-  }, [postDate, settings, postTypes]);
+  }, [postDate, settings, postTypes, ruleList]);
 
   // ── Mode A: generate from raw notes ──────────────────────────
   const handleGenerate = async (overrideQuota = false) => {
@@ -311,7 +346,8 @@ export default function StudioPage() {
       postFormat,
       postDate,
       selectedHooks: [],
-      selectedHookIds: []
+      selectedHookIds: [],
+      contentIntentId: selectedIntentId !== 'auto' ? selectedIntentId : undefined
     });
   };
 
@@ -339,60 +375,63 @@ export default function StudioPage() {
       postFormat,
       postDate,
       selectedHooks: [],
-      selectedHookIds: []
+      selectedHookIds: [],
+      contentIntentId: selectedIntentId !== 'auto' ? selectedIntentId : undefined
     });
   };
 
-  const handleSectionEdit = (vIdx: number, sectionName: string, value: string) => {
+  const getVersionContent = (vIdx: number): string => {
+    const edited = editedSectionsMap[vIdx];
+    if (edited?.Content !== undefined) return edited.Content;
+    const ver = versions[vIdx];
+    if (!ver) return '';
+    if (ver.content) return ver.content;
+    if (ver.sections?.Content) return ver.sections.Content;
+    // Fallback if legacy multi-section
+    return Object.values(ver.sections || {})
+      .filter(v => typeof v === 'string' && v.trim())
+      .join('\n\n');
+  };
+
+  const handleContentEdit = (vIdx: number, newContent: string) => {
     setEditedSectionsMap(prev => ({
       ...prev,
       [vIdx]: {
         ...(prev[vIdx] || {}),
-        [sectionName]: value
+        Content: newContent
       }
     }));
   };
 
-  const handleRegenerateSection = async (sectionId: string, sectionName: string, vIdx: number) => {
-    if (!postId || !selectedPostTypeId || !rawNotes.trim()) return;
-    const isRegenKey = `${vIdx}_${sectionName}`;
-    setRegeneratingSection(isRegenKey);
-    try {
-      const res = await fetch('/api/generate-post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawNotes, postTypeId: selectedPostTypeId, date: today, sectionId })
-      });
-      const data = await res.json();
-      if (!res.ok) { showToast(data.error ?? 'Section regeneration failed.', 'error'); return; }
-      setEditedSectionsMap(prev => ({
-        ...prev,
-        [vIdx]: {
-          ...(prev[vIdx] || {}),
-          [sectionName]: data.sectionContent
-        }
-      }));
-      showToast(`"${sectionName}" regenerated for Version ${vIdx + 1}.`, 'success');
-    } catch (e) {
-      showToast(String(e), 'error');
-    } finally {
-      setRegeneratingSection(null);
+  const getFormatRange = (format: string) => {
+    switch (format) {
+      case 'text_post': return { min: 600, max: 1200, label: '600–1,200' };
+      case 'image_post': return { min: 900, max: 1500, label: '900–1,500' };
+      case 'carousel': return { min: 1200, max: 1500, label: '1,200–1,500' };
+      case 'video_post': return { min: 500, max: 800, label: '500–800' };
+      default: return { min: 600, max: 1200, label: '600–1,200' };
     }
   };
 
   const handleSaveEdits = async (vIdx: number) => {
-    const updatedVersions = versions.map((v, i) => ({
-      ...v,
-      sections: editedSectionsMap[i] || v.sections
-    }));
+    const updatedVersions = versions.map((v, i) => {
+      const text = getVersionContent(i);
+      return {
+        ...v,
+        content: text,
+        sections: { Content: text }
+      };
+    });
 
     const postTypeIdToUse = selectedPostTypeId || (postTypes.length > 0 ? postTypes[0].id : null);
+    const textToSave = getVersionContent(vIdx);
+    const totalCharCount = textToSave.length;
 
     if (postId) {
       const res = await fetch(`/api/posts/${postId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ versions: updatedVersions, selected_version: vIdx, status: 'draft' })
+        body: JSON.stringify({ versions: updatedVersions, selected_version: vIdx, status: 'draft', character_count: totalCharCount })
       });
       if (res.ok) {
         setVersions(updatedVersions);
@@ -407,8 +446,6 @@ export default function StudioPage() {
       }
     } else {
       const topicSummary = rawNotes.slice(0, 200).replace(/\s+/g, ' ').trim() || 'Untitled Draft';
-      const targetVer = updatedVersions[vIdx]?.sections || {};
-      const totalCharCount = Object.values(targetVer).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -441,16 +478,7 @@ export default function StudioPage() {
   };
 
   const handleCopyFullPost = (vIdx: number) => {
-    const currentSections = editedSectionsMap[vIdx] || versions[vIdx]?.sections || {};
-    const activeAnatomy = settings?.anatomy_scope === 'per_post_type'
-      ? anatomy.filter(s => !s.applies_to_post_type_id || s.applies_to_post_type_id === selectedPostTypeId)
-      : anatomy.filter(s => !s.applies_to_post_type_id);
-
-    const fullText = activeAnatomy
-      .map(s => (currentSections[s.section_name] || '').trim())
-      .filter(Boolean)
-      .join('\n\n');
-
+    const fullText = getVersionContent(vIdx);
     if (!fullText.trim()) {
       showToast('No post content to copy.', 'error');
       return;
@@ -463,23 +491,7 @@ export default function StudioPage() {
   };
 
   const handleFormatPost = (vIdx: number) => {
-    const currentSections = editedSectionsMap[vIdx] || versions[vIdx]?.sections || {};
-    const activeAnatomy = settings?.anatomy_scope === 'per_post_type'
-      ? anatomy.filter(s => !s.applies_to_post_type_id || s.applies_to_post_type_id === selectedPostTypeId)
-      : anatomy.filter(s => !s.applies_to_post_type_id);
-
-    let fullText = activeAnatomy
-      .map(s => (currentSections[s.section_name] || '').trim())
-      .filter(Boolean)
-      .join('\n\n');
-
-    if (!fullText.trim()) {
-      fullText = Object.values(currentSections)
-        .filter(val => typeof val === 'string' && val.trim())
-        .map(val => (val as string).trim())
-        .join('\n\n');
-    }
-
+    const fullText = getVersionContent(vIdx);
     if (!fullText.trim()) {
       showToast('No post content to format.', 'error');
       return;
@@ -489,6 +501,35 @@ export default function StudioPage() {
     showToast(`Redirecting to Formatter with Version ${vIdx + 1}...`, 'info');
     router.push('/formatter');
   };
+
+  const getUnderlyingPostTypeId = (id: string): string => {
+    if (!id) return '';
+    const directMatch = postTypes.find(pt => pt.id === id);
+    if (directMatch) return directMatch.id;
+    const rule = ruleList.find(r => r.id === id);
+    if (rule) {
+      const byName = postTypes.find(pt => pt.name.toLowerCase() === rule.name.toLowerCase());
+      if (byName) return byName.id;
+    }
+    return id;
+  };
+
+  const getRuleIdForPillarId = (id: string): string => {
+    if (!id) return '';
+    const directRule = ruleList.find(r => r.id === id);
+    if (directRule) return directRule.id;
+    const pt = postTypes.find(p => p.id === id);
+    if (pt) {
+      const ruleByName = ruleList.find(r => r.name.toLowerCase() === pt.name.toLowerCase());
+      if (ruleByName) return ruleByName.id;
+    }
+    return id;
+  };
+
+  const underlyingPillarId = getUnderlyingPostTypeId(selectedPostTypeId);
+  const eligibleIntents = underlyingPillarId
+    ? contentIntents.filter(ci => ci.post_type_id === underlyingPillarId || ci.applies_to_post_type_id === underlyingPillarId)
+    : [];
 
   const selectedQuota = ruleList.find(r => r.id === selectedPostTypeId);
 
@@ -668,19 +709,47 @@ export default function StudioPage() {
             </div>
 
             {/* Controls Inputs Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Pillar Dropdown */}
               <div className="flex flex-col space-y-1">
                 <label className="text-[11px] font-bold text-[#1C1C1E]">Pillar Strategy:</label>
                 <div className="relative">
                   <select
-                    value={selectedPostTypeId}
-                    onChange={e => setSelectedPostTypeId(e.target.value)}
+                    value={getRuleIdForPillarId(selectedPostTypeId)}
+                    onChange={e => {
+                      setSelectedPostTypeId(e.target.value);
+                      setSelectedIntentId('auto');
+                    }}
                     className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-white text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
                     <option value="" className="bg-white text-[#1C1C1E]">— Select Pillar —</option>
                     {ruleList.map(r => (
                       <option key={r.id} value={r.id} className="bg-white text-[#1C1C1E]">
                         {r.name} {r.is_hybrid ? ' (Merged)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8B8A93]" />
+                </div>
+              </div>
+
+              {/* Content Intent Dropdown */}
+              <div className="flex flex-col space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-[#1C1C1E]">Content Intent:</label>
+                  <span className="text-[9px] text-[#776497] font-semibold">Deterministic</span>
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedIntentId}
+                    onChange={e => setSelectedIntentId(e.target.value)}
+                    disabled={!underlyingPillarId}
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-white text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 hover:border-[#8B8A93]/50 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] disabled:opacity-60 disabled:cursor-not-allowed">
+                    <option value="auto" className="bg-white text-[#1C1C1E]">
+                      {underlyingPillarId ? '⚡ Auto-Detect Intent (Recommended)' : '— Select Pillar First —'}
+                    </option>
+                    {eligibleIntents.map(intent => (
+                      <option key={intent.id} value={intent.id} className="bg-white text-[#1C1C1E]">
+                        {intent.display_name || intent.name.replace(/_/g, ' ')}
                       </option>
                     ))}
                   </select>
@@ -775,21 +844,95 @@ export default function StudioPage() {
           className={`rounded-3xl p-5 space-y-5 border shadow-[0_8px_30px_rgba(187,178,245,0.10)] transition-all duration-300 ${isLoaded ? 'animate-studio-settle' : ''}`}
           style={{ background: 'linear-gradient(145deg, rgba(187,178,245,0.09) 0%, rgba(255,255,255,0.96) 100%)', borderColor: 'rgba(187,178,245,0.22)', ...getEntranceStyle(300) }}>
 
-          <div className="flex items-center justify-between border-b border-[#8B8A93]/10 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#8B8A93]/10 pb-3">
             <div>
               <h2 className="text-base font-bold text-[#1C1C1E]">
                 Generated Post Angles
               </h2>
+              <p className="text-[11px] text-[#8B8A93] mt-0.5">
+                3 diverse angles crafted with the same thinking flow and distinct hook entries
+              </p>
             </div>
 
             {versions.length > 0 && (
               <button
                 onClick={() => { setVersions([]); setEditedSectionsMap({}); showToast('Discarded generated posts.', 'info'); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#A78BE0]/30 text-[#A78BE0] hover:bg-[#A78BE0]/10 active:scale-[0.98] cursor-pointer">
+                className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#A78BE0]/30 text-[#A78BE0] hover:bg-[#A78BE0]/10 active:scale-[0.98] cursor-pointer">
                 <Trash2 size={13} /> Discard All
               </button>
             )}
           </div>
+
+          {/* Blueprint Banner: Intent & Selected Anatomy */}
+          {(activeIntentInfo || activeAnatomyInfo) && (
+            <div className="flex flex-col gap-2.5 p-3.5 rounded-2xl border border-[#A78BE0]/25 bg-white/90 shadow-2xs backdrop-blur-md">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-[#1C1C1E] flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-[#A78BE0]" />
+                    Blueprint:
+                  </span>
+                  {activeIntentInfo && (
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-[#A78BE0]/15 text-[#776497] border border-[#A78BE0]/30 flex items-center gap-1">
+                      <Compass size={11} />
+                      Intent: {activeIntentInfo.displayName || activeIntentInfo.name.replace(/_/g, ' ')}
+                      {activeIntentInfo.confidence && (
+                        <span className="text-[9px] opacity-75 font-mono">({activeIntentInfo.confidence})</span>
+                      )}
+                    </span>
+                  )}
+                  {activeAnatomyInfo && (
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-[#D6EC72]/30 text-[#4c5c10] border border-[#95b32b]/35">
+                      🧠 Anatomy: {activeAnatomyInfo.name}
+                    </span>
+                  )}
+                </div>
+
+                {activeAnatomyInfo && (
+                  <button
+                    onClick={() => setShowAnatomyDetails(!showAnatomyDetails)}
+                    className="text-[11px] font-semibold text-[#776497] hover:text-[#52446a] flex items-center gap-1 cursor-pointer">
+                    {showAnatomyDetails ? 'Hide Thinking Flow' : 'View Thinking Flow'}
+                    <ChevronDown size={12} className={`transition-transform duration-200 ${showAnatomyDetails ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {showAnatomyDetails && activeAnatomyInfo && (
+                <div className="pt-2.5 mt-1 border-t border-[#8B8A93]/15 text-xs text-[#2C2C2C] space-y-2 animate-fade-in">
+                  {activeAnatomyInfo.purpose && (
+                    <p className="text-[11px] text-[#555] italic">
+                      <strong className="text-[#1C1C1E] not-italic">Purpose: </strong>
+                      {activeAnatomyInfo.purpose}
+                    </p>
+                  )}
+                  {activeAnatomyInfo.thinkingFlow && activeAnatomyInfo.thinkingFlow.length > 0 && (
+                    <div>
+                      <span className="text-[11px] font-bold text-[#1C1C1E] block mb-1">Thinking Flow (Mental Model):</span>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {activeAnatomyInfo.thinkingFlow.map((step, idx) => (
+                          <span key={idx} className="flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-md bg-[#EEECF1] font-medium text-[#1C1C1E] border border-[#8B8A93]/20">
+                              {idx + 1}. {step}
+                            </span>
+                            {idx < activeAnatomyInfo.thinkingFlow!.length - 1 && (
+                              <ChevronRight size={11} className="text-[#8B8A93]" />
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {activeAnatomyInfo.writingStyle && (
+                    <p className="text-[11px] text-[#555]">
+                      <strong className="text-[#1C1C1E]">Writing Style: </strong>
+                      {activeAnatomyInfo.writingStyle}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {generating ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-[#8B8A93]/15 py-12 bg-[#EEECF1]">
@@ -798,14 +941,16 @@ export default function StudioPage() {
                 Generating post...
               </p>
               <p className="text-[11px] text-[#8B8A93] mt-1">
-                Crafting 3 distinct post versions
+                Crafting 3 distinct post versions with selected thinking flow
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
               {versions.map((ver, vIdx) => {
-                const currentVerSections = editedSectionsMap[vIdx] || ver.sections || {};
-                const charCount = Object.values(currentVerSections).reduce((acc: number, curr: unknown) => acc + (typeof curr === 'string' ? curr.length : 0), 0);
+                const content = getVersionContent(vIdx);
+                const charCount = content.length;
+                const range = getFormatRange(postFormat);
+                const inRange = charCount >= range.min && charCount <= range.max;
                 const isCopied = copiedVersionIdx === vIdx;
                 const isSaved = savedVersionIdx === vIdx;
 
@@ -821,60 +966,57 @@ export default function StudioPage() {
                     }}>
 
                     {/* Version Column Header */}
-                    <div className="flex items-center justify-between pb-2.5 border-b border-[#8B8A93]/15">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-2xs bg-[#A78BE0]">
-                          Version {ver.version}
-                        </span>
-                        <span className="text-[11px] font-semibold text-[#8B8A93]">
-                          {charCount} chars
-                        </span>
+                    <div className="flex flex-col gap-2 pb-2.5 border-b border-[#8B8A93]/15">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-2xs bg-[#A78BE0]">
+                            Version {ver.version}
+                          </span>
+                          <span className={`text-[11px] font-semibold ${inRange ? 'text-emerald-700' : 'text-[#8B8A93]'}`} title={`Target: ${range.label}`}>
+                            {charCount} chars
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleCopyFullPost(vIdx)}
+                          className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${isCopied ? 'border-[#8B8A93] text-[#8B8A93] bg-white' : 'border-[#A78BE0] text-[#A78BE0] hover:bg-[#A78BE0]/10'
+                            }`}>
+                          <Copy size={12} />
+                          {isCopied ? 'Copied!' : 'Copy'}
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => handleCopyFullPost(vIdx)}
-                        className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${isCopied ? 'border-[#8B8A93] text-[#8B8A93] bg-white' : 'border-[#A78BE0] text-[#A78BE0] hover:bg-[#A78BE0]/10'
-                          }`}>
-                        <Copy size={12} />
-                        {isCopied ? 'Copied!' : 'Copy'}
-                      </button>
+                      {/* Hook & Angle Pills */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {ver.hookType && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/80 border border-[#8B8A93]/20 text-[#1C1C1E]">
+                            🪝 {ver.hookType}
+                          </span>
+                        )}
+                        {ver.angle && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#EEECF1] border border-[#8B8A93]/15 text-[#555]">
+                            Angle: {ver.angle}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Version Sections */}
+                    {/* Unified Natural Post Content */}
                     <div className="flex-1 flex flex-col gap-2.5">
-                      {activeAnatomy.map(section => {
-                        const content = currentVerSections[section.section_name] ?? '';
-                        const isRegenKey = `${vIdx}_${section.section_name}`;
-                        const isRegen = regeneratingSection === isRegenKey;
-
-                        return (
-                          <div key={section.id} className="rounded-xl border border-[#8B8A93]/15 bg-white overflow-hidden shadow-2xs">
-                            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#8B8A93]/10 bg-[#EEECF1]">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#A78BE0]">
-                                {section.section_name}
-                              </span>
-                              <button
-                                onClick={() => handleRegenerateSection(section.id, section.section_name, vIdx)}
-                                disabled={isRegen}
-                                title="Regenerate this section only"
-                                className="p-1 rounded-full text-[#8B8A93] hover:text-[#1C1C1E] hover:bg-white transition-colors cursor-pointer">
-                                {isRegen ? <Loader2 size={12} className="spinner text-[#A78BE0]" /> : <RefreshCw size={12} />}
-                              </button>
-                            </div>
-                            <textarea
-                              name={`${vIdx}_${section.section_name}`}
-                              value={content}
-                              onChange={e => {
-                                handleSectionEdit(vIdx, section.section_name, e.target.value);
-                                e.target.style.height = 'auto';
-                                e.target.style.height = `${Math.max(50, e.target.scrollHeight)}px`;
-                              }}
-                              className="section-textarea w-full px-3 py-2 bg-white text-xs text-[#1C1C1E] resize-none focus:outline-none focus:ring-1 focus:ring-[#A78BE0]/40 leading-relaxed block transition-colors font-sans"
-                              style={{ height: 'auto', minHeight: '50px', overflow: 'hidden' }}
-                            />
-                          </div>
-                        );
-                      })}
+                      <div className="rounded-xl border border-[#8B8A93]/15 bg-white overflow-hidden shadow-2xs flex-1 flex flex-col">
+                        <textarea
+                          name={`version_content_${vIdx}`}
+                          value={content}
+                          onChange={e => {
+                            handleContentEdit(vIdx, e.target.value);
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${Math.max(220, e.target.scrollHeight)}px`;
+                          }}
+                          className="w-full px-3.5 py-3 bg-white text-xs text-[#1C1C1E] resize-none focus:outline-none focus:ring-1 focus:ring-[#A78BE0]/40 leading-relaxed block transition-colors font-sans"
+                          style={{ minHeight: '220px' }}
+                          placeholder="Post content will appear here..."
+                        />
+                      </div>
 
                       {/* Visual suggestion */}
                       {ver.visualSuggestion && (

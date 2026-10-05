@@ -19,6 +19,7 @@ import {
   Monitor,
   List,
   ListOrdered,
+  SquareCheck,
   ArrowUpDown,
   Type,
   ChevronDown
@@ -748,6 +749,27 @@ export default function FormatterPage() {
                 title="Numbered List"
               >
                 <ListOrdered size={15} />
+              </button>
+
+              {/* Checkbox List */}
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyTransformToSelection(toChecklist)}
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  backgroundColor: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+                title="Checkbox List (☐)"
+              >
+                <SquareCheck size={15} />
               </button>
             </div>
 

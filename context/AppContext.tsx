@@ -11,12 +11,34 @@ export interface PostType {
   visual_suggestions?: string[] | string;
 }
 
+export interface ContentIntent {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  post_type_id: string;
+  applies_to_post_type_id?: string;
+  post_type_name?: string;
+  priority: number;
+  is_default: number;
+}
+
 export interface AnatomySection {
   id: string;
-  section_name: string;
-  rule_description: string;
+  name: string;
+  section_name?: string;
+  purpose: string;
+  rule_description?: string;
+  thinking_flow?: string;
+  thinkingFlowList?: string[];
+  writing_style?: string;
+  constraints?: string | null;
   order_index: number;
-  applies_to_post_type_id: string | null;
+  post_type_id: string | null;
+  applies_to_post_type_id?: string | null;
+  last_used_at?: string | null;
+  intent_ids?: string[];
+  intents?: { id: string; name: string; display_name: string }[];
 }
 
 export interface ToneProfile {
@@ -51,6 +73,7 @@ export interface GenerationParams {
   postDate: string;
   selectedHooks: string[];
   selectedHookIds: string[];
+  contentIntentId?: string | null;
 }
 
 export interface GenerationResult {
@@ -59,10 +82,27 @@ export interface GenerationResult {
   postId: string | null;
   postFormat: string;
   characterCount: number;
+  contentIntent?: {
+    id: string;
+    name: string;
+    displayName: string;
+    confidence: string;
+    source: string;
+    reason: string;
+  };
+  selectedAnatomy?: {
+    id: string;
+    name: string;
+    purpose: string;
+    writingStyle?: string;
+    thinkingFlow?: string[];
+  };
+  validationWarnings?: string[];
 }
 
 interface AppContextType {
   postTypes: PostType[];
+  contentIntents: ContentIntent[];
   anatomy: AnatomySection[];
   settings: Settings | null;
   weeklyMapping: WeeklyMapping[];
@@ -78,6 +118,7 @@ interface AppContextType {
   resetGenerationState: () => void;
 
   refreshPostTypes: () => Promise<void>;
+  refreshContentIntents: () => Promise<void>;
   refreshAnatomy: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   refreshWeeklyMapping: () => Promise<void>;
@@ -88,6 +129,7 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [postTypes, setPostTypes] = useState<PostType[]>([]);
+  const [contentIntents, setContentIntents] = useState<ContentIntent[]>([]);
   const [anatomy, setAnatomy] = useState<AnatomySection[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [weeklyMapping, setWeeklyMapping] = useState<WeeklyMapping[]>([]);
@@ -170,7 +212,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           date: params.postDate,
           webResults: resultsText,
           selectedHooks: params.selectedHooks,
-          selectedHookIds: params.selectedHookIds
+          selectedHookIds: params.selectedHookIds,
+          contentIntentId: params.contentIntentId
         }),
       });
       const data = await genRes.json();
@@ -186,7 +229,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         repeatWarning: data.repeatWarning ?? null,
         postId: data.postId ?? null,
         postFormat: params.postFormat,
-        characterCount: data.characterCount ?? 0
+        characterCount: data.characterCount ?? 0,
+        contentIntent: data.contentIntent,
+        selectedAnatomy: data.selectedAnatomy,
+        validationWarnings: data.validationWarnings
       };
 
       setGenerationResult(resObj);
@@ -202,7 +248,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           selectedPostTypeId: params.selectedPostTypeId,
           postId: data.postId ?? null,
           postFormat: params.postFormat,
-          postDate: params.postDate
+          postDate: params.postDate,
+          contentIntentId: params.contentIntentId
         }));
       } catch { }
 
@@ -230,7 +277,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           postFormat: params.postFormat,
           date: params.postDate,
           selectedHooks: params.selectedHooks,
-          selectedHookIds: params.selectedHookIds
+          selectedHookIds: params.selectedHookIds,
+          contentIntentId: params.contentIntentId
         })
       });
       const data = await res.json();
@@ -245,7 +293,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         repeatWarning: data.repeatWarning ?? null,
         postId: data.postId ?? null,
         postFormat: params.postFormat,
-        characterCount: data.characterCount ?? 0
+        characterCount: data.characterCount ?? 0,
+        contentIntent: data.contentIntent,
+        selectedAnatomy: data.selectedAnatomy,
+        validationWarnings: data.validationWarnings
       };
 
       setGenerationResult(resObj);
@@ -261,7 +312,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           selectedPostTypeId: params.selectedPostTypeId,
           postId: data.postId ?? null,
           postFormat: params.postFormat,
-          postDate: params.postDate
+          postDate: params.postDate,
+          contentIntentId: params.contentIntentId
         }));
       } catch { }
 
@@ -275,6 +327,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshPostTypes = useCallback(async () => {
     const res = await fetch('/api/post-types');
     if (res.ok) setPostTypes(await res.json());
+  }, []);
+
+  const refreshContentIntents = useCallback(async () => {
+    const res = await fetch('/api/content-intents');
+    if (res.ok) setContentIntents(await res.json());
   }, []);
 
   const refreshAnatomy = useCallback(async () => {
@@ -294,9 +351,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([refreshPostTypes(), refreshAnatomy(), refreshSettings(), refreshWeeklyMapping()]);
+    await Promise.all([
+      refreshPostTypes(),
+      refreshContentIntents(),
+      refreshAnatomy(),
+      refreshSettings(),
+      refreshWeeklyMapping()
+    ]);
     setLoading(false);
-  }, [refreshPostTypes, refreshAnatomy, refreshSettings, refreshWeeklyMapping]);
+  }, [refreshPostTypes, refreshContentIntents, refreshAnatomy, refreshSettings, refreshWeeklyMapping]);
 
   useEffect(() => {
     refreshAll();
@@ -314,6 +377,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={{
       postTypes,
+      contentIntents,
       anatomy,
       settings,
       weeklyMapping,
@@ -326,6 +390,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       startNotesGenerate,
       resetGenerationState,
       refreshPostTypes,
+      refreshContentIntents,
       refreshAnatomy,
       refreshSettings,
       refreshWeeklyMapping,

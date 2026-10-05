@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
-import { FileText, Trash2, Copy, Loader2, Save, Check, Calendar, Type } from 'lucide-react';
+import { FileText, Trash2, Copy, Loader2, Save, Check, Calendar, Type, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Modal from '@/components/Modal';
 
 interface PostVersion {
   version: number;
@@ -28,6 +29,11 @@ interface PostItem {
   created_at: string;
 }
 
+interface PostTypeOption {
+  id: string;
+  name: string;
+}
+
 const formatNames: Record<string, string> = {
   'text_post': 'Text Post (600–1,200 chars)',
   'image_post': 'Image Post (900–1,500 chars)',
@@ -49,8 +55,20 @@ export default function DraftsPage() {
   const router = useRouter();
   const { show: showToast, ToastEl } = useToast();
   const [posts, setPosts] = useState<PostItem[]>([]);
+  const [postTypes, setPostTypes] = useState<PostTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Create Draft Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [creatingDraft, setCreatingDraft] = useState(false);
+  const [newDraftData, setNewDraftData] = useState({
+    topic_summary: '',
+    post_type_id: '',
+    post_format: 'text_post',
+    date: new Date().toISOString().split('T')[0],
+    content: ''
+  });
 
   // Local state for draft text edits
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({});
@@ -69,6 +87,19 @@ export default function DraftsPage() {
       sessionStorage.setItem('format_draft_id', post.id);
     } catch { }
     router.push(`/formatter?draftId=${post.id}`);
+  };
+
+  const fetchPostTypes = async () => {
+    try {
+      const res = await fetch('/api/post-types');
+      if (res.ok) {
+        const data = await res.json();
+        setPostTypes(data);
+        if (data.length > 0 && !newDraftData.post_type_id) {
+          setNewDraftData(prev => ({ ...prev, post_type_id: data[0].id }));
+        }
+      }
+    } catch (_) {}
   };
 
   const fetchPosts = async () => {
@@ -98,7 +129,61 @@ export default function DraftsPage() {
 
   useEffect(() => {
     fetchPosts();
+    fetchPostTypes();
   }, []);
+
+  const handleOpenCreateModal = () => {
+    setNewDraftData({
+      topic_summary: '',
+      post_type_id: postTypes[0]?.id || '',
+      post_format: 'text_post',
+      date: new Date().toISOString().split('T')[0],
+      content: ''
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateDraft = async () => {
+    if (!newDraftData.topic_summary.trim()) {
+      showToast('Please enter a topic or title for the draft.', 'error');
+      return;
+    }
+
+    setCreatingDraft(true);
+    try {
+      const selectedPillar = postTypes.find(pt => pt.id === newDraftData.post_type_id);
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic_summary: newDraftData.topic_summary.trim(),
+          post_type_id: newDraftData.post_type_id || (postTypes[0]?.id ?? null),
+          post_format: newDraftData.post_format || 'text_post',
+          date: newDraftData.date || new Date().toISOString().split('T')[0],
+          status: 'draft',
+          character_count: newDraftData.content.trim().length,
+          versions: [
+            {
+              version: 1,
+              sections: { Content: newDraftData.content.trim() }
+            }
+          ]
+        })
+      });
+
+      if (res.ok) {
+        showToast('New draft created successfully!', 'success');
+        setIsCreateModalOpen(false);
+        await fetchPosts();
+      } else {
+        showToast('Failed to create draft.', 'error');
+      }
+    } catch (e) {
+      showToast(String(e), 'error');
+    } finally {
+      setCreatingDraft(false);
+    }
+  };
 
   const handleTextChange = (postId: string, text: string) => {
     setEditedTexts(prev => ({ ...prev, [postId]: text }));
@@ -224,6 +309,14 @@ export default function DraftsPage() {
             </span>
           </div>
         </div>
+
+        <button
+          onClick={handleOpenCreateModal}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[#A78BE0] hover:bg-[#9070CC] transition-all cursor-pointer shadow-md"
+        >
+          <Plus size={16} />
+          Create Draft
+        </button>
       </div>
 
       {/* Content */}
@@ -409,6 +502,120 @@ export default function DraftsPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Create Draft Modal */}
+      {isCreateModalOpen && (
+        <Modal
+          title="Create New Draft"
+          onClose={() => setIsCreateModalOpen(false)}
+          footer={
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#8B8A93] hover:bg-black/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateDraft}
+                disabled={creatingDraft || !newDraftData.topic_summary.trim()}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#A78BE0] hover:bg-[#9070CC] transition-all disabled:opacity-40"
+              >
+                {creatingDraft ? (
+                  <>
+                    <Loader2 size={14} className="spinner" />
+                    Creating Draft...
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} />
+                    Create Draft
+                  </>
+                )}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {/* Title / Topic */}
+            <div>
+              <label className="block text-xs font-bold text-[#1C1C1E] mb-1">
+                Draft Title / Topic <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={newDraftData.topic_summary}
+                onChange={e => setNewDraftData(prev => ({ ...prev, topic_summary: e.target.value }))}
+                placeholder="e.g. 5 LangChain Optimization Techniques"
+                className="w-full p-2.5 rounded-xl border border-black/10 text-xs focus:outline-none focus:ring-1 focus:ring-[#A78BE0]"
+              />
+            </div>
+
+            {/* Pillar & Format Row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-[#1C1C1E] mb-1">
+                  Post Pillar
+                </label>
+                <select
+                  value={newDraftData.post_type_id}
+                  onChange={e => setNewDraftData(prev => ({ ...prev, post_type_id: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl border border-black/10 text-xs focus:outline-none focus:ring-1 focus:ring-[#A78BE0] bg-white cursor-pointer"
+                >
+                  {postTypes.map(pt => (
+                    <option key={pt.id} value={pt.id}>
+                      {pt.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1C1C1E] mb-1">
+                  Post Format
+                </label>
+                <select
+                  value={newDraftData.post_format}
+                  onChange={e => setNewDraftData(prev => ({ ...prev, post_format: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl border border-black/10 text-xs focus:outline-none focus:ring-1 focus:ring-[#A78BE0] bg-white cursor-pointer"
+                >
+                  <option value="text_post">Text Post</option>
+                  <option value="image_post">Image Post</option>
+                  <option value="carousel">Carousel</option>
+                  <option value="video_post">Video Post</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Target Date */}
+            <div>
+              <label className="block text-xs font-bold text-[#1C1C1E] mb-1">
+                Target Date
+              </label>
+              <input
+                type="date"
+                value={newDraftData.date}
+                onChange={e => setNewDraftData(prev => ({ ...prev, date: e.target.value }))}
+                className="w-full p-2.5 rounded-xl border border-black/10 text-xs focus:outline-none focus:ring-1 focus:ring-[#A78BE0] bg-white cursor-pointer"
+              />
+            </div>
+
+            {/* Content Textarea */}
+            <div>
+              <label className="block text-xs font-bold text-[#1C1C1E] mb-1">
+                Draft Content (Optional)
+              </label>
+              <textarea
+                value={newDraftData.content}
+                onChange={e => setNewDraftData(prev => ({ ...prev, content: e.target.value }))}
+                rows={6}
+                placeholder="Write your initial post draft or notes here..."
+                className="w-full p-3 rounded-xl border border-black/10 text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#A78BE0] resize-y"
+              />
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

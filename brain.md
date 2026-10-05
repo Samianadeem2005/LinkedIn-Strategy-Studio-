@@ -43,13 +43,38 @@ CREATE TABLE IF NOT EXISTS post_types (
   visual_suggestions TEXT          -- JSON array or string of visual recommendations
 );
 
--- 3. Post Anatomy Sections
+-- 3. Content Intents (Pillar Goal & Reader Outcome)
+CREATE TABLE IF NOT EXISTS content_intents (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,                         -- Slug identifier (e.g. 'industry_observation', 'compare')
+  display_name TEXT NOT NULL,                 -- Human-readable label
+  description TEXT NOT NULL,                  -- Purpose and reader outcome definition
+  post_type_id TEXT NOT NULL REFERENCES post_types(id),
+  priority INTEGER DEFAULT 1,
+  is_default INTEGER DEFAULT 0                -- 1 if default fallback for pillar
+);
+
+-- 4. Post Anatomy (Thinking Journey & Mental Models)
 CREATE TABLE IF NOT EXISTS post_anatomy (
   id TEXT PRIMARY KEY,
-  section_name TEXT NOT NULL,
-  rule_description TEXT NOT NULL,
+  name TEXT NOT NULL,                         -- Anatomy title (e.g. 'Industry Observation')
+  purpose TEXT,                               -- Strategic thinking goal
+  thinking_flow TEXT,                         -- JSON array of progression steps
+  writing_style TEXT,                         -- Style guidelines (paragraph-led, density, etc.)
+  constraints TEXT,                           -- Specific restrictions
   order_index INTEGER NOT NULL,
-  applies_to_post_type_id TEXT REFERENCES post_types(id) -- NULL = global, specific ID = per-post-type override
+  post_type_id TEXT REFERENCES post_types(id),
+  applies_to_post_type_id TEXT REFERENCES post_types(id),
+  last_used_at TEXT,                          -- Timestamp for backend LRU rotation
+  section_name TEXT,                          -- Legacy compatibility column
+  rule_description TEXT                       -- Legacy compatibility column
+);
+
+-- 5. Anatomy-to-Intent Many-to-Many Mapping
+CREATE TABLE IF NOT EXISTS anatomy_intents (
+  anatomy_id TEXT NOT NULL REFERENCES post_anatomy(id) ON DELETE CASCADE,
+  intent_id TEXT NOT NULL REFERENCES content_intents(id) ON DELETE CASCADE,
+  PRIMARY KEY (anatomy_id, intent_id)
 );
 
 -- 4. Weekly Pillar Schedule & Quotas
@@ -192,37 +217,72 @@ CREATE TABLE IF NOT EXISTS posts (
 
 ---
 
-## 4. Post Anatomy Structure (Per-Post-Type Scope)
+## 4. Post Anatomy & Content Intent Architecture
 
-When `anatomy_scope = 'per_post_type'`, the system maps specific anatomy sequences to pillars:
+### The 3-Tier Conceptual Hierarchy
+1. **Pillar**: Why are we posting? (Business & audience positioning strategy: Value, Lead Magnet, Authority, Personal, Showcase).
+2. **Content Intent**: What should the reader get from this specific post? (Reader outcome: e.g. `compare`, `explain_problem`, `industry_observation`, `failure_reflection`, `architecture_explanation`).
+3. **Anatomy (Thinking Journey)**: How does the thought develop? (Mental model progression: e.g. `Comparison`, `Problem → Why → Fix`, `Industry Observation`, `Architecture Reveal`).
 
-### A. Personal Pillar Anatomy (6-Step Narrative Sequence)
-1. **Hook** (Order 1): Open with the specific moment or turning point under 8 words (1–2 lines) as a bare fact.
-2. **Context** (Order 2): Background leading up to the event — what you were doing and the repeating problem.
-3. **Pivot** (Order 3): Shift in thinking or approach that followed, with a concrete result or timeframe.
-4. **Lesson** (Order 4): Generalize the pivot into 2–4 bulleted principles and name target audience groups.
-5. **Nudge** (Order 5): Direct encouraging push naming the cost of inaction and a clear call to action.
-6. **Visual Suggestion** (Order 6): Workspace photo, raw terminal, or project milestone screenshot.
+### Pipeline Execution Flow
+```text
+RAW NOTES / USER IDEA
+        ↓
+     PILLAR (Selected in Studio or from Calendar/Weekly Schedule)
+        ↓
+  CONTENT INTENT (Deterministically resolved from semantic notes signals; zero LLM call)
+        ↓
+ELIGIBLE ANATOMIES (Filtered by Pillar + Intent via anatomy_intents junction table)
+        ↓
+  ANATOMY LRU (Backend selects least recently used eligible anatomy to prevent repetitive patterns)
+        ↓
+    HOOK POOL (Top 5 least recently used hook formulas matching active pillar)
+        ↓
+ PROMPT ASSEMBLY (Strict 21-step dynamic prompt structure)
+        ↓
+      GEMINI (gemini-3.6-flash generates 3 versions with shared anatomy but distinct angles/hooks)
+        ↓
+    VALIDATION (JSON structure, character counts, 3 versions, tone bans, sanitizes visible section headings)
+        ↓
+OUTPUT & PREVIEW (Presented in Studio as unified natural text with expandable Thinking Journey blueprint)
+```
 
-### B. Global Standard Anatomy (Value, Lead Magnet, Authority, Showcase)
-1. **Hook** (Order 1): Scroll-stopping claim, question, or stat with numbers under 8 words.
-2. **Rehook** (Order 2): 5-step sub-structure: Statement ➔ Challenge ➔ Reasoning ➔ Action Step ➔ Power Ending.
-3. **Context** (Order 3): 1–2 sentence setup explaining why this matters now and what problem it solves.
-4. **Breakdown** (Order 4): Main body of value — numbered steps, bullet points, or structured specs.
-5. **CTA** (Order 5): Targeted question or resource claim (no generic commentary).
+### Thinking Journey Philosophy (Anti-Template Rule)
+Anatomy is a mental model, **NOT** a visible section template. The generated posts must never output mechanical section labels (e.g., `Observation:`, `Evidence:`, `Why:`, `Interpretation:`, `Implication:`). Instead, the model writes fluid, paragraph-led prose that naturally walks the reader through that reasoning journey.
 
 ---
 
 ## 5. Gemini AI Prompting System & API Key Rotation
 
-Model used across AI operations: `gemini-3.6-flash` (with tested backup options: `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-flash-latest`).
+Model used across AI operations: `gemini-3.6-flash` (with tested backup options: `gemini-2.5-flash`, `gemini-2.0-flash`).
 
 ### Key Rotation & Retry Logic (`lib/gemini.ts`)
 - Parses comma-separated keys from `GEMINI_API_KEY`.
 - Runs `callWithGeminiFallback()` across 2 passes. On any error (429, 503, network timeout), it logs warnings and immediately rotates to Key #2, Key #3, etc.
 
-### Full Post Generation Prompt (`/api/generate-post`)
-- Accepts Mode A (Notes) or Mode B (Web Search Results).
+### Full Post Generation Prompt Assembly Order (`/api/generate-post`)
+The system prompt is assembled dynamically in strict conceptual order:
+1. **ROLE / AUTHOR CONTEXT**: Engineering lead / builder identity and brand voice.
+2. **GENERATION MODE**: Mode A (Raw Notes) vs Mode B (Web Search Synthesis).
+3. **ACTIVE PILLAR**: Target pillar name.
+4. **CONTENT INTENT**: Active intent name and reader outcome description.
+5. **POST FORMAT & LIMITS**: Character and word count constraints.
+6. **PILLAR CORE FOCUS**: Strategic purpose from DB.
+7. **PILLAR DOs**: Specific pillar directives.
+8. **PILLAR DON'Ts**: Specific pillar restrictions.
+9. **ACTIVE ANATOMY**: Selected anatomy name.
+10. **ANATOMY PURPOSE**: Thinking goal of the post.
+11. **ANATOMY THINKING FLOW**: Step-by-step reasoning progression.
+12. **ANATOMY WRITING STYLE**: Paragraph-led, scannable, density rules.
+13. **VISUAL GUIDANCE**: Image/screenshot specifications.
+14. **AVAILABLE HOOK TYPES**: Top 5 candidate pool from Hook LRU.
+15. **HOOK SELECTION & DIVERSITY RULES**: Each version must use a different hook angle.
+16. **WRITING MECHANICS**: Short scannable lines, natural paragraphs, plain vocabulary.
+17. **TONE & VOICE**: Casual, authentic, sharp, professional, human.
+18. **STRICT WRITING BANS**: Prohibited patterns (no reversal framing, no rhetorical questions, no em dashes, no cliches).
+19. **NATURAL-FLOW & PILLAR SPECIFIC RULES**: Natural flow over mechanical compliance; Anti-fabrication directive.
+20. **RAW NOTES / INPUT**: User raw notes or Tavily web search results.
+21. **OUTPUT JSON SCHEMA**: Valid 3-version output format.
 - Injects Active Pillar DOs/DON'Ts/Core Focus.
 - Loads Writing Mechanics Directives from DB.
 - Filters Hook Formulas matching active pillar, sorted by least recently used (`last_used_at`), passing top 5 formulas into prompt.
@@ -254,11 +314,14 @@ Model used across AI operations: `gemini-3.6-flash` (with tested backup options:
 |---|---|---|---|---|
 | `/api/settings` | GET / POST | Manage global settings, bio & tone profile | Tone/Anatomy scope | Settings record |
 | `/api/post-types` | GET / POST / PUT / DELETE | Manage content pillars | Name, Core Focus, DOs, DON'Ts | Post type records |
+| `/api/content-intents` | GET / POST | Manage content intents per pillar | `{ name, display_name, description, post_type_id }` | Array of intent records |
+| `/api/content-intents/[id]` | PUT / DELETE | Update or delete content intent | Intent updates | Updated intent record |
+| `/api/resolve-intent` | POST | Deterministically resolve intent & fetch eligible anatomies | `{ rawNotes, postTypeId, explicitIntentId }` | `{ intent, anatomies, selectedAnatomy }` |
 | `/api/pillar-quotas` | GET / POST | Manage weekly pillar quotas | Target counts | Rule & quota status |
-| `/api/anatomy` | GET / POST / PUT | Manage post anatomy structure | Section rules & order | Anatomy array |
+| `/api/anatomy` | GET / POST / PUT | Manage post anatomy thinking flows & intent mappings | Name, purpose, thinking_flow, style, intent_ids | Rich anatomy array |
 | `/api/hook-types` | GET / POST / PUT | Manage hook bank formulas | Name, angles, best_fit_pillars | Hook types list |
 | `/api/web-search` | POST | Web search research query | `{ query }` | `{ resultsText, resultCount }` |
-| `/api/generate-post` | POST | Generate 3 post versions or section | `{ rawNotes, postTypeId, postFormat, webResults }` | `{ versions, characterCount, repeatWarning }` |
+| `/api/generate-post` | POST | Generate 3 post versions with LRU anatomy + hook rotation | `{ rawNotes, postTypeId, postFormat, contentIntentId }` | `{ versions, resolvedIntent, selectedAnatomy }` |
 | `/api/generate-calendar` | POST / PUT | Two-phase calendar generator & saver | `{ rawDump, durationDays, startDate }` | `{ entries, validationWarnings }` |
 | `/api/calendar-today` | GET | Resolve today's planned calendar post | `?date=YYYY-MM-DD` | Entry record or null |
 | `/api/knowledge-dumps` | GET / POST | Manage knowledge dumps for ingestion | Raw text dump | Dump record |
@@ -274,11 +337,12 @@ Model used across AI operations: `gemini-3.6-flash` (with tested backup options:
 linkedin-content-os/
 ├── app/
 │   ├── api/
-│   │   ├── anatomy/
+│   │   ├── anatomy/               # Rich anatomy CRUD & intent junction mapping
 │   │   ├── audit-post/
 │   │   ├── calendar-today/
+│   │   ├── content-intents/       # Content intent CRUD
 │   │   ├── generate-calendar/
-│   │   ├── generate-post/
+│   │   ├── generate-post/         # 21-step dynamic prompt, LRU anatomy & hook rotation
 │   │   ├── history/
 │   │   ├── hook-types/
 │   │   ├── ingest/
@@ -286,6 +350,7 @@ linkedin-content-os/
 │   │   ├── pillar-quotas/
 │   │   ├── post-types/
 │   │   ├── posts/
+│   │   ├── resolve-intent/        # Live intent detection & anatomy resolution endpoint
 │   │   ├── settings/
 │   │   ├── web-search/
 │   │   └── weekly-mapping/
@@ -294,23 +359,26 @@ linkedin-content-os/
 │   ├── history/           # Filterable post log & status manager
 │   ├── hook-types/        # Hook bank formula manager
 │   ├── ingest/            # Strategy Ingestion & Knowledge Dump review
-│   ├── settings/          # Post Types + Anatomy + Tone Profile + About Me
+│   ├── settings/          # Post Types + Content Intents + Post Anatomy + Tone Profile + Bio
 │   ├── strategy/          # Weekly Template grid + Calendar Maker
 │   ├── globals.css        # Glassmorphic design tokens & CSS variables
 │   ├── layout.tsx         # Global layout & AppProvider wrapper
-│   └── page.tsx           # Studio — primary generation workspace
+│   └── page.tsx           # Studio — primary generation workspace (Pillar + Intent selection)
 ├── components/
 │   ├── Modal.tsx          # Reusable modal container
-│   ├── Sidebar.tsx        # Navigation bar with active states
+│   ├── Sidebar.tsx        # Navigation bar with active states & Settings tabs
 │   ├── TagInput.tsx       # Multi-tag editor for DOs, DON'Ts, banned phrases
 │   └── Toast.tsx          # Notification toast system
 ├── context/
-│   └── AppContext.tsx     # React context for global state & web search caching
+│   └── AppContext.tsx     # React context for global state, content intents & web search caching
 ├── lib/
-│   ├── db.ts              # SQLite singleton, schema init & seed logic
+│   ├── db.ts              # SQLite singleton, WAL mode, schema migrations & LRU query helpers
+│   ├── initialContentData.ts # Initial seed data for 24 intents and 24 rich anatomies
+│   ├── intentResolver.ts  # Deterministic semantic regex intent resolution engine
+│   ├── validation.ts      # Post generation validator & visible anatomy heading stripper
 │   ├── gemini.ts          # Multi-key rotation & error retry engine
 │   ├── ingestion.ts       # Extraction review & semantic deduplication
-│   └── constants.ts       # Default avoid words & constants
+│   └── constants.ts       # Default avoid words & format limits
 ├── .env.local             # GEMINI_API_KEY environment configuration
 ├── brain.md               # Master architecture knowledge base
 ├── next.config.ts         # Server external package configuration
@@ -332,3 +400,46 @@ Development commands:
 npm run dev     # Run Next.js local development server
 npm run build   # Build production bundle & validate TypeScript types
 ```
+
+---
+
+## 10. Content Intent Taxonomy & Rich Anatomy Catalog
+
+### Initial Content Intent Taxonomy (24 Intents across 5 Pillars)
+- **Value**:
+  - `teach_concept`: Explain one specific technical concept, tool, or technique actionable for engineers.
+  - `explain_problem`: Diagnose a recurring technical or architectural problem and walk through the fix.
+  - `compare`: Compare two technical approaches, tools, or libraries with objective trade-offs.
+  - `correct_misconception`: Dispel a common industry myth or widely repeated engineering assumption.
+  - `technical_analogy`: Map a complex technical architecture to a simple real-world operational analogy.
+- **Lead Magnet**:
+  - `checklist`: Actionable pre-launch or implementation checklist designed to save engineering time.
+  - `framework`: Structured conceptual framework or mental model for decision-making.
+  - `roadmap`: Step-by-step phased roadmap guiding an engineer from novice to production deployment.
+  - `template`: Ready-to-use prompt, configuration, boilerplate, or architectural specification.
+  - `resource_stack`: Curated high-density stack of open-source libraries, repos, or developer tools.
+- **Authority**:
+  - `industry_observation`: Original analysis of emerging patterns in regional or global tech ecosystems.
+  - `company_analysis`: Dissect an important strategic, architectural, or business model decision made by a real company.
+  - `founder_lens`: Analyze a contrarian bet, problem, or decision made by a prominent founder.
+  - `trend_analysis`: Trace an emerging technological or developer tooling shift and analyze its second-order effects.
+  - `contrarian_view`: Thoughtful, evidence-backed critique challenging conventional wisdom without rage-baiting.
+- **Personal**:
+  - `learning_reflection`: Candid reflection on an engineering habit, work philosophy, or mindset shift.
+  - `turning_point`: Specific professional moment or incident that altered career perspective.
+  - `failure_reflection`: Authentic post-mortem on a technical mistake, system crash, or design error.
+  - `growth_story`: Progressive narrative tracing real professional evolution over a defined timeframe.
+- **Showcase**:
+  - `build_story`: Narrative breakdown of an actual system, tool, or feature built and shipped.
+  - `architecture_explanation`: Technical deep dive into system topology, component interactions, and data flow.
+  - `case_study`: Objective breakdown of a production deployment with measured before/after benchmarks.
+  - `before_after`: Contrast an old clunky workflow or system with a newly engineered solution.
+  - `technical_decision`: Reasoning behind choosing one technology stack, database, or library over alternatives.
+
+### Rich Anatomy Archetypes & Thinking Flows
+- **Comparison**: Introduce Approach A ➔ Introduce Approach B ➔ Highlight critical operational difference ➔ When A makes sense ➔ When B makes sense ➔ Decision takeaway.
+- **Problem → Why → Fix**: Highlight concrete failure symptom ➔ Root cause mechanism under the hood ➔ Actionable reliable fix ➔ Practical code/architecture example.
+- **Industry Observation**: State the observation ➔ Cite concrete evidence/examples ➔ Unpack why the pattern is happening ➔ Offer original interpretation ➔ Outline the implication for readers.
+- **Turning Point**: Open with the moment as a bare fact ➔ What you initially thought ➔ What actually happened ➔ Realization that changed your perspective ➔ New approach moving forward.
+- **Architecture Reveal**: Define system requirements and constraints ➔ Present overall topology ➔ Why this architecture was chosen ➔ Trade-offs accepted ➔ Measurable outcome.
+- **Cheat Sheet**: Frame recurring problem ➔ 3–5 compact core rules ➔ Introduce full reference resource ➔ Direct low-friction CTA.

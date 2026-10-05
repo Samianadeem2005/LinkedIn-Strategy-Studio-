@@ -276,6 +276,268 @@ function initSchema(db: Database.Database) {
       });
     })();
   }
+
+  // ── Runtime migration: content_intents table ──────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS content_intents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      description TEXT,
+      post_type_id TEXT REFERENCES post_types(id),
+      priority INTEGER DEFAULT 0,
+      is_default INTEGER DEFAULT 0,
+      created_at TEXT,
+      updated_at TEXT
+    );
+  `);
+
+  // ── Runtime migration: rich columns in post_anatomy ──────────────────────
+  const anatomyCols = (db.prepare("PRAGMA table_info(post_anatomy)").all() as { name: string }[]).map(c => c.name);
+  if (!anatomyCols.includes('name')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN name TEXT");
+  }
+  if (!anatomyCols.includes('purpose')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN purpose TEXT");
+  }
+  if (!anatomyCols.includes('thinking_flow')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN thinking_flow TEXT");
+  }
+  if (!anatomyCols.includes('writing_style')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN writing_style TEXT");
+  }
+  if (!anatomyCols.includes('constraints')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN constraints TEXT");
+  }
+  if (!anatomyCols.includes('last_used_at')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN last_used_at TEXT DEFAULT NULL");
+  }
+  if (!anatomyCols.includes('post_type_id')) {
+    db.exec("ALTER TABLE post_anatomy ADD COLUMN post_type_id TEXT REFERENCES post_types(id)");
+  }
+
+  // Sync legacy columns where new columns are null
+  db.exec("UPDATE post_anatomy SET name = section_name WHERE name IS NULL OR name = ''");
+  db.exec("UPDATE post_anatomy SET post_type_id = applies_to_post_type_id WHERE post_type_id IS NULL AND applies_to_post_type_id IS NOT NULL");
+
+  // ── Runtime migration: anatomy_intents junction table ────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS anatomy_intents (
+      anatomy_id TEXT NOT NULL REFERENCES post_anatomy(id) ON DELETE CASCADE,
+      intent_id TEXT NOT NULL REFERENCES content_intents(id) ON DELETE CASCADE,
+      PRIMARY KEY (anatomy_id, intent_id)
+    );
+  `);
+
+  // Seed content intents & rich anatomies if not already present
+  seedContentIntentsAndAnatomies(db);
+}
+
+import { INITIAL_CONTENT_INTENTS, INITIAL_ANATOMIES } from '@/lib/initialContentData';
+
+function seedContentIntentsAndAnatomies(db: Database.Database) {
+  const existingPts = db.prepare('SELECT id, name FROM post_types').all() as { id: string; name: string }[];
+  if (existingPts.length === 0) return;
+
+  const pillarMap = new Map<string, string>();
+  existingPts.forEach(pt => pillarMap.set(pt.name.toLowerCase().trim(), pt.id));
+
+  // 1. Seed content intents if empty
+  const intentCount = (db.prepare('SELECT COUNT(*) as c FROM content_intents').get() as { c: number }).c;
+  const intentMap = new Map<string, string>(); // key: `${pillarId}:${intentName}` -> intentId
+
+  if (intentCount === 0) {
+    const insertIntent = db.prepare(`
+      INSERT INTO content_intents (id, name, display_name, description, post_type_id, priority, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const now = new Date().toISOString();
+    db.transaction(() => {
+      for (const item of INITIAL_CONTENT_INTENTS) {
+        const pillarId = pillarMap.get(item.pillar.toLowerCase().trim());
+        if (!pillarId) continue;
+        const intentId = uuidv4();
+        insertIntent.run(
+          intentId,
+          item.name,
+          item.displayName,
+          item.description,
+          pillarId,
+          item.priority,
+          item.isDefault ? 1 : 0,
+          now,
+          now
+        );
+        intentMap.set(`${pillarId}:${item.name}`, intentId);
+      }
+    })();
+  } else {
+    // Populate intentMap from existing DB
+    const allIntents = db.prepare('SELECT id, name, post_type_id FROM content_intents').all() as { id: string; name: string; post_type_id: string }[];
+    allIntents.forEach(it => intentMap.set(`${it.post_type_id}:${it.name}`, it.id));
+  }
+
+  // 2. Seed rich anatomies if none exist with purpose
+  const richAnatomyCount = (db.prepare('SELECT COUNT(*) as c FROM post_anatomy WHERE purpose IS NOT NULL').get() as { c: number }).c;
+  if (richAnatomyCount === 0) {
+    const insertAnatomy = db.prepare(`
+      INSERT INTO post_anatomy (id, name, section_name, rule_description, purpose, thinking_flow, writing_style, constraints, order_index, post_type_id, applies_to_post_type_id, last_used_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+    `);
+
+    const insertAnatomyIntent = db.prepare(`
+      INSERT OR IGNORE INTO anatomy_intents (anatomy_id, intent_id)
+      VALUES (?, ?)
+    `);
+
+    db.transaction(() => {
+      let orderIndex = 1;
+      for (const item of INITIAL_ANATOMIES) {
+        const pillarId = pillarMap.get(item.pillar.toLowerCase().trim());
+        if (!pillarId) continue;
+        const anatomyId = uuidv4();
+        const flowJson = JSON.stringify(item.thinkingFlow);
+        insertAnatomy.run(
+          anatomyId,
+          item.name,
+          item.name,
+          item.purpose,
+          item.purpose,
+          flowJson,
+          item.writingStyle,
+          item.constraints || null,
+          orderIndex++,
+          pillarId,
+          pillarId
+        );
+
+        // Map to corresponding intents
+        for (const intentName of item.intents) {
+          const intentId = intentMap.get(`${pillarId}:${intentName}`);
+          if (intentId) {
+            insertAnatomyIntent.run(anatomyId, intentId);
+          }
+        }
+      }
+    })();
+  }
+}
+
+// ── Anatomy & Intent Queries ───────────────────────────────────────────────
+
+export interface RichAnatomy {
+  id: string;
+  name: string;
+  section_name?: string;
+  purpose: string;
+  thinking_flow: string; // JSON array of steps
+  writing_style: string;
+  constraints?: string | null;
+  order_index: number;
+  post_type_id: string;
+  applies_to_post_type_id?: string | null;
+  last_used_at: string | null;
+  intent_ids?: string[];
+  intents?: { id: string; name: string; display_name: string }[];
+}
+
+export interface ContentIntentRow {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  post_type_id: string;
+  post_type_name?: string;
+  priority: number;
+  is_default: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function getContentIntents(postTypeId?: string): ContentIntentRow[] {
+  const db = getDb();
+  let query = `
+    SELECT ci.*, pt.name as post_type_name
+    FROM content_intents ci
+    LEFT JOIN post_types pt ON ci.post_type_id = pt.id
+  `;
+  const params: unknown[] = [];
+  if (postTypeId) {
+    query += ' WHERE ci.post_type_id = ?';
+    params.push(postTypeId);
+  }
+  query += ' ORDER BY ci.priority ASC, ci.name ASC';
+  return db.prepare(query).all(...params) as ContentIntentRow[];
+}
+
+export function getEligibleAnatomiesForIntent(postTypeId: string, intentId?: string | null): RichAnatomy[] {
+  const db = getDb();
+
+  // 1. Try to find anatomies specifically mapped to this intent
+  if (intentId) {
+    const mapped = db.prepare(`
+      SELECT DISTINCT pa.*
+      FROM post_anatomy pa
+      JOIN anatomy_intents ai ON pa.id = ai.anatomy_id
+      WHERE ai.intent_id = ? AND pa.purpose IS NOT NULL
+      ORDER BY
+        CASE WHEN pa.last_used_at IS NULL THEN 0 ELSE 1 END ASC,
+        pa.last_used_at ASC,
+        pa.order_index ASC
+    `).all(intentId) as RichAnatomy[];
+
+    if (mapped.length > 0) return mapped;
+  }
+
+  // 2. Fallback: all rich anatomies for this post_type_id
+  const pillarAnatomies = db.prepare(`
+    SELECT pa.*
+    FROM post_anatomy pa
+    WHERE (pa.post_type_id = ? OR pa.applies_to_post_type_id = ?)
+      AND pa.purpose IS NOT NULL
+    ORDER BY
+      CASE WHEN pa.last_used_at IS NULL THEN 0 ELSE 1 END ASC,
+      pa.last_used_at ASC,
+      pa.order_index ASC
+  `).all(postTypeId, postTypeId) as RichAnatomy[];
+
+  if (pillarAnatomies.length > 0) return pillarAnatomies;
+
+  // 3. Ultimate fallback: legacy anatomy sections if no rich ones exist
+  return db.prepare(`
+    SELECT * FROM post_anatomy
+    WHERE applies_to_post_type_id = ? OR applies_to_post_type_id IS NULL
+    ORDER BY
+      CASE WHEN last_used_at IS NULL THEN 0 ELSE 1 END ASC,
+      last_used_at ASC,
+      order_index ASC
+  `).all(postTypeId) as RichAnatomy[];
+}
+
+export function selectAnatomyLRU(eligible: RichAnatomy[]): RichAnatomy | null {
+  if (!eligible || eligible.length === 0) return null;
+
+  // Filter to the freshest: either those with last_used_at IS NULL, or the oldest timestamp
+  const nulls = eligible.filter(a => !a.last_used_at);
+  if (nulls.length > 0) {
+    // Pick the first among fresh anatomies
+    return nulls[0];
+  }
+
+  // Otherwise, sort by oldest timestamp
+  const sorted = [...eligible].sort((a, b) => {
+    const timeA = new Date(a.last_used_at!).getTime();
+    const timeB = new Date(b.last_used_at!).getTime();
+    return timeA - timeB;
+  });
+
+  return sorted[0];
+}
+
+export function updateAnatomyLastUsed(anatomyId: string): void {
+  const db = getDb();
+  db.prepare('UPDATE post_anatomy SET last_used_at = ? WHERE id = ?').run(new Date().toISOString(), anatomyId);
 }
 
 function seedIfEmpty(db: Database.Database) {
