@@ -11,38 +11,24 @@ interface ComponentRow {
   instructions: string;
   order_index: number;
   enabled: number;
-  anatomy_ids?: string[];
 }
-
-interface AnatomyRow { id: string; name: string; }
 
 const emptyForm = {
   name: '', component_type: '', purpose: '', description: '',
-  instructions: '', order_index: 0, enabled: true, anatomy_ids: [] as string[]
+  instructions: '', order_index: 0, enabled: true
 };
 
 export default function PostComponentsPage() {
   const [components, setComponents] = useState<ComponentRow[]>([]);
-  const [anatomies, setAnatomies] = useState<AnatomyRow[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
-    const [componentsRes, anatomiesRes] = await Promise.all([
-      fetch('/api/post-components'),
-      fetch('/api/anatomy')
-    ]);
+    const componentsRes = await fetch('/api/post-components');
     const componentRows = await componentsRes.json();
-    const anatomyRows = await anatomiesRes.json();
-    const mapped = await Promise.all((componentRows as ComponentRow[]).map(async component => {
-      const mappingRes = await fetch(`/api/post-components/${component.id}/mappings`);
-      const mappings = await mappingRes.json();
-      return { ...component, anatomy_ids: (mappings as { anatomy_id: string }[]).map(row => row.anatomy_id) };
-    }));
-    setComponents(mapped);
-    setAnatomies(anatomyRows);
+    setComponents(componentRows);
     setLoading(false);
   }
 
@@ -57,8 +43,7 @@ export default function PostComponentsPage() {
       description: component.description || '',
       instructions: component.instructions,
       order_index: component.order_index,
-      enabled: component.enabled === 1,
-      anatomy_ids: component.anatomy_ids || []
+      enabled: component.enabled === 1
     });
   }
 
@@ -71,12 +56,6 @@ export default function PostComponentsPage() {
     });
     if (!response.ok) { alert((await response.json()).error || 'Could not save component.'); return; }
     const saved = await response.json();
-    const id = editingId || saved.id;
-    await fetch(`/api/post-components/${id}/mappings`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ anatomy_ids: form.anatomy_ids })
-    });
     setForm(emptyForm);
     setEditingId(null);
     await load();
@@ -101,12 +80,14 @@ export default function PostComponentsPage() {
       <section className="rounded-xl border p-5 mb-8 space-y-4">
         <h2 className="font-semibold">{editingId ? 'Edit component' : 'Create component'}</h2>
         <div className="grid md:grid-cols-2 gap-3">
-          <input
+          <select
             className="border rounded p-2"
-            placeholder="Name (e.g. Hook, Body, Proof)"
             value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value, component_type: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-          />
+          >
+            <option value="">Select component</option>
+            {['Hook', 'Context', 'Body', 'CTA', 'Visual Suggestion'].map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
           <input className="border rounded p-2 bg-gray-100" aria-label="Component type" readOnly value={form.component_type || 'auto-generated'} />
           <input className="border rounded p-2" placeholder="Purpose" value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} />
           <input className="border rounded p-2" type="number" placeholder="Order" value={form.order_index} onChange={e => setForm({ ...form, order_index: Number(e.target.value) })} />
@@ -114,20 +95,6 @@ export default function PostComponentsPage() {
         <input className="border rounded p-2 w-full" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
         <textarea className="border rounded p-2 w-full min-h-24" placeholder="Instructions sent to Gemini" value={form.instructions} onChange={e => setForm({ ...form, instructions: e.target.value })} />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} /> Enabled</label>
-        <div>
-          <p className="text-sm font-medium mb-2">Applicable Anatomies</p>
-          <div className="flex flex-wrap gap-2">
-            {anatomies.map(anatomy => (
-              <label key={anatomy.id} className="text-xs border rounded px-2 py-1">
-                <input type="checkbox" className="mr-1" checked={form.anatomy_ids.includes(anatomy.id)} onChange={e => setForm({
-                  ...form,
-                  anatomy_ids: e.target.checked ? [...form.anatomy_ids, anatomy.id] : form.anatomy_ids.filter(id => id !== anatomy.id)
-                })} />
-                {anatomy.name}
-              </label>
-            ))}
-          </div>
-        </div>
         <div className="flex gap-2">
           <button className="px-4 py-2 rounded-lg bg-purple-600 text-white" onClick={() => void save()}>Save</button>
           {editingId && <button className="px-4 py-2 rounded-lg border" onClick={() => { setEditingId(null); setForm(emptyForm); }}>Cancel</button>}

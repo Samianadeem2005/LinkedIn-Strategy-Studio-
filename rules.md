@@ -64,10 +64,6 @@ It can also share industry opinions or commentary on changes in market. It can a
   4. Step 4: Deliver your original interpretation and synthesis of the situation.
   5. Step 5: Conclude with the broader implication for practitioners, founders, or the industry. Explain what behavior or decision should change because of this broader implication.
 - **Writing Style Directives**: Paragraph-led but highly scannable. Prefer short sentences and frequent line breaks. Use contrast framing only when it naturally clarifies the observation. Do not force numbered lists or groups of three. End with an implication rather than a generic takeaway.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Company Breakdown
 - **Purpose**: Dissect an important strategic, architectural, or business model decision made by a real company.
@@ -79,10 +75,6 @@ It can also share industry opinions or commentary on changes in market. It can a
   4. Review the outcome or market effect of the decision.
   5. Synthesize what builders and technical teams can learn from their move.
 - **Writing Style Directives**: Analytical and respectful. Develop the company decision through connected paragraphs, using contrast only for genuine trade-offs. Do not turn the analysis into a generic list of lessons.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Founder Lens
 - **Purpose**: Examine a non-obvious bet or tactical philosophy through a founder's perspective.
@@ -94,10 +86,6 @@ It can also share industry opinions or commentary on changes in market. It can a
   4. Review the result or operational milestone achieved.
   5. Extract the strategic lesson for engineering and product leaders.
 - **Writing Style Directives**: Insightful narrative analysis grounded in public record. Follow the founder’s decision logic chronologically, with readable line breaks and focus on strategy rather than biography.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Contrarian Opinion
 - **Purpose**: Provide a thoughtful, evidence-backed challenge to common consensus without drama or cliches.
@@ -109,10 +97,6 @@ It can also share industry opinions or commentary on changes in market. It can a
   4. Step 4: Add nuance: acknowledge where the common wisdom still holds true.
   5. Step 5: Conclude with the strategic shift in thinking you recommend. State the practical behavior or decision that should change because of this strategic shift.
 - **Writing Style Directives**: Measured, rational, and nuanced. Build the disagreement through evidence and qualification, not dramatic reversal framing. End with a considered strategic implication rather than a slogan.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Trend Analysis
 - **Purpose**: Trace an emerging technological or developer tooling shift and analyze its second-order effects.
@@ -124,10 +108,6 @@ It can also share industry opinions or commentary on changes in market. It can a
   4. Explain the technological catalyst or bottleneck that provoked the shift.
   5. Discuss the strategic implications for teams building in this space over the next 12-24 months.
 - **Writing Style Directives**: Forward-looking, analytical, and paragraph-led. Use short readable paragraphs to connect adoption signals, technical mechanics, and second-order effects. Avoid hype and forced list structures.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ## 7. Best-Fit Hook Formulas (6)
 
@@ -233,11 +213,6 @@ This post type exists to hand the reader a ready-to-use, save-worthy resource �
   3. Step 3: Introduce the complete cheat sheet / reference resource.
   4. Step 4: Close with a clear, direct, non-salesy engagement CTA to get it. Make the reference rules actionable by stating what behavior each rule should change.
 - **Writing Style Directives**: High-density, punchy, and scannable. Use short lines and compact grouped points when they help the reader preview the resource, without forcing a fixed count.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Checklist
 - **Purpose**: Provide a structured verification checklist to prevent critical oversights before or during execution.
@@ -249,11 +224,6 @@ This post type exists to hand the reader a ready-to-use, save-worthy resource �
   4. Step 4: Present the complete checklist resource/doc.
   5. Step 5: Close with a frictionless CTA to claim the checklist. Close by stating the action the reader should take after completing the checklist.
 - **Writing Style Directives**: Resource-first, organized, and rigorous. Use short lines and numbered items where useful. Groups of three can be used when natural, but do not force exactly three items.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Roadmap
 - **Purpose**: Outline a multi-stage progression from starting baseline to advanced implementation capability.
@@ -266,11 +236,6 @@ This post type exists to hand the reader a ready-to-use, save-worthy resource �
   5. Describe the final destination and capability unlocked.
   6. Offer the comprehensive roadmap guide via a natural CTA.
 - **Writing Style Directives**: Sequential and practical. Numbered stages are appropriate when they clarify progression; keep each stage concise and grounded in real engineering prerequisites.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Template
 - **Purpose**: Offer a plug-and-play template, scaffold, or boilerplate that eliminates tedious setup work.
@@ -282,11 +247,6 @@ This post type exists to hand the reader a ready-to-use, save-worthy resource �
   4. Share a concrete snippet or configuration preview.
   5. Close with a clear CTA to get access to the template.
 - **Writing Style Directives**: Pragmatic and utility-focused. Use concise steps, a concrete preview, and clear setup guidance; keep the emphasis on saved effort and clean design patterns.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Decision Tree
 - **Purpose**: Guide builders through branching choices to determine the optimal solution for their specific context.
@@ -299,11 +259,6 @@ This post type exists to hand the reader a ready-to-use, save-worthy resource �
   5. Deliver the final recommended path.
   6. Offer the full visual decision tree diagram via CTA.
 - **Writing Style Directives**: Logic-driven and branching. Use a clear decision path or numbered branches when useful, with concise criteria for each choice and no forced symmetry.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Resource Stack
 - **Purpose**: Curate a targeted collection of tools, repos, and documentation for a specific technical workflow.
@@ -315,11 +270,6 @@ This post type exists to hand the reader a ready-to-use, save-worthy resource �
   4. Explain how they combine into a powerful stack.
   5. Offer the complete curated stack list and repository links via CTA.
 - **Writing Style Directives**: Resource-first and action-oriented. Name specific tools and repos, group them by workflow role, and use short readable lines to show how they work together.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ## 7. Best-Fit Hook Formulas (5)
 
@@ -412,12 +362,6 @@ This post type exists to share your raw, authentic journey — struggles, confus
   4. Step 4: Reveal the realization that clicked.
   5. Step 5: Show what permanently changed in your approach or mindset. Reconnect the realization and changed approach to the reader’s situation so the insight leads to useful action.
 - **Writing Style Directives**: Story-driven and conversational. Use short, natural sentences and frequent line breaks. Let the moment, realization, and changed approach flow chronologically without forced lessons.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
-  - Visual Suggestion: Concrete visual recommendation: exactly what image, diagram, screenshot, or graphic to create. Be specific (e.g. "Code snippet showing X" not just "add an image").
 
 ### Anatomy: Before / After
 - **Purpose**: Show a meaningful professional evolution without turning it into generic motivational content.
@@ -429,12 +373,6 @@ This post type exists to share your raw, authentic journey — struggles, confus
   4. Step 4: Show the after state and the concrete difference it produced.
   5. Step 5: End on an earned personal reflection on craftsmanship or discipline. Turn the reflection into a practical implication for someone facing the same friction.
 - **Writing Style Directives**: Use clear before/after contrast backed by measurable numbers and operational impact. A side-by-side structure is appropriate when it makes the engineering change easier to scan, without exaggeration.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
-  - Visual Suggestion: Concrete visual recommendation: exactly what image, diagram, screenshot, or graphic to create. Be specific (e.g. "Code snippet showing X" not just "add an image").
 
 ### Anatomy: Failure Story
 - **Purpose**: Show a real technical or professional mistake, the root misunderstanding, and the resulting change in practice.
@@ -446,12 +384,6 @@ This post type exists to share your raw, authentic journey — struggles, confus
   4. Step 4: Explain what you fundamentally misunderstood at the time.
   5. Step 5: Share the new approach you adopted to ensure it never happens again. State the hard-won lesson and the changed behavior another builder can reuse.
 - **Writing Style Directives**: Humble, candid, and self-aware. Use short, natural sentences and frequent line breaks. Let the story flow chronologically and end with the realization or changed approach, not a forced list of lessons.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
-  - Visual Suggestion: Concrete visual recommendation: exactly what image, diagram, screenshot, or graphic to create. Be specific (e.g. "Code snippet showing X" not just "add an image").
 
 ### Anatomy: Micro Story
 - **Purpose**: A concise, punchy personal snapshot capturing a single realization without forced elongation.
@@ -461,12 +393,6 @@ This post type exists to share your raw, authentic journey — struggles, confus
   2. State the one sharp realization it created in your mind.
   3. Close on one practical takeaway for the reader.
 - **Writing Style Directives**: Crisp and minimalist, with frequent line breaks and only the context needed for one realization. Do not pad the story or force a list of lessons.
-- **Post Components**:
-  - Hook: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
-  - Visual Suggestion: Concrete visual recommendation: exactly what image, diagram, screenshot, or graphic to create. Be specific (e.g. "Code snippet showing X" not just "add an image").
 
 ## 7. Best-Fit Hook Formulas (2)
 
@@ -545,10 +471,6 @@ This post type exists to prove your work — the specific decisions, code, archi
   4. Step 4: Share the concrete result, latency metric, accuracy benchmark, or operational outcome.
   5. Step 5: Reflect on the technical lesson or principle learned from the build. State when another builder should reuse the technical lesson from this build.
 - **Writing Style Directives**: Engineering-grounded, candid, and authentic. Tell the build chronologically with frequent line breaks, naming real stack decisions and results without bragging or forcing a list of lessons.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Architecture Reveal
 - **Purpose**: Demonstrate technical depth through a comprehensive architectural breakdown of a production system.
@@ -560,10 +482,6 @@ This post type exists to prove your work — the specific decisions, code, archi
   4. Step 4: Detail the major technical trade-off accepted to achieve the goals.
   5. Step 5: Summarize the resulting stability, latency, or throughput achieved. Explain the operational behavior or implementation decision this architecture should change.
 - **Writing Style Directives**: High technical precision and structured explanation. Use compact paragraphs or numbered components when they clarify topology, state handling, schemas, and trade-offs; avoid decorative prose.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Before / After
 - **Purpose**: Demonstrate measurable engineering impact by contrasting a legacy inefficient system with the redesigned stack.
@@ -575,10 +493,6 @@ This post type exists to prove your work — the specific decisions, code, archi
   4. Step 4: Highlight the measurable improvements (e.g. latency reduced by 40%, memory usage slashed).
   5. Step 5: Extract the fundamental design lesson proven by the migration. Turn the reflection into a practical implication for someone facing the same friction.
 - **Writing Style Directives**: Use clear before/after contrast backed by measurable numbers and operational impact. A side-by-side structure is appropriate when it makes the engineering change easier to scan, without exaggeration.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Build Failure
 - **Purpose**: Build trust and credibility by transparently dissecting an engineering failure encountered during development.
@@ -590,10 +504,6 @@ This post type exists to prove your work — the specific decisions, code, archi
   4. Step 4: Explain the fix, refactor, or architectural pivot that permanently solved it.
   5. Step 5: Conclude with the hard-won engineering rule or mental model gained. State the changed engineering behavior the hard-won rule should produce.
 - **Writing Style Directives**: Transparent, analytical post-mortem tone. Use short, natural sentences and frequent line breaks. Let the failure flow chronologically and end with the changed approach or mental model, not a forced list.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Demo Narrative
 - **Purpose**: Take the reader through a live user interaction and reveal the sophisticated engineering behind the scenes.
@@ -605,10 +515,6 @@ This post type exists to prove your work — the specific decisions, code, archi
   4. Show the final accurate result returned to the user.
   5. Summarize the engineering principle that makes the seamless experience possible.
 - **Writing Style Directives**: Engaging workflow narrative. Follow the user interaction in sequence, using short readable paragraphs to reveal backend orchestration without turning the experience into a checklist.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ## 7. Best-Fit Hook Formulas (4)
 
@@ -701,10 +607,6 @@ This post type exists to teach the internal mechanics of an AI concept or techno
   3. Explain the underlying technical mechanism that causes the difference.
   4. Conclude with the practical implication for building or designing systems.
 - **Writing Style Directives**: Educational and authoritative yet accessible. Use contrast between misconception and reality only when it clarifies the mechanism, then explain it with concrete technical examples.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Problem → Why → Fix
 - **Purpose**: Diagnose a recurring technical problem, explain its root mechanism, and provide an actionable fix.
@@ -715,10 +617,6 @@ This post type exists to teach the internal mechanics of an AI concept or techno
   3. Step 3: Walk through what actually fixes it reliably.
   4. Step 4: Provide a practical example or snippet demonstrating the resolution. Clarify the decision rule for applying the fix in a similar situation.
 - **Writing Style Directives**: Diagnostic and actionable. Use clear transitions from symptom to root cause to fix, with short readable paragraphs and a practical example where it improves clarity.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Technical Analogy
 - **Purpose**: Demystify a complex technical concept using a familiar, intuitive real-world mental model.
@@ -730,10 +628,6 @@ This post type exists to teach the internal mechanics of an AI concept or techno
   4. Clarify where the analogy breaks down to avoid false mental models.
   5. Deliver a practical takeaway for how to think about it when building.
 - **Writing Style Directives**: Visual, engaging, and intuitive. Move naturally from the familiar analogy to the technical mapping, using line breaks to keep the explanation easy to scan without condescension.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ### Anatomy: Comparison
 - **Purpose**: Compare two architectural approaches, tools, or techniques with objective trade-offs and decision criteria.
@@ -746,10 +640,6 @@ This post type exists to teach the internal mechanics of an AI concept or techno
   5. Step 5: Clarify the exact scenarios where Approach B makes sense.
   6. Step 6: Provide a definitive decision heuristic or takeaway. End with the decision heuristic and the action it implies for the reader’s context.
 - **Writing Style Directives**: Balanced, objective, and nuanced. Use clear contrast where helpful; a simple A vs B structure is appropriate when it genuinely improves clarity. Focus on real production trade-offs, not superficial lists.
-- **Post Components**:
-  - Context: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
-  - Body: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
-  - CTA: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
 
 ## 7. Best-Fit Hook Formulas (5)
 
@@ -790,6 +680,14 @@ This post type exists to teach the internal mechanics of an AI concept or techno
 ---
 
 # Global Writing Mechanics & System Directives
+
+## Universal Post Components (Global Order)
+
+- **Hook**: Write a scroll-stopping hook under 8 words (1–2 lines) that functions as a standalone preview snippet.
+- **Context**: Brief setup explaining why this matters now or what problem it solves. Use short, scannable 1-2 sentence paragraphs separated by line breaks. Bridge from hook to main content.
+- **Body**: The main content body. Use numbered steps, bullet points, or mini-paragraphs. This is where the real value is delivered.
+- **CTA**: End posts with a clear, thought-provoking question or targeted call-to-action to drive comments and boost engagement by 20%–40%; never use generic prompts like "let me know your thoughts."
+- **Visual Suggestion**: Concrete visual recommendation: exactly what image, diagram, screenshot, or graphic to create. Be specific (e.g. "Code snippet showing X" not just "add an image").
 
 ## 1. Writing Mechanics Directives (DB Configured)
 
@@ -889,7 +787,7 @@ RAW NOTES / USER IDEA
         ↓
 ELIGIBLE ANATOMIES (Filtered by Pillar + Intent via anatomy_intents)
         ↓
-  ANATOMY (First configured anatomy by deterministic order)
+  ANATOMY (Explicitly selected Anatomy, or first eligible fallback)
         ↓
     HOOK TYPE POOL (Top 5 configured hook formulas matching pillar)
         ↓

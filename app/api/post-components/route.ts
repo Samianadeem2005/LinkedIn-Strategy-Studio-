@@ -2,23 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
-const BLOCKED_ANATOMY_COMPONENTS = new Set(['rehook', 'pivot', 'breakdown', 'lesson', 'nudge']);
+const UNIVERSAL_COMPONENTS = ['Hook', 'Context', 'Body', 'CTA', 'Visual Suggestion'];
 const componentTypeFor = (name: string) => name.toLowerCase().replace(/\s+/g, '_');
-const isBlockedAnatomyComponent = (name: string) => BLOCKED_ANATOMY_COMPONENTS.has(name.trim().toLowerCase());
+const isUniversalComponent = (name: string) => UNIVERSAL_COMPONENTS.includes(name.trim());
 
 export async function GET(req: NextRequest) {
   try {
     const db = getDb();
-    const anatomyId = new URL(req.url).searchParams.get('anatomy_id');
-    const rows = anatomyId
-      ? db.prepare(`
-          SELECT pc.*, ac.order_index AS anatomy_order_index
-          FROM post_components pc
-          JOIN anatomy_components ac ON ac.component_id = pc.id
-          WHERE ac.anatomy_id = ?
-          ORDER BY ac.order_index, pc.order_index, pc.name
-        `).all(anatomyId)
-      : db.prepare('SELECT * FROM post_components ORDER BY order_index, name').all();
+    const rows = db.prepare(`
+      SELECT * FROM post_components
+      ORDER BY CASE name
+        WHEN 'Hook' THEN 0
+        WHEN 'Context' THEN 1
+        WHEN 'Body' THEN 2
+        WHEN 'CTA' THEN 3
+        WHEN 'Visual Suggestion' THEN 4
+      END
+    `).all();
     return NextResponse.json(rows);
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
@@ -30,19 +30,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const name = String(body.name || '').trim();
     const instructions = String(body.instructions || body.rules || '').trim();
-    if (isBlockedAnatomyComponent(name)) {
-      return NextResponse.json({ error: 'This name is reserved for Anatomy thinking journeys and cannot be used as a Post Component.' }, { status: 400 });
+    if (!isUniversalComponent(name)) {
+      return NextResponse.json({ error: `Component name must be one of: ${UNIVERSAL_COMPONENTS.join(', ')}.` }, { status: 400 });
     }
     if (!name || !instructions) {
       return NextResponse.json({ error: 'Name and instructions are required.' }, { status: 400 });
     }
     const db = getDb();
     const id = uuidv4();
-    const maxOrder = (db.prepare('SELECT MAX(order_index) AS value FROM post_components').get() as { value: number | null }).value ?? -1;
+    const orderIndex = UNIVERSAL_COMPONENTS.indexOf(name);
     db.prepare(`
       INSERT INTO post_components
-        (id, name, description, component_type, purpose, instructions, order_index, enabled, post_type_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, name, description, component_type, purpose, instructions, order_index, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       name,
@@ -50,9 +50,8 @@ export async function POST(req: NextRequest) {
       componentTypeFor(name),
       body.purpose?.trim() || null,
       instructions,
-      body.order_index === undefined ? maxOrder + 1 : Number(body.order_index),
-      body.enabled === undefined ? 1 : (body.enabled ? 1 : 0),
-      body.post_type_id || null
+      orderIndex,
+      body.enabled === undefined ? 1 : (body.enabled ? 1 : 0)
     );
     return NextResponse.json(db.prepare('SELECT * FROM post_components WHERE id = ?').get(id), { status: 201 });
   } catch (error) {

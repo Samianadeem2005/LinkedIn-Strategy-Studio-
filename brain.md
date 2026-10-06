@@ -461,3 +461,239 @@ npm run build   # Build production bundle & validate TypeScript types
 - **Turning Point**: Open with the moment as a bare fact ➔ What you initially thought ➔ What actually happened ➔ Realization that changed your perspective ➔ New approach moving forward.
 - **Architecture Reveal**: Define system requirements and constraints ➔ Present overall topology ➔ Why this architecture was chosen ➔ Trade-offs accepted ➔ Measurable outcome.
 - **Cheat Sheet**: Frame recurring problem ➔ 3–5 compact core rules ➔ Introduce full reference resource ➔ Direct low-friction CTA.
+
+
+# LinkedIn Content System
+
+## Pillar → Content Intent → Anatomy Map
+
+### 1. Authority
+
+```text
+Authority
+├── Industry Observation
+│   ├── Industry Observation
+│   └── Trend Analysis
+│
+├── Company Analysis
+│   └── Company Breakdown
+│
+├── Founder Lens
+│   └── Founder Lens
+│
+├── Trend Analysis
+│   ├── Industry Observation
+│   └── Trend Analysis
+│
+└── Contrarian View
+    └── Contrarian Opinion
+```
+
+---
+
+### 2. Lead Magnet
+
+```text
+Lead Magnet
+├── Checklist
+│   ├── Checklist
+│   └── Decision Tree
+│
+├── Framework
+│   └── No currently justified existing Anatomy
+│
+├── Roadmap
+│   └── Roadmap
+│
+├── Template / Scaffold
+│   └── Template
+│
+└── Resource Stack
+    └── Resource Stack
+```
+
+---
+
+### 3. Personal
+
+```text
+Personal
+├── Learning Reflection
+│   ├── Turning Point
+│   ├── Before / After
+│   └── Failure Story
+│
+├── Turning Point
+│   ├── Turning Point
+│   └── Micro Story
+│
+├── Failure Reflection
+│   └── Failure Story
+│
+└── Growth Story
+    ├── Turning Point
+    └── Before / After
+```
+
+---
+
+### 4. Showcase
+
+```text
+Showcase
+├── Build Story
+│   ├── Build Story
+│   ├── Build Failure
+│   └── Demo Narrative
+│
+├── Architecture Explanation
+│   └── Architecture Reveal
+│
+├── Case Study
+│   ├── Build Story
+│   ├── Before / After
+│   └── Demo Narrative
+│
+├── Before / After
+│   └── Before / After
+│
+└── Technical Decision
+    └── Architecture Reveal
+```
+
+---
+
+### 5. Value
+
+```text
+Value
+├── Teach Concept
+│   ├── Myth → Reality → Explanation
+│   ├── Problem → Why → Fix
+│   └── Technical Analogy
+│
+├── Explain Problem & Fix
+│   └── Problem → Why → Fix
+│
+├── Compare Approaches
+│   └── Comparison
+│
+├── Correct Misconception
+│   └── Myth → Reality → Explanation
+│
+└── Technical Analogy
+    └── Technical Analogy
+```
+
+---
+
+# 3-Version Generation Strategy
+
+## Core Rule
+
+For all 3 generated versions:
+
+**Pillar stays the same.**
+**Content Intent stays the same.**
+
+The system should create meaningful variation primarily through **Anatomy + Hook Type + angle/framing**.
+
+### Preferred behavior
+
+If an Intent has multiple mapped Anatomies, use different Anatomies across the 3 versions whenever those Anatomies represent genuinely different thinking journeys.
+
+Example:
+
+```text
+Teach Concept
+├── Version 1 → Myth → Reality → Explanation
+├── Version 2 → Problem → Why → Fix
+└── Version 3 → Technical Analogy
+```
+
+This produces three genuinely different ways of teaching the same concept.
+
+### If an Intent has only 2 Anatomies
+
+Use both, then reuse one only if necessary:
+
+```text
+Checklist
+├── Version 1 → Checklist
+├── Version 2 → Decision Tree
+└── Version 3 → Checklist
+```
+
+The repeated Anatomy must still produce a substantially different post through a different Hook Type, angle, framing, examples, or emphasis.
+
+### If an Intent has only 1 Anatomy
+
+Use the same Anatomy for all 3 versions:
+
+```text
+Technical Decision
+└── Architecture Reveal
+    ├── Version 1 → Angle A
+    ├── Version 2 → Angle B
+    └── Version 3 → Angle C
+```
+
+Do not invent additional Anatomies just to create variation.
+
+## Anatomy Selection Rule
+
+Anatomy is the **thinking journey**, not a cosmetic variation.
+
+Therefore:
+
+* Never use an Anatomy that is not mapped to the selected Content Intent.
+* Do not force different Anatomies simply because 3 versions are required.
+* Prefer different mapped Anatomies when they create genuinely different intellectual approaches.
+* Keep the Content Intent fixed across all 3 versions.
+* Use Hook Types and angles to create additional variation.
+
+## Selection Without LRU
+
+`anatomy_intents` does not have a priority/order column.
+
+The system must NOT use:
+
+* LRU
+* `last_used_at`
+* random selection
+* hidden recency logic
+* manual Anatomy selection in Studio
+
+For automatic selection, use the existing Anatomy `order_index` as the deterministic ordering mechanism.
+
+For 3-version generation:
+
+1. Get all Anatomies mapped to the selected Content Intent.
+2. Order them deterministically using Anatomy `order_index`.
+3. Prefer a different mapped Anatomy for each version where enough meaningful Anatomies exist.
+4. If the number of Anatomies is smaller than 3, reuse an Anatomy only when necessary.
+5. Never select an unrelated Anatomy.
+
+## Example
+
+```text
+Pillar
+  ↓
+Content Intent
+  ↓
+Mapped Anatomies
+  ↓
+Version 1 → Anatomy + Hook Type + Angle
+Version 2 → Anatomy + Hook Type + Angle
+Version 3 → Anatomy + Hook Type + Angle
+```
+
+The goal is **three meaningfully different posts**, not three superficial rewrites of the same post.
+
+## Framework Exception
+
+`Framework` currently has no semantically justified existing Anatomy after the mapping cleanup.
+
+Do not assign an unrelated existing Anatomy merely to make generation work.
+
+Until a suitable Anatomy is intentionally defined, this Intent should be handled explicitly rather than silently falling back to an unrelated Anatomy.

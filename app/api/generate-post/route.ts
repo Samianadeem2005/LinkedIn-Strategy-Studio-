@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, getComponentsForAnatomy, getEligibleAnatomiesForIntent } from '@/lib/db';
+import { getDb, getUniversalPostComponents, getEligibleAnatomiesForIntent } from '@/lib/db';
 import { resolveContentIntent } from '@/lib/intentResolver';
 import { validatePostGeneration } from '@/lib/validation';
 import { DEFAULT_AVOID_WORDS } from '@/lib/constants';
@@ -36,7 +36,7 @@ function safeParseJSON(rawText: string): any {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { rawNotes, postTypeId, date, sectionId, postFormat, contentIntentId, explicitIntent } = body;
+    const { rawNotes, postTypeId, date, sectionId, postFormat, contentIntentId, explicitIntent, anatomyId } = body;
 
     const format = postFormat || 'text_post';
     const formatConstraints: Record<string, { name: string; min: number; max: number }> = {
@@ -158,14 +158,21 @@ export async function POST(req: NextRequest) {
     const resolvedIntent = resolveContentIntent(rawNotes, postTypeId, postType.name, requestedIntent);
 
     // ── Step 2: Resolve a configured Anatomy deterministically ────
-    const eligibleAnatomies = getEligibleAnatomiesForIntent(postTypeId, resolvedIntent.intentId);
-    if (eligibleAnatomies.length === 0) {
+    const selectedAnatomy = anatomyId
+      ? db.prepare(`
+          SELECT * FROM post_anatomy
+          WHERE id = @anatomyId
+            AND entity_type = 'anatomy'
+            AND (post_type_id = @postTypeId OR applies_to_post_type_id = @postTypeId)
+        `).get({ anatomyId, postTypeId }) as ReturnType<typeof getEligibleAnatomiesForIntent>[number] | undefined
+      : getEligibleAnatomiesForIntent(postTypeId, resolvedIntent.intentId)[0];
+    if (!selectedAnatomy) {
       return NextResponse.json({
-        error: `No anatomies found for pillar "${postType.name}" and intent "${resolvedIntent.displayName}". Please check Settings.`
+        error: anatomyId
+          ? `Anatomy "${anatomyId}" was not found for pillar "${postType.name}".`
+          : `No anatomies found for pillar "${postType.name}" and intent "${resolvedIntent.displayName}". Please check Settings.`
       }, { status: 400 });
     }
-
-    const selectedAnatomy = eligibleAnatomies[0];
 
     // Parse Thinking Flow into clean numbered steps
     let thinkingFlowSteps: string[] = [];
@@ -185,7 +192,7 @@ export async function POST(req: NextRequest) {
       thinkingFlowSteps = [selectedAnatomy.purpose];
     }
 
-    const postComponents = getComponentsForAnatomy(selectedAnatomy.id);
+    const postComponents = getUniversalPostComponents();
 
     // ── Step 3: Hook Pool (deterministic configured order) ───────
     const allHookTypes = db.prepare(

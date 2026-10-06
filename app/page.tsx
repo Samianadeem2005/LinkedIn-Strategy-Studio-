@@ -103,6 +103,7 @@ export default function StudioPage() {
   }, []);
 
   const [selectedIntentId, setSelectedIntentId] = useState<string>('auto');
+  const [selectedAnatomyId, setSelectedAnatomyId] = useState<string>('auto');
   const [activeIntentInfo, setActiveIntentInfo] = useState<{ id: string; name: string; displayName?: string; confidence?: string; source?: string } | null>(null);
   const [activeAnatomyInfo, setActiveAnatomyInfo] = useState<{ id: string; name: string; purpose?: string; thinkingFlow?: string[]; writingStyle?: string } | null>(null);
   const [showAnatomyDetails, setShowAnatomyDetails] = useState(false);
@@ -347,7 +348,8 @@ export default function StudioPage() {
       postDate,
       selectedHooks: [],
       selectedHookIds: [],
-      contentIntentId: selectedIntentId !== 'auto' ? selectedIntentId : undefined
+      contentIntentId: selectedIntentId !== 'auto' ? selectedIntentId : undefined,
+      anatomyId: selectedAnatomyId !== 'auto' ? selectedAnatomyId : undefined
     });
   };
 
@@ -376,7 +378,8 @@ export default function StudioPage() {
       postDate,
       selectedHooks: [],
       selectedHookIds: [],
-      contentIntentId: selectedIntentId !== 'auto' ? selectedIntentId : undefined
+      contentIntentId: selectedIntentId !== 'auto' ? selectedIntentId : undefined,
+      anatomyId: selectedAnatomyId !== 'auto' ? selectedAnatomyId : undefined
     });
   };
 
@@ -529,6 +532,9 @@ export default function StudioPage() {
   const underlyingPillarId = getUnderlyingPostTypeId(selectedPostTypeId);
   const eligibleIntents = underlyingPillarId
     ? contentIntents.filter(ci => ci.post_type_id === underlyingPillarId || ci.applies_to_post_type_id === underlyingPillarId)
+    : [];
+  const eligibleAnatomies = underlyingPillarId
+    ? anatomy.filter(item => item.post_type_id === underlyingPillarId || item.applies_to_post_type_id === underlyingPillarId)
     : [];
 
   const selectedQuota = ruleList.find(r => r.id === selectedPostTypeId);
@@ -751,6 +757,27 @@ export default function StudioPage() {
                       <option key={intent.id} value={intent.id} className="bg-white text-[#1C1C1E]">
                         {intent.display_name || intent.name.replace(/_/g, ' ')}
                       </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8B8A93]" />
+                </div>
+              </div>
+
+              {/* Format Dropdown */}
+              <div className="flex flex-col space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-[#1C1C1E]">Anatomy:</label>
+                  <span className="text-[9px] text-[#776497] font-semibold">Exact journey</span>
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedAnatomyId}
+                    onChange={e => setSelectedAnatomyId(e.target.value)}
+                    disabled={!underlyingPillarId}
+                    className="h-9 w-full px-3 py-1 pr-8 rounded-xl border border-[#8B8A93]/20 bg-white text-xs text-[#1C1C1E] appearance-none cursor-pointer font-medium focus:outline-none focus:ring-2 focus:ring-[#A78BE0]/40 disabled:opacity-60 disabled:cursor-not-allowed">
+                    <option value="auto">Auto-select from intent</option>
+                    {eligibleAnatomies.map(item => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
                     ))}
                   </select>
                   <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8B8A93]" />
@@ -1088,5 +1115,3 @@ export default function StudioPage() {
     </div>
   );
 }
-
-

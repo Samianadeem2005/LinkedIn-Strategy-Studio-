@@ -8,8 +8,16 @@ const postTypes = db.prepare('SELECT * FROM post_types ORDER BY name ASC').all()
 const contentIntents = db.prepare('SELECT * FROM content_intents ORDER BY priority ASC, name ASC').all() as any[];
 const postAnatomy = db.prepare("SELECT * FROM post_anatomy WHERE entity_type = 'anatomy' ORDER BY order_index ASC").all() as any[];
 const anatomyIntents = db.prepare('SELECT * FROM anatomy_intents').all() as any[];
-const postComponents = db.prepare('SELECT * FROM post_components ORDER BY order_index ASC, name ASC').all() as any[];
-const anatomyComponents = db.prepare('SELECT * FROM anatomy_components ORDER BY order_index ASC').all() as any[];
+const postComponents = db.prepare(`
+  SELECT * FROM post_components
+  ORDER BY CASE name
+    WHEN 'Hook' THEN 0
+    WHEN 'Context' THEN 1
+    WHEN 'Body' THEN 2
+    WHEN 'CTA' THEN 3
+    WHEN 'Visual Suggestion' THEN 4
+  END
+`).all() as any[];
 const writingMechanics = db.prepare('SELECT * FROM writing_mechanics WHERE enabled = 1 ORDER BY order_index ASC').all() as any[];
 const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as any;
 const hookTypes = db.prepare('SELECT * FROM hook_types ORDER BY name ASC').all() as any[];
@@ -93,16 +101,6 @@ postTypes.forEach(pt => {
     if (anat.constraints) {
       markdown += `- **Constraints**: ${anat.constraints}\n`;
     }
-    const mappedComponents = anatomyComponents
-      .filter(ac => ac.anatomy_id === anat.id)
-      .map(ac => postComponents.find(pc => pc.id === ac.component_id))
-      .filter(Boolean);
-    if (mappedComponents.length > 0) {
-      markdown += `- **Post Components**:\n`;
-      mappedComponents.forEach((component: any) => {
-        markdown += `  - ${component.name}: ${component.instructions}\n`;
-      });
-    }
     markdown += `\n`;
   });
 
@@ -134,6 +132,12 @@ postTypes.forEach(pt => {
 
 // System Mechanics & Global Directives
 markdown += `# Global Writing Mechanics & System Directives\n\n`;
+
+markdown += `## Universal Post Components (Global Order)\n\n`;
+postComponents.forEach((component: any) => {
+  markdown += `- **${component.name}**: ${component.instructions}\n`;
+});
+markdown += `\n`;
 
 markdown += `## 1. Writing Mechanics Directives (DB Configured)\n\n`;
 writingMechanics.forEach(wm => {
@@ -187,7 +191,7 @@ markdown += `  CONTENT INTENT (Deterministically resolved from semantic notes si
 markdown += `        ↓\n`;
 markdown += `ELIGIBLE ANATOMIES (Filtered by Pillar + Intent via anatomy_intents)\n`;
 markdown += `        ↓\n`;
-markdown += `  ANATOMY (First configured anatomy by deterministic order)\n`;
+markdown += `  ANATOMY (Explicitly selected Anatomy, or first eligible fallback)\n`;
 markdown += `        ↓\n`;
 markdown += `    HOOK TYPE POOL (Top 5 configured hook formulas matching pillar)\n`;
 markdown += `        ↓\n`;

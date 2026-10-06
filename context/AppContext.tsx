@@ -79,6 +79,7 @@ export interface GenerationParams {
   selectedHooks: string[];
   selectedHookIds: string[];
   contentIntentId?: string | null;
+  anatomyId?: string | null;
 }
 
 export interface GenerationResult {
@@ -218,7 +219,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           webResults: resultsText,
           selectedHooks: params.selectedHooks,
           selectedHookIds: params.selectedHookIds,
-          contentIntentId: params.contentIntentId
+          contentIntentId: params.contentIntentId,
+          anatomyId: params.anatomyId
         }),
       });
       const data = await genRes.json();
@@ -254,7 +256,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           postId: data.postId ?? null,
           postFormat: params.postFormat,
           postDate: params.postDate,
-          contentIntentId: params.contentIntentId
+          contentIntentId: params.contentIntentId,
+          anatomyId: params.anatomyId
         }));
       } catch { }
 

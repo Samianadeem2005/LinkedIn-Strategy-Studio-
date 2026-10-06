@@ -21,6 +21,7 @@ export function getDb(): Database.Database {
     deduplicatePostComponents(db);
     consolidateNamedPostComponents(db);
     migrateUniversalPostComponentsAndAnatomyJourneys(db);
+    migrateGlobalUniversalPostComponents(db);
   }
   return db;
 }
@@ -61,13 +62,6 @@ function initSchema(db: Database.Database) {
       order_index INTEGER NOT NULL DEFAULT 0,
       enabled INTEGER NOT NULL DEFAULT 1,
       post_type_id TEXT REFERENCES post_types(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS anatomy_components (
-      anatomy_id TEXT NOT NULL REFERENCES post_anatomy(id) ON DELETE CASCADE,
-      component_id TEXT NOT NULL REFERENCES post_components(id) ON DELETE CASCADE,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (anatomy_id, component_id)
     );
 
     CREATE TABLE IF NOT EXISTS weekly_mapping (
@@ -480,6 +474,14 @@ function applyWritingStyleMigration(db: Database.Database) {
 function migrateAnatomyComponentsAndRemoveLru(db: Database.Database) {
   const migrationId = '2026-10-06-separate-post-components-remove-lru';
   if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS anatomy_components (
+      anatomy_id TEXT NOT NULL REFERENCES post_anatomy(id) ON DELETE CASCADE,
+      component_id TEXT NOT NULL REFERENCES post_components(id) ON DELETE CASCADE,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (anatomy_id, component_id)
+    )
+  `);
 
   const componentNames = ['Hook', 'Rehook', 'Context', 'Breakdown', 'CTA', 'Lesson', 'Nudge', 'Pivot', 'Visual Suggestion'];
   const placeholders = componentNames.map(() => '?').join(', ');
@@ -762,18 +764,71 @@ export interface PostComponent {
   instructions: string;
   order_index: number;
   enabled: number;
-  post_type_id: string | null;
 }
 
-export function getComponentsForAnatomy(anatomyId: string): PostComponent[] {
+export function getUniversalPostComponents(): PostComponent[] {
   const db = getDb();
   return db.prepare(`
     SELECT pc.*
     FROM post_components pc
-    JOIN anatomy_components ac ON ac.component_id = pc.id
-    WHERE ac.anatomy_id = ? AND pc.enabled = 1
-    ORDER BY ac.order_index ASC, pc.order_index ASC, pc.name ASC
-  `).all(anatomyId) as PostComponent[];
+    WHERE pc.enabled = 1
+    ORDER BY CASE pc.name
+      WHEN 'Hook' THEN 0
+      WHEN 'Context' THEN 1
+      WHEN 'Body' THEN 2
+      WHEN 'CTA' THEN 3
+      WHEN 'Visual Suggestion' THEN 4
+      ELSE 99
+    END
+  `).all() as PostComponent[];
+}
+
+function migrateGlobalUniversalPostComponents(db: Database.Database) {
+  const migrationId = '2026-10-06-global-universal-post-components';
+  db.prepare('DROP TABLE IF EXISTS anatomy_components').run();
+  if (db.prepare('SELECT 1 FROM system_migrations WHERE id = ?').get(migrationId)) return;
+
+  const allowed = ['Hook', 'Context', 'Body', 'CTA', 'Visual Suggestion'];
+  db.transaction(() => {
+    const placeholders = allowed.map(() => '?').join(', ');
+    db.prepare(`DELETE FROM post_components WHERE name NOT IN (${placeholders})`).run(...allowed);
+    const canonical = new Map<string, string>();
+    const rows = db.prepare('SELECT id, name FROM post_components ORDER BY id').all() as { id: string; name: string }[];
+    for (const row of rows) {
+      if (canonical.has(row.name)) {
+        db.prepare('DELETE FROM post_components WHERE id = ?').run(row.id);
+      } else {
+        canonical.set(row.name, row.id);
+      }
+    }
+    const update = db.prepare('UPDATE post_components SET component_type = ?, order_index = ?, enabled = 1 WHERE id = ?');
+    allowed.forEach((name, index) => {
+      const id = canonical.get(name);
+      if (id) update.run(name.toLowerCase().replace(/\s+/g, '_'), index, id);
+    });
+    const columns = (db.prepare('PRAGMA table_info(post_components)').all() as { name: string }[]).map(c => c.name);
+    if (columns.includes('post_type_id')) {
+      db.exec(`
+        CREATE TABLE post_components_global (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          component_type TEXT NOT NULL,
+          purpose TEXT,
+          instructions TEXT NOT NULL,
+          order_index INTEGER NOT NULL DEFAULT 0,
+          enabled INTEGER NOT NULL DEFAULT 1
+        );
+        INSERT INTO post_components_global
+          (id, name, description, component_type, purpose, instructions, order_index, enabled)
+        SELECT id, name, description, component_type, purpose, instructions, order_index, enabled
+        FROM post_components;
+        DROP TABLE post_components;
+        ALTER TABLE post_components_global RENAME TO post_components;
+      `);
+    }
+    db.prepare('INSERT INTO system_migrations (id, applied_at) VALUES (?, ?)').run(migrationId, new Date().toISOString());
+  })();
 }
 
 function seedIfEmpty(db: Database.Database) {
